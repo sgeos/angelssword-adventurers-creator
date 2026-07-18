@@ -5,8 +5,12 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+<<<<<<< HEAD
     "test:api": "node --test test/integration/api/**/*.test.js",
     "test": "npm run test:api"
+=======
+    "test:unit": "node --test test/unit/**/*.test.js"
+>>>>>>> origin/cursor/extracted-utilities-characterization-0afd
   },
   "dependencies": {
     "express": "^4.21.0",
