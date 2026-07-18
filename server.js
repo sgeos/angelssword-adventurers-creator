@@ -7,7 +7,7 @@
  */
 
 const express = require('express');
-const fetch = require('node-fetch');
+const fetchImpl = globalThis.__AS_FETCH__ || require('node-fetch');
 const FormData = require('form-data');
 const path = require('path');
 const { exec } = require('child_process');
@@ -51,7 +51,7 @@ app.post('/api/generate', async (req, res) => {
 
     try {
         console.log('  [PROXY] POST /api/generate →  OpenAI /v1/images/generations');
-        const response = await fetch('https://api.openai.com/v1/images/generations', {
+        const response = await fetchImpl('https://api.openai.com/v1/images/generations', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -126,7 +126,7 @@ app.post('/api/edits', async (req, res) => {
             });
         }
 
-        const response = await fetch('https://api.openai.com/v1/images/edits', {
+        const response = await fetchImpl('https://api.openai.com/v1/images/edits', {
             method: 'POST',
             headers: {
                 'Authorization': authHeader,
@@ -158,7 +158,7 @@ app.post('/api/chat', async (req, res) => {
 
     try {
         console.log('  [PROXY] POST /api/chat → OpenAI /v1/chat/completions');
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        const response = await fetchImpl('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -202,7 +202,7 @@ app.post('/api/video/generate', async (req, res) => {
         const url = `https://generativelanguage.googleapis.com/v1beta/interactions?key=${apiKey}`;
         console.log('  [PROXY] URL:', url.replace(apiKey, apiKey.substring(0, 8) + '...'));
 
-        const response = await fetch(url, {
+        const response = await fetchImpl(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -248,7 +248,7 @@ app.post('/api/video/poll', async (req, res) => {
         }
 
         const url = `https://generativelanguage.googleapis.com/v1beta/${operationName}?key=${apiKey}`;
-        const response = await fetch(url, { method: 'GET', timeout: 30000 });
+        const response = await fetchImpl(url, { method: 'GET', timeout: 30000 });
         const data = await response.text();
         res.status(response.status).type('application/json').send(data);
     } catch (err) {
@@ -258,17 +258,21 @@ app.post('/api/video/poll', async (req, res) => {
 });
 
 // --- Server Start ---
-app.listen(PORT, () => {
-    console.log('');
-    console.log('  ⚔️  AS Adventurer — VTuber Creation Pipeline');
-    console.log('  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log(`  Server running at http://localhost:${PORT}`);
-    console.log('  Press Ctrl+C to stop');
-    console.log('');
+if (require.main === module) {
+    app.listen(PORT, () => {
+        console.log('');
+        console.log('  ⚔️  AS Adventurer — VTuber Creation Pipeline');
+        console.log('  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log(`  Server running at http://localhost:${PORT}`);
+        console.log('  Press Ctrl+C to stop');
+        console.log('');
 
-    // Auto-open browser
-    const url = `http://localhost:${PORT}`;
-    const start = process.platform === 'win32' ? 'start' :
-                  process.platform === 'darwin' ? 'open' : 'xdg-open';
-    exec(`${start} ${url}`);
-});
+        // Auto-open browser
+        const url = `http://localhost:${PORT}`;
+        const start = process.platform === 'win32' ? 'start' :
+                      process.platform === 'darwin' ? 'open' : 'xdg-open';
+        exec(`${start} ${url}`);
+    });
+}
+
+module.exports = { app };

@@ -4,3 +4,6 @@ backup/
 .env
 *.log
 *.lnk
+test-results/
+playwright-report/
+blob-report/
