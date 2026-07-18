@@ -4,7 +4,9 @@
   "description": "⚔️ AS Adventurer — VTuber Creation Pipeline by Angel's Sword Studios",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test:api": "node --test test/integration/api/**/*.test.js",
+    "test": "npm run test:api"
   },
   "dependencies": {
     "express": "^4.21.0",
@@ -17,6 +19,7 @@
   "private": true,
   "devDependencies": {
     "rcedit": "^5.0.2",
-    "sharp": "^0.35.3"
+    "sharp": "^0.35.3",
+    "supertest": "^7.1.0"
   }
 }
