@@ -22,6 +22,10 @@
 (function () {
     'use strict';
 
+    const VideoPrepCore = (typeof window !== 'undefined' && window.VideoPrepCore)
+        ? window.VideoPrepCore
+        : null;
+
     // ================================================================
     // STATE
     // ================================================================
@@ -152,14 +156,11 @@
 
     /** Get output frame count based on loop mode and loop point */
     function getOutputFrameCount() {
-        if (state.loopPoint < 2) return state.totalFrames;
-        const n = state.loopPoint + 1; // frames 0..loopPoint
-        switch (state.loopMode) {
-            case 'pingpong': return n + Math.max(0, n - 2); // 0→N→0 (no duplicate of endpoints)
-            case 'reverse':  return n;                       // N→0
-            case 'none':
-            default:         return n;                       // 0→N
-        }
+        return VideoPrepCore.getOutputFrameCount({
+            loopPoint: state.loopPoint,
+            loopMode: state.loopMode,
+            totalFrames: state.totalFrames,
+        });
     }
 
     // ================================================================
@@ -564,23 +565,7 @@
         }
 
         // ── Phase 2: Build playback sequence based on mode ──
-        const sequence = [];
-        switch (state.loopMode) {
-            case 'pingpong':
-                // 0 → N → 0
-                for (let i = 0; i < frames.length; i++) sequence.push(i);
-                for (let i = frames.length - 2; i >= 1; i--) sequence.push(i);
-                break;
-            case 'reverse':
-                // N → 0
-                for (let i = frames.length - 1; i >= 0; i--) sequence.push(i);
-                break;
-            case 'none':
-            default:
-                // 0 → N
-                for (let i = 0; i < frames.length; i++) sequence.push(i);
-                break;
-        }
+        const sequence = VideoPrepCore.buildLoopSequence(frames.length, state.loopMode);
 
         let idx = 0;
         const frameDelay = (loopTime * 1000) / frames.length;
@@ -706,17 +691,18 @@
      */
     function buildCrossfadeFrames(v1Frames, v2Frames, w, h) {
         const count = Math.min(v1Frames.length, v2Frames.length);
+        const alphas = VideoPrepCore.buildCrossfadeAlphas(count);
         const result = [];
         for (let i = 0; i < count; i++) {
-            const t = i / (count - 1); // 0 → 1
+            const { alpha1, alpha2 } = alphas[i];
             const fc = document.createElement('canvas');
             fc.width = w; fc.height = h;
             const ctx = fc.getContext('2d');
             // Draw video 1 frame
-            ctx.globalAlpha = 1 - t;
+            ctx.globalAlpha = alpha1;
             ctx.drawImage(v1Frames[i], 0, 0, w, h);
             // Draw video 2 frame on top
-            ctx.globalAlpha = t;
+            ctx.globalAlpha = alpha2;
             ctx.drawImage(v2Frames[i], 0, 0, w, h);
             ctx.globalAlpha = 1.0;
             result.push(fc);
@@ -743,32 +729,12 @@
             ? parseInt(document.getElementById('vpCrossfadeDuration')?.value || '300')
             : 0;
 
-        // Pack handoff data
-        window.ASAdventurer.handoff.videoPrepData = {
-            // Primary video
-            videoSrc: state.video.src,
-            videoWidth: state.videoWidth,
-            videoHeight: state.videoHeight,
-            duration: state.duration,
-            fps: state.fps,
-            totalFrames: state.totalFrames,
-
-            // Loop config
-            loopMode: state.loopMode,
-            loopPoint: state.loopPoint,
-            outputFrameCount: getOutputFrameCount(),
-
-            // Concatenation
-            concat: state.concatLoaded ? {
-                videoSrc: state.concatVideo.src,
-                videoWidth: state.concatWidth,
-                videoHeight: state.concatHeight,
-                duration: state.concatDuration,
-                fps: state.concatFps,
-                crossfade: crossfadeEnabled,
-                crossfadeDuration: crossfadeDuration,
-            } : null,
-        };
+        // Pack handoff data via pure core (matches prior sendToExporter shape)
+        window.ASAdventurer.handoff.videoPrepData = VideoPrepCore.buildVideoPrepHandoffPayload(state, {
+            concatEnabled: state.concatLoaded,
+            crossfade: crossfadeEnabled,
+            crossfadeDuration: crossfadeDuration,
+        });
 
         window.showToast('Video data sent to Model Exporter!', 'success');
         window.switchTab('tab-exporter');
