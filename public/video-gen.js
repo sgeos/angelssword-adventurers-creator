@@ -9,6 +9,10 @@
 (function() {
     'use strict';
 
+    const VideoGenCore = (typeof window !== 'undefined' && window.VideoGenCore)
+        ? window.VideoGenCore
+        : null;
+
     // ============================================
     // STATE
     // ============================================
@@ -156,52 +160,14 @@
     }
 
     async function generateOneVideo(apiKey, prompt, duration, mode) {
-        // Build the Gemini Omni Flash Interactions API request
-        // Docs: https://ai.google.dev/gemini-api/docs/omni
-        // REST: POST https://generativelanguage.googleapis.com/v1beta/interactions?key=$API_KEY
-        //
-        // Text-only:  { model, input: "text string" }
-        // Image+text: { model, input: [{type:"image",data:"b64",mime_type:"image/png"},{type:"text",text:"prompt"}],
-        //              generation_config: { video_config: { task: "image_to_video" } } }
-
-        const textPrompt = prompt || 'Generate a gentle breathing idle animation with slight body sway. Keep the character on the same background.';
-
-        const requestBody = {
-            model: 'gemini-omni-flash-preview'
-        };
-
-        // Build input — either a string (text-only) or an array (image + text)
-        if (mode === 'keyframe' && referenceImages.length >= 2) {
-            // Keyframe mode: Gemini Omni Flash only supports 1 image.
-            // Send the start frame as the image, and incorporate the end
-            // frame concept into the text prompt for motion guidance.
-            const startRef = referenceImages[0];
-            const startRaw = startRef.dataUrl.includes(',') ? startRef.dataUrl.split(',')[1] : startRef.dataUrl;
-            const startMime = startRef.dataUrl.includes('image/png') ? 'image/png' : 'image/jpeg';
-
-            requestBody.input = [
-                { type: 'image', data: startRaw, mime_type: startMime },
-                { type: 'text', text: `Starting from this image (start frame), animate the character transitioning to the end pose. ${textPrompt}` }
-            ];
-            requestBody.generation_config = {
-                video_config: { task: 'image_to_video' }
-            };
-        } else if (referenceImages.length > 0) {
-            // Reference mode: single image + prompt
-            const ref = referenceImages[0];
-            const raw = ref.dataUrl.includes(',') ? ref.dataUrl.split(',')[1] : ref.dataUrl;
-            const mimeType = ref.dataUrl.includes('image/png') ? 'image/png' : 'image/jpeg';
-
-            requestBody.input = [
-                { type: 'image', data: raw, mime_type: mimeType },
-                { type: 'text', text: textPrompt }
-            ];
-            requestBody.generation_config = {
-                video_config: { task: 'image_to_video' }
-            };
-        } else {
-            requestBody.input = textPrompt;
-        }
+        // Build the Gemini Omni Flash Interactions API request via pure core.
+        // Quirk: `duration` is collected by the UI but is NOT placed in the POST body.
+        // Quirk: keyframe end image is loaded in UI but NOT sent (only first/start image).
+        const requestBody = VideoGenCore.buildVideoRequestBody({
+            prompt,
+            mode,
+            referenceImages
+        });
 
         // Send through proxy
         const response = await fetch('/api/video/generate', {
@@ -264,51 +230,14 @@
     }
 
     function extractVideoFromResponse(data) {
-        // Interactions API response format:
-        // { steps: [
-        //   { type: "user_input", content: [...] },
-        //   { type: "thought", content: [...] },
-        //   { type: "model_output", content: [
-        //     { type: "video", mime_type: "video/mp4", data: "base64..." }
-        //   ]}
-        // ], id: "...", status: "completed", model: "gemini-omni-flash-preview" }
-
-        // Pattern 1: Interactions API — steps[] with model_output
-        if (data.steps && Array.isArray(data.steps)) {
-            for (const step of data.steps) {
-                if (step.type === 'model_output' && step.content) {
-                    for (const item of step.content) {
-                        if (item.type === 'video' && item.data) {
-                            const mimeType = item.mime_type || 'video/mp4';
-                            const blob = base64ToBlob(item.data, mimeType);
-                            return { blob, url: URL.createObjectURL(blob) };
-                        }
-                    }
-                }
-            }
+        // Pure extract → { mimeType, base64 } | null; Blob/URL stay here.
+        const payload = VideoGenCore.extractVideoPayload(data);
+        if (!payload) {
+            console.warn('[VideoGen] Could not extract video from response:', JSON.stringify(data).substring(0, 1000));
+            throw new Error('No video data found in API response. Check the console for details.');
         }
-
-        // Pattern 2: generateContent format (candidates/parts) — fallback
-        if (data.candidates) {
-            for (const candidate of data.candidates) {
-                if (candidate.content?.parts) {
-                    for (const part of candidate.content.parts) {
-                        if (part.inlineData?.mimeType?.startsWith('video/')) {
-                            const blob = base64ToBlob(part.inlineData.data, part.inlineData.mimeType);
-                            return { blob, url: URL.createObjectURL(blob) };
-                        }
-                    }
-                }
-            }
-        }
-
-        // Pattern 3: Nested result (from polled operation)
-        if (data.result) {
-            return extractVideoFromResponse(data.result);
-        }
-
-        console.warn('[VideoGen] Could not extract video from response:', JSON.stringify(data).substring(0, 1000));
-        throw new Error('No video data found in API response. Check the console for details.');
+        const blob = base64ToBlob(payload.base64, payload.mimeType);
+        return { blob, url: URL.createObjectURL(blob) };
     }
 
     // ============================================
@@ -413,9 +342,8 @@
             return;
         }
 
-        // Send the first selected video
-        const idx = Array.from(selectedVideos)[0];
-        const video = generatedVideos[idx];
+        // Quirk: multi-select UI, but handoff uses only the first selected index
+        const video = VideoGenCore.pickHandoffVideo(generatedVideos, Array.from(selectedVideos));
 
         if (video) {
             window.ASAdventurer.handoff.videoBlob = video.blob;
