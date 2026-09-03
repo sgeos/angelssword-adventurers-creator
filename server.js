@@ -266,9 +266,14 @@ app.listen(PORT, () => {
     console.log('  Press Ctrl+C to stop');
     console.log('');
 
-    // Auto-open browser
-    const url = `http://localhost:${PORT}`;
-    const start = process.platform === 'win32' ? 'start' :
-                  process.platform === 'darwin' ? 'open' : 'xdg-open';
-    exec(`${start} ${url}`);
+    // Auto-open browser. Set AS_NO_OPEN=1 to suppress it, which matters for
+    // headless CI and for the BSDs, where xdg-open comes from xdg-utils and
+    // is frequently not installed.
+    if (process.env.AS_NO_OPEN !== '1') {
+        const url = `http://localhost:${PORT}`;
+        const opener = process.platform === 'win32' ? 'start' :
+                       process.platform === 'darwin' ? 'open' : 'xdg-open';
+        // Failure is not fatal. The URL is printed above either way.
+        exec(`${opener} ${url}`, () => {});
+    }
 });
