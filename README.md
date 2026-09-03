@@ -10,7 +10,7 @@
 
 AS Adventurer Creator is a standalone desktop tool that lets you create animated VTuber / PNGtuber assets from scratch. It walks you through a simple 4-step pipeline — from a static sprite all the way to a transparent, looping animated model ready for streaming.
 
-No installation required. Just run `ASAdventurer.exe` and open your browser.
+No installation required for the prebuilt binary. Run it and open your browser. From source, Node.js 18 or newer is the only prerequisite.
 
 ---
 
@@ -178,13 +178,16 @@ recipient clearing the quarantine attribute by hand.
 
 ## File Structure
 
+The built distribution, where the binary and launcher names follow the
+platform they were built on:
+
 ```
 ASAdventurer/
-├── ASAdventurer.exe          ← Main application (double-click to run)
-├── Start AS Adventurer.bat   ← Launcher with console output
-├── README.md                 ← This file
-├── icon.ico                  ← Application icon
-└── public/                   ← UI files (do not modify)
+├── ASAdventurer[.exe]                ← Main application (double-click to run)
+├── Start AS Adventurer.[bat|command|sh]  ← Launcher with console output
+├── README.md                         ← This file
+├── icon.ico                          ← Application icon (Windows builds only)
+└── public/                           ← UI files (do not modify)
     ├── index.html
     ├── style.css
     ├── sprite-prep.js

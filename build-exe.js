@@ -99,7 +99,7 @@ if (fs.existsSync(DIST)) {
 }
 fs.mkdirSync(DIST, { recursive: true });
 
-// 3. Compile EXE with pkg
+// 3. Compile the binary with pkg
 log(`Compiling server.js → ${HOST.binary} (${HOST.target}) ...`);
 const ICON = path.join(ROOT, 'icon.ico');
 const BIN = path.join(DIST, HOST.binary);
