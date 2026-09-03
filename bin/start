@@ -1,0 +1,56 @@
+#!/bin/sh
+#
+# AS Adventurer launcher for macOS, Linux, and the BSDs.
+#
+# POSIX sh only. /bin/sh is not bash on FreeBSD, OpenBSD, or NetBSD, so
+# bashisms here would fail there while passing everywhere else.
+#
+# This script does not install anything. On a multi-user or packaged system
+# that is the operator's decision, not the launcher's, so a missing
+# dependency is reported and the script exits non-zero.
+
+set -eu
+
+# Finder starts .command files in $HOME, so the working directory cannot be
+# trusted. Resolve the repository root from this script's own path instead.
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+cd "$SCRIPT_DIR/.."
+
+if ! command -v node >/dev/null 2>&1; then
+    printf 'AS Adventurer requires Node.js, which is not on PATH.\n\n' >&2
+    case "$(uname -s)" in
+        Darwin)
+            printf '  brew install node\n' >&2
+            printf '  sudo port install nodejs22    MacPorts\n' >&2 ;;
+        Linux)
+            printf '  apt install nodejs npm    Debian and Ubuntu\n' >&2
+            printf '  dnf install nodejs        Fedora and RHEL\n' >&2
+            printf '  pacman -S nodejs npm      Arch\n' >&2 ;;
+        FreeBSD)
+            printf '  pkg install node npm\n' >&2 ;;
+        OpenBSD)
+            printf '  pkg_add node\n' >&2 ;;
+        NetBSD)
+            printf '  pkgin install nodejs\n' >&2 ;;
+        *)
+            printf '  See https://nodejs.org/\n' >&2 ;;
+    esac
+    printf '\n' >&2
+    exit 1
+fi
+
+# Node is available by this point, so let it compare its own version rather
+# than parsing a version string in the shell.
+NODE_MAJOR=$(node -p 'process.versions.node.split(".")[0]')
+if [ "$NODE_MAJOR" -lt 18 ]; then
+    printf 'AS Adventurer requires Node.js 18 or newer. Found %s.\n' "$(node --version)" >&2
+    exit 1
+fi
+
+if [ ! -d node_modules ]; then
+    printf '  Installing dependencies...\n'
+    npm install
+fi
+
+# exec so that the server replaces this shell and receives Ctrl+C directly.
+exec node server.js

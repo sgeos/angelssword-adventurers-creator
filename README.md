@@ -16,9 +16,28 @@ No installation required. Just run `ASAdventurer.exe` and open your browser.
 
 ## Quick Start
 
+**Windows**
+
 1. **Double-click** `ASAdventurer.exe` (or use `Start AS Adventurer.bat`)
 2. Your browser will open to `http://localhost:3001`
 3. Follow the 4-step pipeline below
+
+**macOS**
+
+1. **Double-click** `Start ASAdventurer.command`
+2. Your browser will open to `http://localhost:3001`
+
+**Linux and the BSDs**
+
+```sh
+./bin/start          # or simply: npm start
+```
+
+The launcher checks for Node.js and reports the install command for your
+platform if it is missing. It does not install anything itself.
+
+Set `AS_NO_OPEN=1` to stop the server opening a browser, which is useful
+headless and on systems without `xdg-open`.
 
 ---
 
@@ -136,10 +155,24 @@ The exported WebM files also work with any OBS browser source, PNGtuber app, or 
 
 ## System Requirements
 
-- **OS:** Windows 10/11 (64-bit)
+- **OS:** Windows 10/11, macOS, Linux, or FreeBSD/OpenBSD/NetBSD (64-bit)
+- **Node.js:** 18 or newer, required on every platform except when running a
+  prebuilt binary on Windows or macOS
 - **Browser:** Chrome, Edge, or Firefox (opens automatically)
 - **Internet:** Required only for AI generation steps (Steps 1-2). Steps 3-4 work fully offline.
 - **Disk Space:** ~40 MB for the application
+
+### Building a standalone binary
+
+`node build-exe.js` produces a self-contained binary for the platform it is
+run on, into `dist/ASAdventurer/`. Windows, macOS, and Linux are supported.
+The BSDs are not, because `pkg` publishes no base binary for them; run the
+application with `npm start` there instead.
+
+On macOS the build applies an ad-hoc code signature so the result runs on the
+machine that produced it. That is not notarization. Distributing the binary to
+another Mac requires an Apple Developer ID and a notarization step, or the
+recipient clearing the quarantine attribute by hand.
 
 ---
 
