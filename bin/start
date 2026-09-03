@@ -40,14 +40,30 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 
 # Node is available by this point, so let it compare its own version rather
-# than parsing a version string in the shell.
-NODE_MAJOR=$(node -p 'process.versions.node.split(".")[0]')
+# than parsing a version string in the shell. A failure here means node is on
+# PATH but not working, which set -e would otherwise report as silence.
+NODE_MAJOR=$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null) || NODE_MAJOR=''
+case "$NODE_MAJOR" in
+    ''|*[!0-9]*)
+        printf 'Found node at %s but could not read its version.\n' "$(command -v node)" >&2
+        printf 'The installation appears to be broken.\n' >&2
+        exit 1 ;;
+esac
+
 if [ "$NODE_MAJOR" -lt 18 ]; then
     printf 'AS Adventurer requires Node.js 18 or newer. Found %s.\n' "$(node --version)" >&2
     exit 1
 fi
 
 if [ ! -d node_modules ]; then
+    # Several distributions ship nodejs and npm as separate packages, so the
+    # presence of node says nothing about npm.
+    if ! command -v npm >/dev/null 2>&1; then
+        printf 'Dependencies are not installed and npm is not on PATH.\n' >&2
+        printf 'npm is packaged separately from nodejs on some systems.\n\n' >&2
+        printf 'Install npm, then run:  npm install\n\n' >&2
+        exit 1
+    fi
     printf '  Installing dependencies...\n'
     npm install
 fi
