@@ -9,7 +9,7 @@
  * Output goes to: dist/ASAdventurer/
  *   ├── ASAdventurer[.exe]
  *   ├── public/          (UI files: sprite-prep, video-prep, model-exporter)
- *   └── Start AS Adventurer.[bat|command]
+ *   └── Start AS Adventurer.[bat|command|sh]
  *
  * pkg ships prebuilt base binaries for Windows, macOS, and Linux only. There
  * is no FreeBSD, OpenBSD, or NetBSD target, so on those systems this script
@@ -30,7 +30,7 @@ const ARCH = { x64: 'x64', arm64: 'arm64' }[process.arch];
 const HOST = !ARCH ? null : {
   win32:  { target: `node18-win-${ARCH}`,   binary: 'ASAdventurer.exe', launcher: 'bat' },
   darwin: { target: `node18-macos-${ARCH}`, binary: 'ASAdventurer',     launcher: 'command' },
-  linux:  { target: `node18-linux-${ARCH}`, binary: 'ASAdventurer',     launcher: 'command' }
+  linux:  { target: `node18-linux-${ARCH}`, binary: 'ASAdventurer',     launcher: 'sh' }
 }[process.platform];
 
 if (!HOST) {
@@ -165,11 +165,11 @@ pause
 } else {
   // Named .command so Finder will run it on a double-click. Harmless on
   // Linux, where it is an ordinary POSIX script.
-  const launcher = path.join(DIST, 'Start AS Adventurer.command');
+  const launcher = path.join(DIST, `Start AS Adventurer.${HOST.launcher}`);
   fs.writeFileSync(launcher,
 `#!/bin/sh
 set -eu
-cd "$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
+cd "$(CDPATH='' cd -- "$(dirname "$0")" && pwd)"
 printf '\n  AS Adventurer\n  Open your browser to: http://localhost:3001\n\n'
 exec ./${HOST.binary}
 `);

@@ -13,7 +13,7 @@ set -eu
 
 # Finder starts .command files in $HOME, so the working directory cannot be
 # trusted. Resolve the repository root from this script's own path instead.
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname "$0")" && pwd)
 cd "$SCRIPT_DIR/.."
 
 if ! command -v node >/dev/null 2>&1; then
