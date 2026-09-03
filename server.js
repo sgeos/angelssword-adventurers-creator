@@ -10,7 +10,7 @@ const express = require('express');
 const fetch = require('node-fetch');
 const FormData = require('form-data');
 const path = require('path');
-const { exec } = require('child_process');
+const { execFile } = require('child_process');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -271,9 +271,15 @@ app.listen(PORT, () => {
     // is frequently not installed.
     if (process.env.AS_NO_OPEN !== '1') {
         const url = `http://localhost:${PORT}`;
-        const opener = process.platform === 'win32' ? 'start' :
-                       process.platform === 'darwin' ? 'open' : 'xdg-open';
+        // execFile rather than exec, so there is no shell and PORT cannot be
+        // interpolated into a command line. On Windows `start` is a cmd
+        // builtin, and its first quoted argument is the window title.
+        const [opener, args] = process.platform === 'win32'
+            ? ['cmd', ['/c', 'start', '', url]]
+            : process.platform === 'darwin'
+                ? ['open', [url]]
+                : ['xdg-open', [url]];
         // Failure is not fatal. The URL is printed above either way.
-        exec(`${opener} ${url}`, () => {});
+        execFile(opener, args, () => {});
     }
 });
