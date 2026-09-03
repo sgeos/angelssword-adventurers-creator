@@ -11,9 +11,10 @@
  *   ├── public/          (UI files: sprite-prep, video-prep, model-exporter)
  *   └── Start AS Adventurer.[bat|command|sh]
  *
- * pkg ships prebuilt base binaries for Windows, macOS, and Linux only. There
- * is no FreeBSD, OpenBSD, or NetBSD target, so on those systems this script
- * refuses rather than producing something broken. `npm start` works there.
+ * pkg ships prebuilt base binaries for Windows, macOS, and Linux only. It
+ * recognises a freebsd target name, but no binary is published for it and
+ * pkg will not cross-build one, so on the BSDs this script refuses rather
+ * than producing something broken. `npm start` works there regardless.
  *
  * pkg itself is archived upstream, which is why the targets stop at Node 18.
  * Node's own single executable applications feature is the eventual
