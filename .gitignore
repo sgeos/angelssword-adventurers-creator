@@ -1,6 +1,1 @@
 node_modules/
-dist/
-backup/
-.env
-*.log
-*.lnk

@@ -1,0 +1,126 @@
+{
+  // ===================================================================
+  // Strict TypeScript, tuned against LLM-authored code.
+  //
+  // WHAT THIS FILE CANNOT DO
+  //
+  // It cannot ban `any`. No compiler flag exists. `noImplicitAny` only
+  // forces you to type the word rather than have it inferred. The same
+  // applies to `as`, to `!`, and to every suppression comment.
+  //
+  // Those live in eslint.config.mjs, which carries roughly two thirds of
+  // the enforcement. This file alone is a strict setup with every escape
+  // hatch open. The two are a unit; do not adopt one without the other.
+  //
+  // The lint config's type-aware rules need the project service, which
+  // needs this file to include the files being linted. Keep the globs
+  // below in sync with the `files` array over there.
+  // ===================================================================
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    // ---- Runtime target -------------------------------------------
+    // Node executes TypeScript directly by stripping types, so tsc is a
+    // checker and never a build step. Adjust this block for a different
+    // runtime; everything below it is the part that matters.
+    "types": ["node"],
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "noEmit": true,
+
+    // ---- Dialect restriction ---------------------------------------
+    // Rejects every construct that needs a code-generation step: enums,
+    // value-producing namespaces, parameter properties, decorators, and
+    // import-equals. Without this the prohibition is enforced only by
+    // Node refusing to strip them, which surfaces as a run failure
+    // rather than a check failure.
+    //
+    // Losing `enum` is not a real loss. A union of string literals plus
+    // switch-exhaustiveness-check is a closer fit to a sum type.
+    "erasableSyntaxOnly": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "noUncheckedSideEffectImports": true,
+
+    // NOTE: verbatimModuleSyntax rejects ESM syntax in .ts files under a
+    // CommonJS package. Either set "type": "module" in package.json, or
+    // use the .mts extension, which is unconditionally ESM.
+
+    // ---- Soundness --------------------------------------------------
+    "strict": true,
+
+    // Indexing yields T | undefined. The single highest-value flag here
+    // and the one you will feel most.
+    "noUncheckedIndexedAccess": true,
+
+    // Separates "property absent" from "property present and undefined".
+    "exactOptionalPropertyTypes": true,
+
+    // Forces bracket syntax for index-signature reads, so a typo in a
+    // dotted name cannot silently resolve through the signature.
+    "noPropertyAccessFromIndexSignature": true,
+
+    "noImplicitOverride": true,
+
+    // LIMITATION: this verifies that third-party declarations are
+    // internally consistent. It does NOT verify they match the
+    // JavaScript they describe. A .d.ts that simply lies still passes.
+    "skipLibCheck": false,
+
+    // ---- Control flow -----------------------------------------------
+    // LIMITATION: noImplicitReturns is satisfied by
+    // `throw new Error("not implemented")`, as is every declared return
+    // type. Stub bodies are undetectable by construction, since no rule
+    // can distinguish one from a legitimate throw.
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+
+    // ---- Hygiene ----------------------------------------------------
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // ---- Legacy JavaScript ------------------------------------------
+    // DELETE BOTH if you are starting from TypeScript. They exist only so
+    // the config has effect before any .ts file exists, and they are the
+    // reason the block above is needed in eslint.config.mjs.
+    //
+    // LIMITATION: allowJs is mutually exclusive with
+    // `isolatedDeclarations`, which would force explicit types on every
+    // export at the compiler level rather than the lint level. That is a
+    // concrete reason to finish the migration rather than leave checkJs
+    // on indefinitely.
+    "allowJs": true,
+    "checkJs": true
+  },
+
+  // Recursive by construction. A directory-scoped list means a new
+  // folder is silently unchecked, and an unchecked folder is exactly
+  // where generated code goes to avoid the rules. This was a real hole
+  // found by probe: a file in an unlisted src/ was invisible to tsc,
+  // which then exited green. A false pass is worse than a failure.
+  "include": [
+    "**/*.mts",
+    "**/*.cts",
+    "**/*.ts",
+    "**/*.js",
+    "**/*.mjs",
+    "**/*.cjs"
+  ],
+
+  // Anything excluded here is unchecked, which makes it a designated
+  // hiding place: an agent that cannot satisfy the rules can satisfy them
+  // by writing the file somewhere excluded. Keep this list as short as
+  // you can bear and treat every entry as a known gap.
+  //
+  // "dist" and "node_modules" are build output and vendored code. Add
+  // your own only with a reason you would defend in review. The example
+  // that follows is a browser-source directory, which is a real gap and
+  // not a safe one.
+  "exclude": ["node_modules", "dist", "tools/probe"]
+}
