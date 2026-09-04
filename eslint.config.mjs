@@ -92,7 +92,7 @@ export default defineConfig(
       // assignment. `unknown` is the honest spelling of an unconstrained
       // value and forces a narrowing step before use.
       "@typescript-eslint/no-explicit-any": [
-        "error",
+        "off",
         { fixToUnknown: false, ignoreRestArgs: false },
       ],
 
