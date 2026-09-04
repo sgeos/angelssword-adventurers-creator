@@ -36,12 +36,27 @@ jobs:
       # it protects, which is a self-signed certificate.
       # The explicit fetch is defensive: actions/checkout does not always
       # leave a usable origin/<base> remote-tracking ref for a PR event.
+      #
+      # Each file is restored only if it EXISTS on the base branch. Without
+      # that guard the step dies with "pathspec did not match", which makes
+      # the very first PR introducing this configuration impossible to
+      # merge: the files are not on the base branch yet, by definition.
+      # Found by running this workflow for real; it is not hypothetical.
+      #
+      # The fallback does not weaken anything. If the base branch has no
+      # copy, there is no stricter version being bypassed.
       - name: Use configs from the protected branch
         if: github.event_name == 'pull_request'
         run: |
           git fetch --no-tags --depth=1 origin "+refs/heads/${GITHUB_BASE_REF}:refs/remotes/origin/${GITHUB_BASE_REF}"
-          git checkout "origin/${GITHUB_BASE_REF}" -- tsconfig.json eslint.config.mjs
-          echo "Config restored from origin/${GITHUB_BASE_REF}"
+          for f in tsconfig.json eslint.config.mjs; do
+            if git cat-file -e "origin/${GITHUB_BASE_REF}:$f" 2>/dev/null; then
+              git checkout "origin/${GITHUB_BASE_REF}" -- "$f"
+              echo "restored $f from origin/${GITHUB_BASE_REF}"
+            else
+              echo "::notice::$f is not on origin/${GITHUB_BASE_REF}; using this branch copy. Expected only for the PR that first introduces it."
+            fi
+          done
 
       - name: Typecheck
         run: npx tsc --noEmit
@@ -66,7 +81,14 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           git fetch --no-tags --depth=1 origin "+refs/heads/${GITHUB_BASE_REF}:refs/remotes/origin/${GITHUB_BASE_REF}"
-          git checkout "origin/${GITHUB_BASE_REF}" -- tsconfig.json eslint.config.mjs
+          for f in tsconfig.json eslint.config.mjs; do
+            if git cat-file -e "origin/${GITHUB_BASE_REF}:$f" 2>/dev/null; then
+              git checkout "origin/${GITHUB_BASE_REF}" -- "$f"
+              echo "restored $f from origin/${GITHUB_BASE_REF}"
+            else
+              echo "::notice::$f is not on origin/${GITHUB_BASE_REF}; using this branch copy. Expected only for the PR that first introduces it."
+            fi
+          done
 
       # Assertions are on MESSAGE TEXT, not rule ids.
       #
