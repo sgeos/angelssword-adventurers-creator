@@ -1,0 +1,163 @@
+# Goes at .github/workflows/verify.yml
+#
+# Two jobs. The first enforces the configuration; the second verifies the
+# configuration still has teeth. You want both: a config that has quietly
+# stopped working passes the first job perfectly.
+
+name: verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  enforce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # needed to read the base branch below
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      # Use `npm install` instead if the repository has no lockfile.
+      - run: npm ci
+
+      # The configs come from the BASE branch, not the branch under test.
+      # A pull request that weakens them is still measured against the
+      # strict version. Combined with CODEOWNERS, changing them for real
+      # requires an approved merge first, and until that lands the old
+      # config is what runs.
+      #
+      # This is strictly better than committing a checksum beside the file
+      # it protects, which is a self-signed certificate.
+      # The explicit fetch is defensive: actions/checkout does not always
+      # leave a usable origin/<base> remote-tracking ref for a PR event.
+      - name: Use configs from the protected branch
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "+refs/heads/${GITHUB_BASE_REF}:refs/remotes/origin/${GITHUB_BASE_REF}"
+          git checkout "origin/${GITHUB_BASE_REF}" -- tsconfig.json eslint.config.mjs
+          echo "Config restored from origin/${GITHUB_BASE_REF}"
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx eslint .
+
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - run: npm ci
+
+      - name: Use configs from the protected branch
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "+refs/heads/${GITHUB_BASE_REF}:refs/remotes/origin/${GITHUB_BASE_REF}"
+          git checkout "origin/${GITHUB_BASE_REF}" -- tsconfig.json eslint.config.mjs
+
+      # Assertions are on MESSAGE TEXT, not rule ids.
+      #
+      # A rule id is too coarse to be a safety net. `no-restricted-syntax`
+      # alone carries five distinct selectors here (type predicates,
+      # assertion signatures, function overloads, class method overloads,
+      # ambient declarations). Grepping the id lets four of them be deleted
+      # while CI stays green. Verified: removing three selectors left an
+      # id-based check passing. Message fragments are per-selector.
+      #
+      # Never assert on error COUNTS. They move between releases and a
+      # brittle check gets deleted rather than fixed.
+      - name: Syntax hatches must stay closed
+        run: |
+          set -u
+          # Copied to the ROOT on purpose. tsconfig.json excludes
+          # tools/probe, and passing tsc a file path makes it ignore
+          # tsconfig entirely, so the only way the real settings apply is
+          # for the file to sit inside the project.
+          cp tools/probe/probe.mts ./__probe.mts
+          npx eslint --no-ignore --format json __probe.mts > probe.json || true
+
+          fail=0
+          while IFS= read -r frag; do
+            [ -z "$frag" ] && continue
+            if ! grep -qF -- "$frag" probe.json; then
+              echo "::error::REOPENED - no finding matching: $frag"
+              fail=1
+            fi
+          done <<'FRAGMENTS'
+          Unexpected any
+          Do not use any type assertions
+          Unsafe assertion from
+          Forbidden non-null assertion
+          @ts-expect-error
+          Type predicates and assertion signatures
+          An overload signature or ambient function declaration
+          A class method overload signature
+          An ambient declaration asserts a type
+          An ambient module declaration fabricates
+          object` as a type
+          Function` as a type
+          {}` as a type
+          string value in conditional
+          Switch is not exhaustive
+          Shorthand method signature is forbidden
+          Missing return type on function
+          Promises must be awaited
+          Invalid type
+          eval can be harmful
+          Unexpected var
+          FRAGMENTS
+
+          # The compiler half. Run through the project so tsconfig applies.
+          npx tsc -p tsconfig.json > tsc.txt 2>&1 || true
+          grep -q "__probe.mts.*TS1294" tsc.txt || { echo "::error::REOPENED - erasableSyntaxOnly no longer rejects enum/namespace"; fail=1; }
+          grep -q "__probe.mts.*TS2322" tsc.txt || { echo "::error::REOPENED - noUncheckedIndexedAccess no longer flags unchecked indexing"; fail=1; }
+
+          rm -f __probe.mts probe.json tsc.txt
+          exit $fail
+
+      # The structural escapes, which are the ones that matter in practice.
+      # An agent does not usually reach for exotic syntax; it writes the
+      # file where the tools do not look. Each of these was a real hole
+      # found by audit, and none of them is covered by probe.mts, because
+      # they are properties of the include globs and the files array rather
+      # than of any source construct.
+      - name: Structural escapes must stay closed
+        run: |
+          set -u
+          rm -rf __struct && mkdir -p __struct/nested
+          # a directory that did not exist when the config was written
+          printf 'export const a: any = 1;\n'                     > __struct/nested/deep.mts
+          # an extension the files array might not list
+          printf 'export const b = (x) => x.y.z;\n'               > __struct/sneaky.mjs
+          # a declaration file, historically exempt from linting
+          printf 'declare module "fake" { export const c: any; }\n' > __struct/types.d.ts
+          # a NEW .js file, which must not inherit the legacy exemption
+          printf 'const d = (x) => x.y.z;\nmodule.exports = { d };\n' > __struct/fresh.js
+
+          npx eslint --format json __struct > struct.json || true
+          node -e '
+            const r = require("./struct.json");
+            let fail = 0;
+            for (const w of ["deep.mts", "sneaky.mjs", "types.d.ts", "fresh.js"]) {
+              const f = r.find(x => x.filePath.endsWith(w));
+              if (!f)                      { console.log("::error::REOPENED - " + w + " is not linted at all"); fail = 1; }
+              else if (f.errorCount === 0) { console.log("::error::REOPENED - " + w + " is linted but reports nothing"); fail = 1; }
+            }
+            process.exit(fail);
+          '
+          status=$?
+          rm -rf __struct struct.json
+          exit $status
