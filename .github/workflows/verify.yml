@@ -1,0 +1,237 @@
+# Goes at .github/workflows/verify.yml
+#
+# Two jobs. The first enforces the configuration; the second verifies the
+# configuration still has teeth. You want both: a config that has quietly
+# stopped working passes the first job perfectly.
+
+name: verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  enforce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # needed to read the base branch below
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      # Use `npm install` instead if the repository has no lockfile.
+      - run: npm ci
+
+      # The configs come from the BASE branch, not the branch under test.
+      # A pull request that weakens them is still measured against the
+      # strict version. Combined with CODEOWNERS, changing them for real
+      # requires an approved merge first, and until that lands the old
+      # config is what runs.
+      #
+      # This is strictly better than committing a checksum beside the file
+      # it protects, which is a self-signed certificate.
+      # The explicit fetch is defensive: actions/checkout does not always
+      # leave a usable origin/<base> remote-tracking ref for a PR event.
+      #
+      # Each file is restored only if it EXISTS on the base branch. Without
+      # that guard the step dies with "pathspec did not match", which makes
+      # the very first PR introducing this configuration impossible to
+      # merge: the files are not on the base branch yet, by definition.
+      # Found by running this workflow for real; it is not hypothetical.
+      #
+      # The fallback does not weaken anything. If the base branch has no
+      # copy, there is no stricter version being bypassed.
+      - name: Use configs from the protected branch
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "+refs/heads/${GITHUB_BASE_REF}:refs/remotes/origin/${GITHUB_BASE_REF}"
+          for f in tsconfig.json eslint.config.mjs; do
+            if git cat-file -e "origin/${GITHUB_BASE_REF}:$f" 2>/dev/null; then
+              git checkout "origin/${GITHUB_BASE_REF}" -- "$f"
+              echo "restored $f from origin/${GITHUB_BASE_REF}"
+            else
+              echo "::notice::$f is not on origin/${GITHUB_BASE_REF}; using this branch copy. Expected only for the PR that first introduces it."
+            fi
+          done
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx eslint .
+
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - run: npm ci
+
+      - name: Use configs from the protected branch
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "+refs/heads/${GITHUB_BASE_REF}:refs/remotes/origin/${GITHUB_BASE_REF}"
+          for f in tsconfig.json eslint.config.mjs; do
+            if git cat-file -e "origin/${GITHUB_BASE_REF}:$f" 2>/dev/null; then
+              git checkout "origin/${GITHUB_BASE_REF}" -- "$f"
+              echo "restored $f from origin/${GITHUB_BASE_REF}"
+            else
+              echo "::notice::$f is not on origin/${GITHUB_BASE_REF}; using this branch copy. Expected only for the PR that first introduces it."
+            fi
+          done
+
+      # Assertions are on MESSAGE TEXT, not rule ids.
+      #
+      # A rule id is too coarse to be a safety net. `no-restricted-syntax`
+      # alone carries five distinct selectors here (type predicates,
+      # assertion signatures, function overloads, class method overloads,
+      # ambient declarations). Grepping the id lets four of them be deleted
+      # while CI stays green. Verified: removing three selectors left an
+      # id-based check passing. Message fragments are per-selector.
+      #
+      # Never assert on error COUNTS. They move between releases and a
+      # brittle check gets deleted rather than fixed.
+      - name: Write the expected-findings list
+        run: |
+          cat > fragments.txt <<'FRAGMENTS'
+          Unexpected any
+          Do not use any type assertions
+          Unsafe assertion from
+          Forbidden non-null assertion
+          @ts-expect-error
+          Type predicates and assertion signatures
+          An overload signature or ambient function declaration
+          A class method overload signature
+          An ambient declaration asserts a type
+          An ambient module declaration fabricates
+          object` as a type
+          Function` as a type
+          {}` as a type
+          string value in conditional
+          Switch is not exhaustive
+          Shorthand method signature is forbidden
+          Missing return type on function
+          Promises must be awaited
+          Invalid type
+          eval can be harmful
+          Unexpected var
+          FRAGMENTS
+
+      - name: Syntax hatches must stay closed
+        run: |
+          set -u
+          # Copied to the ROOT on purpose. tsconfig.json excludes
+          # tools/probe, and passing tsc a file path makes it ignore
+          # tsconfig entirely, so the only way the real settings apply is
+          # for the file to sit inside the project.
+          cp tools/probe/probe.mts ./__probe.mts
+          npx eslint --no-ignore --format json __probe.mts > probe.json || true
+
+          # Matching is done against the ACTIVE messages array only, never
+          # against the raw JSON blob.
+          #
+          # ESLint moves a suppressed finding into `suppressedMessages`
+          # rather than dropping it. A grep over the whole file therefore
+          # still matches after someone removes `noInlineConfig` and adds
+          # eslint-disable comments — CI reports green while every rule has
+          # become individually suppressible. Verified: that produced a
+          # false pass. A false green is worse than no check.
+          node -e '
+            const fs = require("fs");
+            // A crashed or incompatible linter writes nothing here. Report
+            // that plainly instead of dying on a JSON parse error: an
+            // unreadable report is a failure, never a pass.
+            let report;
+            try {
+              report = JSON.parse(fs.readFileSync("probe.json", "utf8"))[0];
+            } catch {
+              console.log("::error::eslint produced no readable report. It likely crashed; check the toolchain versions in SETUP.md.");
+              process.exit(1);
+            }
+            if (!report) {
+              console.log("::error::eslint reported on no files. Check that probe.mts was copied into the project.");
+              process.exit(1);
+            }
+            const active = (report.messages || []).map(m => m.message).join("\n");
+            const suppressed = (report.suppressedMessages || []).length;
+            if (suppressed > 0) {
+              console.log("::error::" + suppressed + " finding(s) were SUPPRESSED on probe.mts. noInlineConfig must be enabled.");
+            }
+            const fragments = fs.readFileSync("fragments.txt", "utf8").split("\n").filter(Boolean);
+            let fail = suppressed > 0 ? 1 : 0;
+            for (const frag of fragments) {
+              if (!active.includes(frag)) {
+                console.log("::error::REOPENED - no active finding matching: " + frag);
+                fail = 1;
+              }
+            }
+            process.exit(fail);
+          '
+          status=$?
+
+          # The compiler half. Run through the project so tsconfig applies.
+          npx tsc -p tsconfig.json > tsc.txt 2>&1 || true
+          grep -q "__probe.mts.*TS1294" tsc.txt || { echo "::error::REOPENED - erasableSyntaxOnly no longer rejects enum/namespace"; status=1; }
+          grep -q "__probe.mts.*TS2322" tsc.txt || { echo "::error::REOPENED - noUncheckedIndexedAccess no longer flags unchecked indexing"; status=1; }
+
+          rm -f __probe.mts probe.json tsc.txt
+          exit $status
+
+      # The other half of the net. probe.mts proves bad things fail; this
+      # proves good things still pass. A config tightened until it rejects
+      # ordinary correct TypeScript is broken rather than stricter, and
+      # nothing in probe.mts would catch that.
+      - name: Ordinary code must still pass
+        run: |
+          set -u
+          cp tools/probe/control.mts ./__control.mts
+          if ! npx eslint __control.mts; then
+            echo "::error::OVER-TIGHTENED - control.mts contains only legitimate TypeScript and must produce no findings"
+            rm -f __control.mts
+            exit 1
+          fi
+          rm -f __control.mts
+
+      # The structural escapes, which are the ones that matter in practice.
+      # An agent does not usually reach for exotic syntax; it writes the
+      # file where the tools do not look. Each of these was a real hole
+      # found by audit, and none of them is covered by probe.mts, because
+      # they are properties of the include globs and the files array rather
+      # than of any source construct.
+      - name: Structural escapes must stay closed
+        run: |
+          set -u
+          rm -rf __struct && mkdir -p __struct/nested
+          # a directory that did not exist when the config was written
+          printf 'export const a: any = 1;\n'                     > __struct/nested/deep.mts
+          # an extension the files array might not list
+          printf 'export const b = (x) => x.y.z;\n'               > __struct/sneaky.mjs
+          # a declaration file, historically exempt from linting
+          printf 'declare module "fake" { export const c: any; }\n' > __struct/types.d.ts
+          # a NEW .js file, which must not inherit the legacy exemption
+          printf 'const d = (x) => x.y.z;\nmodule.exports = { d };\n' > __struct/fresh.js
+
+          npx eslint --format json __struct > struct.json || true
+          node -e '
+            const r = require("./struct.json");
+            let fail = 0;
+            for (const w of ["deep.mts", "sneaky.mjs", "types.d.ts", "fresh.js"]) {
+              const f = r.find(x => x.filePath.endsWith(w));
+              if (!f)                      { console.log("::error::REOPENED - " + w + " is not linted at all"); fail = 1; }
+              else if (f.errorCount === 0) { console.log("::error::REOPENED - " + w + " is linted but reports nothing"); fail = 1; }
+            }
+            process.exit(fail);
+          '
+          status=$?
+          rm -rf __struct struct.json
+          exit $status
