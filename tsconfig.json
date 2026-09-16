@@ -128,5 +128,17 @@
   // public/ is browser code loaded by <script> tags with globals rather
   // than modules. It is phase 2 and needs a module story first, so it is
   // excluded here rather than silently half-checked.
-  "exclude": ["node_modules", "dist", "public", "tools/probe", "tmp", "secret"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tmp",
+    "secret",
+    "tools/probe",
+    // Browser code and its end-to-end harness. Both need the DOM lib,
+    // which the server must not have, so they get their own project in
+    // phase 2 rather than being half-checked under this one.
+    "public",
+    "playwright.config.js",
+    "test/integration/browser"
+  ]
 }

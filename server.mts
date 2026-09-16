@@ -6,8 +6,8 @@
  * Google Gemini, so the browser never holds a key and CORS is avoided.
  */
 
-import express, { type Request, type RequestHandler, type Response } from "express";
-import fetch from "node-fetch";
+import express, { type Express, type Request, type RequestHandler, type Response } from "express";
+import nodeFetch from "node-fetch";
 import FormData from "form-data";
 import path from "node:path";
 import { execFile } from "node:child_process";
@@ -59,10 +59,23 @@ const relay = async (res: Response, upstream: { status: number; text: () => Prom
   res.status(upstream.status).type("application/json").send(body);
 };
 
+/**
+ * The outbound fetch, injectable.
+ *
+ * Deliberately a parameter rather than a global lookup such as
+ * `globalThis.__AS_FETCH__ ?? nodeFetch`. A global seam ships in the built
+ * binary and lets anything loaded earlier intercept every request,
+ * including the ones carrying the user's API keys. A parameter is visible
+ * only to whoever constructs the app.
+ */
+type FetchLike = typeof nodeFetch;
+
 // ── App ──────────────────────────────────────────────────────────────
 
-const app = express();
 const PORT = parsePort(process.env["PORT"]);
+
+export const createApp = (fetchImpl: FetchLike = nodeFetch): Express => {
+const app = express();
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
@@ -97,7 +110,7 @@ app.post(
     }
     try {
       console.log("  [PROXY] POST /api/generate → OpenAI /v1/images/generations");
-      const upstream = await fetch("https://api.openai.com/v1/images/generations", {
+      const upstream = await fetchImpl("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: authHeader },
         body: JSON.stringify(req.body),
@@ -199,7 +212,7 @@ app.post(
         });
       }
 
-      const upstream = await fetch("https://api.openai.com/v1/images/edits", {
+      const upstream = await fetchImpl("https://api.openai.com/v1/images/edits", {
         method: "POST",
         headers: { Authorization: authHeader, ...form.getHeaders() },
         body: form,
@@ -224,7 +237,7 @@ app.post(
     }
     try {
       console.log("  [PROXY] POST /api/chat → OpenAI /v1/chat/completions");
-      const upstream = await fetch("https://api.openai.com/v1/chat/completions", {
+      const upstream = await fetchImpl("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: authHeader },
         body: JSON.stringify(req.body),
@@ -258,7 +271,7 @@ app.post(
       const url = `https://generativelanguage.googleapis.com/v1beta/interactions?key=${apiKey}`;
       console.log("  [PROXY] URL:", url.replace(apiKey, `${apiKey.slice(0, 8)}...`));
 
-      const upstream = await fetch(url, {
+      const upstream = await fetchImpl(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(req.body),
@@ -301,7 +314,7 @@ app.post(
     }
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/${operationName}?key=${apiKey}`;
-      const upstream = await fetch(url, { method: "GET", timeout: 30_000 });
+      const upstream = await fetchImpl(url, { method: "GET", timeout: 30_000 });
       await relay(res, upstream);
     } catch (err) {
       console.error("  [ERROR] Video poll failed:", errorMessage(err));
@@ -310,9 +323,19 @@ app.post(
   }),
 );
 
+return app;
+};
+
 // ── Start ────────────────────────────────────────────────────────────
 
-app.listen(PORT, () => {
+/**
+ * Only listen when this module is the process entry point, so importing it
+ * from a test constructs the app without binding a port.
+ */
+const isEntryPoint = process.argv[1] !== undefined && import.meta.filename === path.resolve(process.argv[1]);
+
+if (isEntryPoint) {
+createApp().listen(PORT, () => {
   console.log("");
   console.log("  ⚔️  AS Adventurer — VTuber Creation Pipeline");
   console.log("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -337,3 +360,4 @@ app.listen(PORT, () => {
     execFile(opener, [...args], () => undefined);
   }
 });
+}

@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 
 test.describe('C — Static / API proxy smoke', () => {
-  test('static assets and CORS headers are available', async ({ page, request }) => {
+  test('static assets and CORS headers are available', async ({ request }) => {
     const home = await request.get('/');
     expect(home.ok()).toBeTruthy();
     expect(await home.text()).toMatch(/AS Adventurer/);

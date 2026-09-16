@@ -98,18 +98,9 @@ describe('ChromaKey', () => {
 
         const cornerA = img.data[(0 * 20 + 0) * 4 + 3];
         const midTop = img.data[(0 * 20 + 10) * 4 + 3];
-        // Corner minDist=0 → alpha 0; mid-top minDist=0 still (y=0) → also 0
-        // Use near-corner vs deeper mid-edge: (1,1) vs (0,10) both on edge...
-        // Corners have minDist to left AND top = 0.
-        // Mid-left edge (x=0,y=10): minDist=0 as well.
-        // Better: compare (2,2) near corner vs (10,2) mid near top.
-        const nearCorner = img.data[(2 * 20 + 2) * 4 + 3];
-        const midNearTop = img.data[(2 * 20 + 10) * 4 + 3];
-        // nearCorner minDist=2 → factor=(0.2)^2=0.04 → alpha≈10
-        // midNearTop minDist=2 (top) → same... need different minDist
-        // (5,5) minDist=5 → factor=0.25 → alpha=64
-        // (10,1) minDist=1 → factor=0.01 → alpha=3
-        // Actually corners are MORE transparent: (1,1) minDist=1 vs (10,5) minDist=5
+        // A corner is nearer two edges at once, so it fades further than a
+        // point the same distance from a single edge: (1,1) has minDist 1
+        // against (10,5) with minDist 5.
         const c = img.data[(1 * 20 + 1) * 4 + 3];
         const mid = img.data[(5 * 20 + 10) * 4 + 3];
         assert.ok(c < mid, `corner alpha ${c} should be < mid-edge ${mid}`);

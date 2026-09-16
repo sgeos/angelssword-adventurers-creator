@@ -1,6 +1,9 @@
 /**
  * Injectable fetch mock for AS Adventurer API characterization tests.
- * Install on globalThis.__AS_FETCH__ BEFORE requiring server.js.
+ *
+ * Pass `mockFetch` to createApp(). There is deliberately no global
+ * installer: a global seam ships in the built binary and lets anything
+ * loaded earlier intercept requests carrying the user's API keys.
  */
 
 const calls = [];
@@ -32,10 +35,6 @@ async function mockFetch(url, options = {}) {
     const response = nextResponse || createResponse();
     nextResponse = null;
     return response;
-}
-
-function installMockFetch() {
-    globalThis.__AS_FETCH__ = mockFetch;
 }
 
 function resetMockFetch() {
@@ -82,7 +81,6 @@ async function getFormBodyString(body) {
 }
 
 module.exports = {
-    installMockFetch,
     resetMockFetch,
     mockFetchResponse,
     mockFetchReject,
