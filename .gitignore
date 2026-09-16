@@ -4,3 +4,10 @@ backup/
 .env
 *.log
 *.lnk
+test-results/
+playwright-report/
+blob-report/
+tmp/*
+!tmp/.gitkeep
+secret/*
+!secret/.gitkeep
