@@ -11,3 +11,5 @@ tmp/*
 !tmp/.gitkeep
 secret/*
 !secret/.gitkeep
+# Build output of src/browser (npm run build:browser)
+public/js/

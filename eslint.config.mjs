@@ -326,6 +326,21 @@ export default defineConfig(
   // Build scripts not yet converted. Named individually, never a
   // "**/*.js" glob, so a NEW .js file gets no relief from the rules and
   // this list can only shrink.
+  // Browser sources live in a second TypeScript project, which supplies
+  // the DOM lib and withholds the node types. The project service resolves
+  // against the root config alone, so these files name theirs explicitly.
+  // Every rule still applies; only the type information differs.
+  {
+    files: ["src/browser/**/*.mts"],
+    languageOptions: {
+      parserOptions: {
+        projectService: false,
+        project: "./tsconfig.browser.json",
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
+
   // Test code and its harness, all untyped CommonJS. Same treatment as the
   // build scripts and for the same reason: the type-aware rules report on
   // the absence of types rather than on anything an author did. The

@@ -139,6 +139,13 @@
     // phase 2 rather than being half-checked under this one.
     "public",
     "playwright.config.js",
-    "test/integration/browser"
+    "test/integration/browser",
+    // Tests belong to tsconfig.test.json, which adds the DOM lib so they
+    // can exercise browser modules directly.
+    "test",
+    // Browser sources belong to tsconfig.browser.json, which supplies the
+    // DOM lib and withholds the node types. Checking them here too would
+    // report every DOM global as missing.
+    "src/browser"
   ]
 }

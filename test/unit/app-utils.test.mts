@@ -1,8 +1,6 @@
-'use strict';
-
-const { describe, it } = require('node:test');
-const assert = require('node:assert/strict');
-const { debounce, base64ToBlob, hexToRgb, colorName } = require('../../public/lib/app-utils.js');
+import { describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import { debounce, base64ToBlob, hexToRgb, colorName } from '../../src/browser/app-utils.mts';
 
 describe('app-utils', () => {
     it('hexToRgb(#00FF00) → {r:0,g:255,b:0}', () => {
@@ -39,19 +37,11 @@ describe('app-utils', () => {
     });
 
     it('debounce fires once after quiet period', () => {
-        const realSetTimeout = global.setTimeout;
-        const realClearTimeout = global.clearTimeout;
-        let now = 0;
-        const timers = new Map();
-        let nextId = 1;
-
-        global.setTimeout = (fn, ms) => {
-            const id = nextId++;
-            timers.set(id, { fn, due: now + ms });
-            return id;
-        };
-        global.clearTimeout = (id) => { timers.delete(id); };
-
+        // node:test's fake timers replace the originals in a typed,
+        // supported way. The previous version assigned an untyped stub over
+        // global.setTimeout, which no longer typechecks and never matched
+        // Node's signature anyway.
+        mock.timers.enable({ apis: ['setTimeout'] });
         try {
             let calls = 0;
             const fn = debounce(() => { calls++; }, 100);
@@ -60,26 +50,16 @@ describe('app-utils', () => {
             fn();
             assert.equal(calls, 0);
 
-            now = 99;
-            for (const [id, t] of [...timers]) {
-                if (t.due <= now) { timers.delete(id); t.fn(); }
-            }
-            assert.equal(calls, 0);
+            mock.timers.tick(99);
+            assert.equal(calls, 0, 'must not fire before the quiet period elapses');
 
-            now = 100;
-            for (const [id, t] of [...timers]) {
-                if (t.due <= now) { timers.delete(id); t.fn(); }
-            }
-            assert.equal(calls, 1);
+            mock.timers.tick(1);
+            assert.equal(calls, 1, 'fires once at the end of the quiet period');
 
-            now = 300;
-            for (const [id, t] of [...timers]) {
-                if (t.due <= now) { timers.delete(id); t.fn(); }
-            }
-            assert.equal(calls, 1);
+            mock.timers.tick(200);
+            assert.equal(calls, 1, 'does not fire again for the same burst');
         } finally {
-            global.setTimeout = realSetTimeout;
-            global.clearTimeout = realClearTimeout;
+            mock.timers.reset();
         }
     });
 });

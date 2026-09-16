@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  // Tests are the one place that legitimately sees both halves: they run
+  // on Node, and they exercise browser modules directly rather than
+  // through a compiled artefact. So this project alone carries the node
+  // types and the DOM lib together.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "moduleResolution": "Bundler",
+    "module": "ESNext",
+    "noEmit": true,
+    "allowJs": true,
+    "checkJs": false
+  },
+  "include": ["test/**/*.mts", "test/**/*.mjs", "src/browser/**/*.mts"],
+  "exclude": ["test/integration/browser"]
+}
