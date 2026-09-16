@@ -58,7 +58,7 @@ function hasCommand(cmd) {
   try {
     execSync(`command -v ${cmd}`, { stdio: 'pipe', shell: '/bin/sh' });
     return true;
-  } catch (e) {
+  } catch (_e) {
     return false;
   }
 }
@@ -88,7 +88,7 @@ console.log();
 log('Checking for pkg...');
 try {
   execSync('npx --yes pkg --version', { stdio: 'pipe' });
-} catch (e) {
+} catch (_e) {
   log('Installing pkg globally...');
   execSync('npm install -g pkg', { stdio: 'inherit' });
 }
@@ -116,7 +116,7 @@ const pkgCmd = [
 
 try {
   execSync(pkgCmd, { stdio: 'inherit', cwd: ROOT });
-} catch (e) {
+} catch (_e) {
   console.error('\n  ❌ pkg compilation failed! Make sure you have run: npm install');
   process.exit(1);
 }
@@ -135,7 +135,7 @@ if (process.platform === 'darwin') {
   try {
     execSync(`codesign --force --sign - "${BIN}"`, { stdio: 'pipe' });
     log('Applied an ad-hoc signature (runs here; not notarized for others).');
-  } catch (e) {
+  } catch (_e) {
     log('⚠️  codesign failed — the binary may be blocked on Apple Silicon.');
   }
 }
@@ -207,7 +207,7 @@ try {
   }
   const zipSize = (fs.statSync(ZIP_PATH).size / (1024 * 1024)).toFixed(1);
   log(`Created ASAdventurer.zip (${zipSize} MB)`);
-} catch (e) {
+} catch (_e) {
   log('⚠️  ZIP creation failed — you can zip manually');
   console.error(e.message);
 }

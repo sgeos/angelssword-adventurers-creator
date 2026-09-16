@@ -68,5 +68,8 @@ if [ ! -d node_modules ]; then
     npm install
 fi
 
+# server.mts, not .js: Node 24 strips types natively, so TypeScript runs
+# directly with no build step.
+#
 # exec so that the server replaces this shell and receives Ctrl+C directly.
-exec node server.js
+exec node server.mts
