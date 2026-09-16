@@ -2,18 +2,18 @@
  * GREEN characterization tests for video-gen-core.
  * Locks CURRENT behavior including known quirks — do not "fix" production.
  */
-'use strict';
-
-const { describe, it } = require('node:test');
-const assert = require('node:assert/strict');
-const {
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { at } from '../helpers/at.mts';
+import { imagePart, parts, textPart } from '../helpers/request-parts.mts';
+import {
     DEFAULT_PROMPT,
     MODEL,
     buildVideoRequestBody,
     extractVideoPayload,
     pickHandoffVideo,
     parseGenCount,
-} = require('../../public/lib/video-gen-core.js');
+} from '../../src/browser/video-gen-core.mts';
 
 describe('video-gen-core buildVideoRequestBody', () => {
     it('reference body strips data-URL prefix, sets image_to_video, detects png mime', () => {
@@ -29,12 +29,12 @@ describe('video-gen-core buildVideoRequestBody', () => {
         assert.equal(body.model, MODEL);
         assert.equal(body.model, 'gemini-omni-flash-preview');
         assert.equal(body.input.length, 2);
-        assert.deepEqual(body.input[0], {
+        assert.deepEqual(at(parts(body.input), 0), {
             type: 'image',
             data: 'AAAA',
             mime_type: 'image/png',
         });
-        assert.deepEqual(body.input[1], { type: 'text', text: 'walk cycle' });
+        assert.deepEqual(at(parts(body.input), 1), { type: 'text', text: 'walk cycle' });
         assert.deepEqual(body.generation_config, {
             video_config: { task: 'image_to_video' },
         });
@@ -46,8 +46,8 @@ describe('video-gen-core buildVideoRequestBody', () => {
             mode: 'reference',
             referenceImages: [{ dataUrl: 'data:image/jpeg;base64,JPEGDATA' }],
         });
-        assert.equal(body.input[0].mime_type, 'image/jpeg');
-        assert.equal(body.input[0].data, 'JPEGDATA');
+        assert.equal(imagePart(body.input, 0).mime_type, 'image/jpeg');
+        assert.equal(imagePart(body.input, 0).data, 'JPEGDATA');
     });
 
     it('empty prompt → default breathing idle string from source', () => {
@@ -57,10 +57,10 @@ describe('video-gen-core buildVideoRequestBody', () => {
             referenceImages: [{ dataUrl: 'data:image/png;base64,XX' }],
         });
         assert.equal(
-            body.input[1].text,
+            textPart(body.input, 1).text,
             'Generate a gentle breathing idle animation with slight body sway. Keep the character on the same background.'
         );
-        assert.equal(body.input[1].text, DEFAULT_PROMPT);
+        assert.equal(textPart(body.input, 1).text, DEFAULT_PROMPT);
     });
 
     it('keyframe: only first image sent; motion text prefixed (end image NOT sent — quirk)', () => {
@@ -75,13 +75,13 @@ describe('video-gen-core buildVideoRequestBody', () => {
         });
 
         assert.equal(body.input.length, 2);
-        assert.equal(body.input[0].data, 'START');
+        assert.equal(imagePart(body.input, 0).data, 'START');
         assert.ok(!JSON.stringify(body).includes('END'));
         assert.match(
-            body.input[1].text,
+            textPart(body.input, 1).text,
             /^Starting from this image \(start frame\), animate the character transitioning to the end pose\. morph$/
         );
-        assert.equal(body.generation_config.video_config.task, 'image_to_video');
+        assert.equal(body.generation_config?.video_config.task, 'image_to_video');
     });
 
     it('duration is unused in POST body (quirk — UI collects it, body omits it)', () => {
@@ -92,8 +92,7 @@ describe('video-gen-core buildVideoRequestBody', () => {
             referenceImages: [{ dataUrl: 'data:image/png;base64,Y' }],
             duration: 8, // even if a caller passes it, it must not appear
         });
-        assert.equal(body.duration, undefined);
-        assert.ok(!('duration' in body));
+        assert.ok(!('duration' in body), 'duration must not reach the request body');
         assert.ok(!('video_length' in (body.generation_config?.video_config || {})));
     });
 });
@@ -121,8 +120,9 @@ describe('video-gen-core extractVideoPayload', () => {
                 content: [{ type: 'video', data: 'NODATA' }],
             }],
         });
-        assert.equal(payload.mimeType, 'video/mp4');
-        assert.equal(payload.base64, 'NODATA');
+        assert.notEqual(payload, null, 'a video payload must be found');
+        assert.equal(payload?.mimeType, 'video/mp4');
+        assert.equal(payload?.base64, 'NODATA');
     });
 
     it('extracts from candidates inlineData (generateContent fallback)', () => {
