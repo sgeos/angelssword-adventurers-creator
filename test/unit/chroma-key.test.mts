@@ -1,11 +1,14 @@
-'use strict';
-
-const { describe, it } = require('node:test');
-const assert = require('node:assert/strict');
-const { ChromaKey } = require('../../public/lib/chroma-key.js');
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { at } from '../helpers/at.mts';
+import { ChromaKey } from '../../src/browser/chroma-key.mts';
 
 /** Build ImageData-like object usable in Node. */
-function makeImageData(width, height, fillFn) {
+function makeImageData(
+    width: number,
+    height: number,
+    fillFn: (x: number, y: number) => readonly [number, number, number, number],
+): ImageData {
     const data = new Uint8ClampedArray(width * height * 4);
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
@@ -14,7 +17,8 @@ function makeImageData(width, height, fillFn) {
             data[i] = r; data[i + 1] = g; data[i + 2] = b; data[i + 3] = a;
         }
     }
-    return { data, width, height };
+    // Node has no ImageData; this is a structurally complete stand-in.
+    return { data, width, height, colorSpace: 'srgb' };
 }
 
 describe('ChromaKey', () => {
@@ -29,7 +33,7 @@ describe('ChromaKey', () => {
     it('edgeFloodFill: 8×8 green border + red center → border α=0, center opaque', () => {
         const ck = new ChromaKey();
         ck.setKeyColorHex('#00FF00');
-        const img = makeImageData(8, 8, (x, y) => {
+        const img = makeImageData(8, 8, (x: number, y: number) => {
             const edge = x === 0 || y === 0 || x === 7 || y === 7;
             return edge ? [0, 255, 0, 255] : [255, 0, 0, 255];
         });
@@ -38,23 +42,23 @@ describe('ChromaKey', () => {
 
         // Border pixels transparent
         for (let x = 0; x < 8; x++) {
-            assert.equal(img.data[(0 * 8 + x) * 4 + 3], 0, `top ${x}`);
-            assert.equal(img.data[(7 * 8 + x) * 4 + 3], 0, `bot ${x}`);
+            assert.equal(at(img.data, (0 * 8 + x) * 4 + 3), 0, `top ${x}`);
+            assert.equal(at(img.data, (7 * 8 + x) * 4 + 3), 0, `bot ${x}`);
         }
         for (let y = 0; y < 8; y++) {
-            assert.equal(img.data[(y * 8 + 0) * 4 + 3], 0, `left ${y}`);
-            assert.equal(img.data[(y * 8 + 7) * 4 + 3], 0, `right ${y}`);
+            assert.equal(at(img.data, (y * 8 + 0) * 4 + 3), 0, `left ${y}`);
+            assert.equal(at(img.data, (y * 8 + 7) * 4 + 3), 0, `right ${y}`);
         }
         // Center red stays opaque
-        assert.equal(img.data[(3 * 8 + 3) * 4 + 3], 255);
-        assert.equal(img.data[(3 * 8 + 3) * 4], 255);
+        assert.equal(at(img.data, (3 * 8 + 3) * 4 + 3), 255);
+        assert.equal(at(img.data, (3 * 8 + 3) * 4), 255);
     });
 
     it('edgeFloodFill: enclosed green pocket stays opaque', () => {
         // 8x8: green border, red ring, green pocket at center — pocket not edge-connected
         const ck = new ChromaKey();
         ck.setKeyColorHex('#00FF00');
-        const img = makeImageData(8, 8, (x, y) => {
+        const img = makeImageData(8, 8, (x: number, y: number) => {
             const edge = x === 0 || y === 0 || x === 7 || y === 7;
             if (edge) return [0, 255, 0, 255];
             // pocket at (3,3)-(4,4)
@@ -64,10 +68,10 @@ describe('ChromaKey', () => {
         ck.edgeFloodFill(img, { r: 0, g: 255, b: 0 }, 40);
 
         // Enclosed pocket remains opaque after flood fill alone
-        assert.equal(img.data[(3 * 8 + 3) * 4 + 3], 255);
-        assert.equal(img.data[(4 * 8 + 4) * 4 + 3], 255);
+        assert.equal(at(img.data, (3 * 8 + 3) * 4 + 3), 255);
+        assert.equal(at(img.data, (4 * 8 + 4) * 4 + 3), 255);
         // Outer border cleared
-        assert.equal(img.data[3], 0);
+        assert.equal(at(img.data, 3), 0);
     });
 
     it('process solid green frame → all transparent', () => {
@@ -76,7 +80,7 @@ describe('ChromaKey', () => {
         const img = makeImageData(4, 4, () => [0, 255, 0, 255]);
         ck.process(img);
         for (let i = 0; i < 16; i++) {
-            assert.equal(img.data[i * 4 + 3], 0, `pixel ${i}`);
+            assert.equal(at(img.data, i * 4 + 3), 0, `pixel ${i}`);
         }
     });
 
@@ -96,13 +100,13 @@ describe('ChromaKey', () => {
         const img = makeImageData(20, 20, () => [255, 255, 255, 255]);
         ck.applyEdgeFade(img, 10);
 
-        const cornerA = img.data[(0 * 20 + 0) * 4 + 3];
-        const midTop = img.data[(0 * 20 + 10) * 4 + 3];
+        const cornerA = at(img.data, (0 * 20 + 0) * 4 + 3);
+        const midTop = at(img.data, (0 * 20 + 10) * 4 + 3);
         // A corner is nearer two edges at once, so it fades further than a
         // point the same distance from a single edge: (1,1) has minDist 1
         // against (10,5) with minDist 5.
-        const c = img.data[(1 * 20 + 1) * 4 + 3];
-        const mid = img.data[(5 * 20 + 10) * 4 + 3];
+        const c = at(img.data, (1 * 20 + 1) * 4 + 3);
+        const mid = at(img.data, (5 * 20 + 10) * 4 + 3);
         assert.ok(c < mid, `corner alpha ${c} should be < mid-edge ${mid}`);
         assert.equal(cornerA, 0);
         assert.ok(midTop === 0 || midTop < 255); // on top edge
@@ -111,15 +115,16 @@ describe('ChromaKey', () => {
     it('applyAntiAlias: no pixel alpha increases', () => {
         const ck = new ChromaKey();
         // Opaque square with jagged edge against transparent
-        const img = makeImageData(8, 8, (x, y) => {
+        const img = makeImageData(8, 8, (x: number, y: number) => {
             if (x >= 3 && y >= 3) return [200, 100, 50, 255];
             return [0, 0, 0, 0];
         });
         const before = Uint8Array.from(img.data.filter((_, i) => i % 4 === 3));
         ck.applyAntiAlias(img);
         for (let i = 0; i < 64; i++) {
-            const after = img.data[i * 4 + 3];
-            assert.ok(after <= before[i], `alpha increased at ${i}: ${before[i]} → ${after}`);
+            const after = at(img.data, i * 4 + 3);
+            const wasBefore = at(before, i);
+            assert.ok(after <= wasBefore, `alpha increased at ${i}: ${wasBefore} → ${after}`);
         }
     });
 });
