@@ -1,14 +1,12 @@
-'use strict';
-
-const { describe, it } = require('node:test');
-const assert = require('node:assert/strict');
-const {
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import {
     MODE_LIMITS,
     formatBytes,
     getOutputFrameCount,
     computeCropToCenter,
     sanitizeFilename
-} = require('../../public/lib/exporter-math.js');
+} from '../../src/browser/exporter-math.mts';
 
 describe('exporter-math', () => {
     it('MODE_LIMITS: adventurer webm Infinity; normal gif 120/1000; premium gif 600/4000', () => {

@@ -2,16 +2,16 @@
  * GREEN characterization tests for video-prep-core.
  * Locks CURRENT behavior including known quirks — do not "fix" production.
  */
-'use strict';
-
-const { describe, it } = require('node:test');
-const assert = require('node:assert/strict');
-const {
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { at } from '../helpers/at.mts';
+import type { VideoPrepState } from '../../src/browser/video-prep-core.mts';
+import {
     getOutputFrameCount,
     buildLoopSequence,
     buildCrossfadeAlphas,
     buildVideoPrepHandoffPayload,
-} = require('../../public/lib/video-prep-core.js');
+} from '../../src/browser/video-prep-core.mts';
 
 describe('video-prep-core getOutputFrameCount', () => {
     it('loopPoint -1 (unset) → totalFrames', () => {
@@ -83,21 +83,21 @@ describe('video-prep-core buildCrossfadeAlphas', () => {
     it('crossfade endpoint alphas: first (1,0) and last (0,1)', () => {
         const alphas = buildCrossfadeAlphas(5);
         assert.equal(alphas.length, 5);
-        assert.equal(alphas[0].alpha1, 1);
-        assert.equal(alphas[0].alpha2, 0);
-        assert.equal(alphas[0].t, 0);
-        assert.equal(alphas[4].alpha1, 0);
-        assert.equal(alphas[4].alpha2, 1);
-        assert.equal(alphas[4].t, 1);
+        assert.equal(at(alphas, 0).alpha1, 1);
+        assert.equal(at(alphas, 0).alpha2, 0);
+        assert.equal(at(alphas, 0).t, 0);
+        assert.equal(at(alphas, 4).alpha1, 0);
+        assert.equal(at(alphas, 4).alpha2, 1);
+        assert.equal(at(alphas, 4).t, 1);
         // midpoint
-        assert.equal(alphas[2].t, 0.5);
-        assert.equal(alphas[2].alpha1, 0.5);
-        assert.equal(alphas[2].alpha2, 0.5);
+        assert.equal(at(alphas, 2).t, 0.5);
+        assert.equal(at(alphas, 2).alpha1, 0.5);
+        assert.equal(at(alphas, 2).alpha2, 0.5);
     });
 });
 
 describe('video-prep-core buildVideoPrepHandoffPayload', () => {
-    function makeState(overrides) {
+    function makeState(overrides: Partial<VideoPrepState> = {}): VideoPrepState {
         return Object.assign({
             video: { src: 'blob:primary' },
             videoWidth: 512,
@@ -162,7 +162,8 @@ describe('video-prep-core buildVideoPrepHandoffPayload', () => {
             crossfade: false,
             crossfadeDuration: 0,
         });
-        assert.equal(payload.concat.crossfade, false);
-        assert.equal(payload.concat.crossfadeDuration, 0);
+        assert.notEqual(payload.concat, null, 'concat payload must be present when enabled');
+        assert.equal(payload.concat?.crossfade, false);
+        assert.equal(payload.concat?.crossfadeDuration, 0);
     });
 });
