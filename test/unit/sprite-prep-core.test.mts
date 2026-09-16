@@ -2,13 +2,11 @@
  * GREEN characterization tests — sprite-prep-core.js
  * Documents current behavior; must pass against extracted algorithms.
  */
-'use strict';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { at } from '../helpers/at.mts';
 
-const { describe, it } = require('node:test');
-const assert = require('node:assert/strict');
-const path = require('node:path');
-
-const Core = require(path.join(__dirname, '../../public/lib/sprite-prep-core.js'));
+import * as Core from '../../src/browser/sprite-prep-core.mts';
 
 const {
     KEY_COLORS,
@@ -20,7 +18,11 @@ const {
     buildGenerateRequest
 } = Core;
 
-function rgbaBuffer(w, h, fillFn) {
+function rgbaBuffer(
+    w: number,
+    h: number,
+    fillFn: (x: number, y: number, i: number) => readonly [number, number, number, number],
+): Uint8ClampedArray {
     const buf = new Uint8ClampedArray(w * h * 4);
     for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
@@ -49,9 +51,9 @@ describe('pickKeyByEuclideanMinDist', () => {
         const result = pickKeyByEuclideanMinDist(rgba, w, h);
         assert.equal(result.hex, '#FF00FF');
         assert.equal(result.bestIdx, 1);
-        assert.equal(KEY_COLORS[result.bestIdx].hex, '#FF00FF');
-        assert.equal(result.minDist[0], 0); // green touches itself
-        assert.ok(result.minDist[1] > result.minDist[0]);
+        assert.equal(at(KEY_COLORS, result.bestIdx).hex, '#FF00FF');
+        assert.equal(at(result.minDist, 0), 0); // green touches itself
+        assert.ok(at(result.minDist, 1) > at(result.minDist, 0));
     });
 
     it('skips pixels with α < 128', () => {
@@ -70,18 +72,18 @@ describe('pickKeyByEuclideanMinDist', () => {
         ]);
         const result = pickKeyByEuclideanMinDist(rgba, w, h);
         assert.equal(result.hex, '#FF00FF', 'transparent magenta must not poison green-sprite key pick');
-        assert.equal(result.minDist[0], 0);
-        assert.ok(result.minDist[1] > 100);
+        assert.equal(at(result.minDist, 0), 0);
+        assert.ok(at(result.minDist, 1) > 100);
     });
 });
 
 describe('buildPrompt', () => {
-    function colorNameFn(hex) {
-        const names = {
+    function colorNameFn(hex: string): string {
+        const names: Readonly<Record<string, string>> = {
             '#00FF00': 'Green', '#FF00FF': 'Magenta', '#0000FF': 'Blue',
             '#FFFF00': 'Yellow', '#00FFFF': 'Cyan'
         };
-        return names[hex.toUpperCase()] || hex;
+        return names[hex.toUpperCase()] ?? hex;
     }
 
     it('includes solid key name/hex, 1280×720, waist-up; empty action → idle default', () => {
@@ -197,14 +199,14 @@ describe('findBottomOpaqueRow', () => {
     it('returns exact bottom opaque row on a tiny buffer', () => {
         // 3×3: only middle row (y=1) has α>30; rows 0 and 2 fully transparent
         const w = 3, h = 3;
-        const rgba = rgbaBuffer(w, h, (x, y) => {
+        const rgba = rgbaBuffer(w, h, (_x, y) => {
             if (y === 1) return [10, 20, 30, 255];
             return [0, 0, 0, 0];
         });
         assert.equal(findBottomOpaqueRow(rgba, w, h, 30), 1);
 
         // Opaque only on top row → bottomRow 0
-        const topOnly = rgbaBuffer(2, 2, (x, y) => (y === 0 ? [1, 1, 1, 40] : [0, 0, 0, 0]));
+        const topOnly = rgbaBuffer(2, 2, (_x, y) => (y === 0 ? [1, 1, 1, 40] : [0, 0, 0, 0]));
         assert.equal(findBottomOpaqueRow(topOnly, 2, 2, 30), 0);
 
         // α=30 is NOT > 30 → treated as transparent; α=31 counts
