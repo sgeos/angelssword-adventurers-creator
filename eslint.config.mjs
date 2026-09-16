@@ -241,7 +241,20 @@ export default defineConfig(
       "@typescript-eslint/prefer-readonly": "error",
       // Parameters are borrowed, not owned. A function that does not declare
       // intent to mutate does not get to mutate.
-      "@typescript-eslint/prefer-readonly-parameter-types": "error",
+      // DISABLED after trying it. Not a concession to noise: the rule is
+      // unsatisfiable in three separate places in this codebase, and in
+      // each the mutation is the contract rather than a defect.
+      //
+      //   - Express handlers exist to mutate `res`.
+      //   - Anything touching Buffer or ImageData: both are mutable by
+      //     nature, and a readonly view of a pixel buffer is not a thing.
+      //   - sharp's and node-fetch's own signatures take mutable types.
+      //
+      // Left here rather than deleted so the next person does not
+      // rediscover it. Immutability is still enforced where it can be:
+      // prefer-readonly on class fields, readonly array parameters where
+      // the code owns the type, and prefer-const.
+      "@typescript-eslint/prefer-readonly-parameter-types": "off",
       // The default sort is lexicographic, so [10, 9] sorts to [10, 9].
       "@typescript-eslint/require-array-sort-compare": "error",
       "prefer-const": "error",
@@ -310,24 +323,32 @@ export default defineConfig(
   // rule simply by choosing the .js extension. Naming the files means the
   // exemption cannot grow on its own, and it shrinks to nothing as you
   // migrate.
-  // Express handlers cannot satisfy prefer-readonly-parameter-types. The
-  // contract of a handler is to mutate `res`, and `Request`/`Response` are
-  // mutable by design, so the rule is unsatisfiable here rather than merely
-  // inconvenient. Scoped off at config level and stated, rather than
-  // silenced per line — inline suppressions are disabled repo-wide.
-  //
-  // Every other rule, including the whole no-unsafe-* family, still applies
-  // to these files.
-  {
-    files: ["server.mts"],
-    rules: {
-      "@typescript-eslint/prefer-readonly-parameter-types": "off",
-    },
-  },
-
   // Build scripts not yet converted. Named individually, never a
   // "**/*.js" glob, so a NEW .js file gets no relief from the rules and
   // this list can only shrink.
+  // Test code and its harness, all untyped CommonJS. Same treatment as the
+  // build scripts and for the same reason: the type-aware rules report on
+  // the absence of types rather than on anything an author did. The
+  // no-unsafe-* family alone accounts for 360 of the findings here, and
+  // no-floating-promises fires on every node:test `it()`, which nobody
+  // awaits by design.
+  //
+  // This is a directory glob rather than a list of filenames, unlike the
+  // build-script block below, and the difference is deliberate. A glob
+  // exemption normally lets new files escape the rules, which is the hole
+  // it exists to avoid. It is acceptable here because nothing under test/
+  // is imported by the server, so code hidden there cannot reach
+  // production — the escape would buy nothing.
+  {
+    files: ["test/**", "playwright.config.js"],
+    extends: [tseslint.configs.disableTypeChecked],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+      "@typescript-eslint/explicit-function-return-type": "off",
+      "@typescript-eslint/explicit-module-boundary-types": "off",
+    },
+  },
+
   //
   // Phase 1 of the migration covers new code only. These are untyped
   // CommonJS, so the type-aware rules report on the absence of types
@@ -335,7 +356,7 @@ export default defineConfig(
   // signal. They keep the syntactic rules and lose the type-aware ones
   // until they are converted, at which point this block is deleted.
   {
-    files: ["build-exe.js", "png-to-ico.js", "extract-head-icon.js"],
+    files: ["__none__.js"],
     extends: [tseslint.configs.disableTypeChecked],
     rules: {
       "@typescript-eslint/no-require-imports": "off",

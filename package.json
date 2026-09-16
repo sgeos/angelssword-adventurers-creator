@@ -12,10 +12,11 @@
     "lint": "eslint .",
     "check": "npm run typecheck && npm run lint",
     "test:unit": "node --test test/unit/**/*.test.js",
-    "test:api": "node --test test/integration/api/**/*.test.js",
+    "test:api": "node --test test/integration/api/**/*.test.mjs",
     "test:browser": "playwright test",
     "test": "npm run test:unit && npm run test:api",
-    "test:all": "npm run check && npm run test && npm run test:browser"
+    "test:all": "npm run check && npm run test && npm run test:browser",
+    "build:exe": "node build-exe.mts"
   },
   "dependencies": {
     "express": "^4.21.0",
