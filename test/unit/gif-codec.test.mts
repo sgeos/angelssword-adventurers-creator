@@ -1,10 +1,10 @@
-'use strict';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { at } from '../helpers/at.mts';
+import type { Rgb } from '../../src/browser/gif-codec.mts';
+import { GifEncoder, ColorQuantizer, GifDecoder } from '../../src/browser/gif-codec.mts';
 
-const { describe, it } = require('node:test');
-const assert = require('node:assert/strict');
-const { GifEncoder, ColorQuantizer, GifDecoder } = require('../../public/lib/gif-codec.js');
-
-function solidRgba(w, h, r, g, b, a = 255) {
+function solidRgba(w: number, h: number, r: number, g: number, b: number, a = 255): Uint8ClampedArray {
     const rgba = new Uint8ClampedArray(w * h * 4);
     for (let i = 0; i < w * h; i++) {
         rgba[i * 4] = r;
@@ -15,7 +15,7 @@ function solidRgba(w, h, r, g, b, a = 255) {
     return rgba;
 }
 
-function findNetscape(buf) {
+function findNetscape(buf: Uint8Array) {
     const needle = Buffer.from('NETSCAPE2.0');
     return Buffer.from(buf).includes(needle);
 }
@@ -32,14 +32,14 @@ describe('ColorQuantizer', () => {
         // maxColors=4 → paletteSlots=3 opaque + 1 transparent entry
         assert.ok(palette.length <= 4);
         assert.equal(palette.length, transparentIndex + 1);
-        assert.equal(indexedPixels[1], transparentIndex);
-        assert.equal(indexedPixels[3], transparentIndex);
-        assert.notEqual(indexedPixels[0], transparentIndex);
-        assert.notEqual(indexedPixels[2], transparentIndex);
+        assert.equal(at(indexedPixels, 1), transparentIndex);
+        assert.equal(at(indexedPixels, 3), transparentIndex);
+        assert.notEqual(at(indexedPixels, 0), transparentIndex);
+        assert.notEqual(at(indexedPixels, 2), transparentIndex);
     });
 
     it('nearestPaletteIndex excludes transparent index', () => {
-        const palette = [
+        const palette: Rgb[] = [
             [255, 0, 0],
             [0, 0, 0], // transparent slot (color irrelevant)
             [0, 255, 0]
@@ -70,17 +70,17 @@ describe('GifEncoder / GifDecoder', () => {
         enc.addFrame(palette, indexedPixels, transparentIndex, 10);
         const gif = enc.finish();
 
-        const decoded = GifDecoder.decode(gif.buffer.slice(gif.byteOffset, gif.byteOffset + gif.byteLength));
+        const decoded = GifDecoder.decode(Uint8Array.from(gif).buffer);
         assert.equal(decoded.width, w);
         assert.equal(decoded.height, h);
         assert.equal(decoded.frames.length, 1);
-        const frame = decoded.frames[0];
+        const frame = at(decoded.frames, 0);
         for (let i = 0; i < w * h; i++) {
-            assert.equal(frame.rgba[i * 4 + 3], 255, `alpha ${i}`);
+            assert.equal(at(frame.rgba, i * 4 + 3), 255, `alpha ${i}`);
             // Quantization may shift slightly; red should dominate
-            assert.ok(frame.rgba[i * 4] > 200, `R ${frame.rgba[i * 4]}`);
-            assert.ok(frame.rgba[i * 4 + 1] < 40, `G`);
-            assert.ok(frame.rgba[i * 4 + 2] < 40, `B`);
+            assert.ok(at(frame.rgba, i * 4) > 200, `R ${at(frame.rgba, i * 4)}`);
+            assert.ok(at(frame.rgba, i * 4 + 1) < 40, `G`);
+            assert.ok(at(frame.rgba, i * 4 + 2) < 40, `B`);
         }
     });
 
@@ -98,15 +98,15 @@ describe('GifEncoder / GifDecoder', () => {
         enc.begin();
         enc.addFrame(palette, indexedPixels, transparentIndex, 5);
         const gif = enc.finish();
-        const decoded = GifDecoder.decode(gif.buffer.slice(gif.byteOffset, gif.byteOffset + gif.byteLength));
-        const frame = decoded.frames[0];
+        const decoded = GifDecoder.decode(Uint8Array.from(gif).buffer);
+        const frame = at(decoded.frames, 0);
         for (let y = 0; y < h; y++) {
             for (let x = 0; x < 2; x++) {
-                assert.equal(frame.rgba[(y * w + x) * 4 + 3], 0, `transparent ${x},${y}`);
+                assert.equal(at(frame.rgba, (y * w + x) * 4 + 3), 0, `transparent ${x},${y}`);
             }
             for (let x = 2; x < 4; x++) {
-                assert.equal(frame.rgba[(y * w + x) * 4 + 3], 255, `opaque ${x},${y}`);
-                assert.ok(frame.rgba[(y * w + x) * 4 + 2] > 200, 'blue channel');
+                assert.equal(at(frame.rgba, (y * w + x) * 4 + 3), 255, `opaque ${x},${y}`);
+                assert.ok(at(frame.rgba, (y * w + x) * 4 + 2) > 200, 'blue channel');
             }
         }
     });
@@ -125,7 +125,7 @@ describe('GifEncoder / GifDecoder', () => {
         let found = false;
         for (let i = 0; i < gif.length - 7; i++) {
             if (gif[i] === 0x21 && gif[i + 1] === 0xF9 && gif[i + 2] === 0x04) {
-                const delay = gif[i + 4] | (gif[i + 5] << 8);
+                const delay = at(gif, i + 4) | (at(gif, i + 5) << 8);
                 assert.equal(delay, delayCs);
                 found = true;
                 break;
@@ -133,8 +133,8 @@ describe('GifEncoder / GifDecoder', () => {
         }
         assert.ok(found, 'GCE not found');
 
-        const decoded = GifDecoder.decode(gif.buffer.slice(gif.byteOffset, gif.byteOffset + gif.byteLength));
+        const decoded = GifDecoder.decode(Uint8Array.from(gif).buffer);
         // Decoder stores delay in ms (centiseconds * 10)
-        assert.equal(decoded.frames[0].delay, delayCs * 10);
+        assert.equal(at(decoded.frames, 0).delay, delayCs * 10);
     });
 });
