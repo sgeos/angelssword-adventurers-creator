@@ -24,18 +24,46 @@ const apiErrorMessage = (body: unknown): string | undefined => {
 // ============================================
 // GLOBAL STATE
 // ============================================
-export const ASAdventurer = {
+/**
+ * Data passed from one pipeline stage to the next.
+ *
+ * Typed explicitly rather than inferred: every field starts null, so
+ * inference would type them as null and reject the assignments the stages
+ * actually make.
+ */
+export interface Handoff {
+    /** Canvas from Sprite Prep. */
+    spriteCanvas: HTMLCanvasElement | null;
+    /** Sprite as a Blob. */
+    spriteBlob: Blob | null;
+    /** Sprite as a data URI. */
+    spriteBase64: string | null;
+    /** Clip from Generate Video. */
+    videoBlob: Blob | null;
+    /** Object URL for the clip above. */
+    videoUrl: string | null;
+    /** Payload from Video Prep; its shape is owned by that stage. */
+    videoPrepData: unknown;
+    /** Key colour, which flows the length of the pipeline. */
+    keyColor: string;
+}
+
+export interface AppState {
+    characterName: string;
+    readonly handoff: Handoff;
+}
+
+export const ASAdventurer: AppState = {
     characterName: '',
-    // Shared data passed between tabs
     handoff: {
-        spriteCanvas: null,      // Canvas data from Sprite Prep
-        spriteBlob: null,        // Sprite as Blob
-        spriteBase64: null,      // Sprite as base64
-        videoBlob: null,         // Video from Generate Video
-        videoUrl: null,          // Object URL for video
-        videoPrepData: null,     // Prepared video data from Video Prep
-        keyColor: '#00FF00',     // Selected key color (flows through pipeline)
-    }
+        spriteCanvas: null,
+        spriteBlob: null,
+        spriteBase64: null,
+        videoBlob: null,
+        videoUrl: null,
+        videoPrepData: null,
+        keyColor: '#00FF00',
+    },
 };
 
 // ============================================
