@@ -15,31 +15,7 @@ import {
 } from "./app.mts";
 import { base64ToBlob } from "./app-utils.mts";
 
-/** Message text from a thrown or rejected value, without assuming Error. */
-const reasonText = (reason: unknown): string =>
-    reason instanceof Error ? reason.message : String(reason);
-
-/**
- * An error message from an API response body.
- *
- * The body is untyped, so each step narrows. Checks `error.message` first,
- * then a bare `message`, matching what the original chained through `any`.
- */
-const responseErrorMessage = (body: unknown): string | undefined => {
-    if (typeof body !== "object" || body === null) return undefined;
-    if ("error" in body) {
-        const error: unknown = body.error;
-        if (typeof error === "object" && error !== null && "message" in error) {
-            const message: unknown = error.message;
-            if (typeof message === "string" && message !== "") return message;
-        }
-    }
-    if ("message" in body) {
-        const message: unknown = body.message;
-        if (typeof message === "string" && message !== "") return message;
-    }
-    return undefined;
-};
+import { reasonText, responseErrorMessage } from "./api.mts";
 import { closestFrom, findEl, requireEl } from "./dom.mts";
 import * as VideoGenCore from "./video-gen-core.mts";
 

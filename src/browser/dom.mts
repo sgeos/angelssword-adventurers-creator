@@ -69,3 +69,33 @@ export const closestFrom = <T extends Element>(
   const found = target.closest(selector);
   return found instanceof kind ? found : undefined;
 };
+
+/**
+ * A 2D drawing context, or a thrown error.
+ *
+ * getContext returns null when the context type is unsupported or the
+ * canvas already has an incompatible one. Every caller here treats that as
+ * impossible, so it fails loudly rather than propagating null.
+ */
+export const require2d = (
+  canvas: HTMLCanvasElement,
+  options?: CanvasRenderingContext2DSettings,
+): CanvasRenderingContext2D => {
+  const ctx = canvas.getContext("2d", options);
+  if (ctx === null) throw new Error("2D canvas context is unavailable");
+  return ctx;
+};
+
+/**
+ * The trimmed value of a text field, or an empty string when it is absent.
+ *
+ * The field may be an input or a textarea depending on the markup, so this
+ * accepts either rather than forcing callers to guess.
+ */
+export const fieldValue = (id: string): string => {
+  const el = document.getElementById(id);
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+    return el.value.trim();
+  }
+  return "";
+};
