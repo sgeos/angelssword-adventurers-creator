@@ -341,6 +341,21 @@ export default defineConfig(
     },
   },
 
+  // Worker sources live in a third project. The WebWorker and DOM libs both
+  // declare `self` and cannot be loaded together, so a worker cannot join the
+  // browser project. This block must follow the one above, whose glob also
+  // matches this file; the later entry wins. Every rule still applies here.
+  {
+    files: ["src/browser/gif-worker.mts"],
+    languageOptions: {
+      parserOptions: {
+        projectService: false,
+        project: "./tsconfig.worker.json",
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
+
   // Test code and its harness, all untyped CommonJS. Same treatment as the
   // build scripts and for the same reason: the type-aware rules report on
   // the absence of types rather than on anything an author did. The

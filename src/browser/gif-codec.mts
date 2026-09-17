@@ -495,11 +495,6 @@ export interface DecodedGif {
   readonly frames: DecodedFrame[];
 }
 
-export interface CompositedFrame {
-  readonly rgba: Uint8ClampedArray;
-  readonly delay: number;
-}
-
 /** GIF decoding. A namespace of pure functions, as above. */
 export const GifDecoder = {
     /**
@@ -672,43 +667,6 @@ export const GifDecoder = {
             prev = code;
         }
         return Uint8Array.from(output.length > pixelCount ? output.slice(0, pixelCount) : output);
-    },
-
-    /**
-     * Composite decoded frames into full RGBA canvases, respecting disposal methods.
-     */
-    compositeFrames(gif: DecodedGif): CompositedFrame[] {
-        const { width, height, frames } = gif;
-        const canvas = document.createElement('canvas');
-        canvas.width = width; canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx === null) throw new Error('2D canvas context is unavailable');
-
-        const result = [];
-        let prevImageData = null;
-
-        for (const frame of frames) {
-            // Disposal: 2 = restore to bg (clear), 3 = restore to previous
-            if (frame.disposalMethod === 2) {
-                ctx.clearRect(0, 0, width, height);
-            } else if (frame.disposalMethod === 3 && prevImageData !== null) {
-                ctx.putImageData(prevImageData, 0, 0);
-            }
-
-            // Save state before drawing if disposal 3
-            if (frame.disposalMethod === 3) {
-                prevImageData = ctx.getImageData(0, 0, width, height);
-            }
-
-            // Draw frame patch
-            const patch = new ImageData(new Uint8ClampedArray(frame.rgba), frame.width, frame.height);
-            ctx.putImageData(patch, frame.left, frame.top);
-
-            // Capture composited frame
-            const full = ctx.getImageData(0, 0, width, height);
-            result.push({ rgba: new Uint8ClampedArray(full.data), delay: frame.delay });
-        }
-        return result;
     },
 };
 

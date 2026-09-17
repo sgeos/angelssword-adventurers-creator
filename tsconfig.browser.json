@@ -22,5 +22,7 @@
     "rewriteRelativeImportExtensions": true
   },
   "include": ["src/browser/**/*.mts"],
-  "exclude": []
+  // Worker code belongs to tsconfig.worker.json; it needs the WebWorker lib,
+  // which cannot be loaded alongside DOM.
+  "exclude": ["src/browser/gif-worker.mts"]
 }
