@@ -25,6 +25,7 @@
   // construction, and this project is what proves that stays true.
   "include": [
     "src/browser/gif-worker.mts",
+    "src/browser/timer-worker.mts",
     "src/browser/gif-worker-core.mts",
     "src/browser/gif-codec.mts"
   ],

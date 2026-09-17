@@ -18,5 +18,5 @@
   // gif-worker.mts needs the WebWorker lib, which cannot be loaded beside DOM.
   // Only its message plumbing lives there; gif-worker-core.mts holds the
   // encoding and stays in this project so tests can reach it.
-  "exclude": ["test/integration/browser", "src/browser/gif-worker.mts"]
+  "exclude": ["test/integration/browser", "src/browser/gif-worker.mts", "src/browser/timer-worker.mts"]
 }

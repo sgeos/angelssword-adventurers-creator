@@ -105,3 +105,25 @@ export const computeCropToCenter = (
 /** Reduce a character name to something safe for a filename. */
 export const sanitizeFilename = (name: string): string =>
   name.toLowerCase().replace(/[^a-z0-9]/g, "_");
+
+/**
+ * Narrow a string from the DOM to an ExportMode, or undefined when it is not
+ * one. Mode selectors carry their value in a data attribute, so the value
+ * arrives as an unconstrained string and has to be checked before use.
+ *
+ * Returns the value rather than a boolean because the lint configuration bans
+ * user-defined type predicates: a predicate asserts a relationship the
+ * compiler takes on trust, which is the class of escape hatch this project
+ * exists to avoid. The comparisons below are checked for real.
+ */
+export const asExportMode = (value: string): ExportMode | undefined =>
+  value === "adventurer" || value === "normal" || value === "premium"
+    ? value
+    : undefined;
+
+/** Narrow a string from the DOM to a CropRatio. See asExportMode. */
+export const asCropRatio = (value: string): CropRatio | undefined =>
+  value === "1:1" || value === "4:3" || value === "3:4" ||
+  value === "16:9" || value === "9:16"
+    ? value
+    : undefined;

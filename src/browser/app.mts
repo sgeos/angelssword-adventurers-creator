@@ -4,6 +4,7 @@
  * Tab switching, settings, toasts, notification sounds, keyboard
  * shortcuts, and the shared handoff state passed between stages.
  */
+import type { HandoffPayload } from "./video-prep-core.mts";
 import { closestFrom, findEl, queryAll, requireEl } from "./dom.mts";
 
 /**
@@ -43,7 +44,7 @@ export interface Handoff {
     /** Object URL for the clip above. */
     videoUrl: string | null;
     /** Payload from Video Prep; its shape is owned by that stage. */
-    videoPrepData: unknown;
+    videoPrepData: HandoffPayload | null;
     /** Key colour, which flows the length of the pipeline. */
     keyColor: string;
 }

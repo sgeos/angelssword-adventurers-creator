@@ -346,7 +346,7 @@ export default defineConfig(
   // browser project. This block must follow the one above, whose glob also
   // matches this file; the later entry wins. Every rule still applies here.
   {
-    files: ["src/browser/gif-worker.mts"],
+    files: ["src/browser/gif-worker.mts", "src/browser/timer-worker.mts"],
     languageOptions: {
       parserOptions: {
         projectService: false,

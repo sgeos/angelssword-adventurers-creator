@@ -24,5 +24,5 @@
   "include": ["src/browser/**/*.mts"],
   // Worker code belongs to tsconfig.worker.json; it needs the WebWorker lib,
   // which cannot be loaded alongside DOM.
-  "exclude": ["src/browser/gif-worker.mts"]
+  "exclude": ["src/browser/gif-worker.mts", "src/browser/timer-worker.mts"]
 }
