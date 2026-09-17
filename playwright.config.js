@@ -1,7 +1,7 @@
 /**
  * Playwright characterization config for AS Adventurer (GREEN).
  *
- * Note: server.js auto-opens a browser via xdg-open/start/open on listen.
+ * Note: server.mts auto-opens a browser via xdg-open/start/open on listen.
  * There is no OPEN_BROWSER=0 gate on current main — in CI/headless Linux
  * xdg-open typically fails harmlessly. Prefer PORT=3001 for webServer.
  */
@@ -31,7 +31,9 @@ module.exports = defineConfig({
     },
   ],
   webServer: {
-    command: 'node server.js',
+    // Rebuilds the browser bundle first: the page loads js/*.mjs, which are
+    // compiled output, so a stale build would silently test old code.
+    command: 'npm run build:browser && node server.mts',
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,

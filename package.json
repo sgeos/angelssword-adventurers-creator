@@ -1,14 +1,14 @@
 {
   "name": "as-adventurer",
   "version": "1.0.0",
-  "description": "⚔️ AS Adventurer — VTuber Creation Pipeline by Angel's Sword Studios",
+  "description": "\u2694\ufe0f AS Adventurer \u2014 VTuber Creation Pipeline by Angel's Sword Studios",
   "main": "server.mts",
   "engines": {
     "node": ">=18"
   },
   "scripts": {
     "start": "node server.mts",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.browser.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.browser.json --noEmit && tsc -p tsconfig.worker.json --noEmit && tsc -p tsconfig.test.json --noEmit",
     "lint": "eslint .",
     "check": "npm run typecheck && npm run lint",
     "test:unit": "node --test test/unit/**/*.test.js test/unit/**/*.test.mts",
@@ -17,7 +17,7 @@
     "test": "npm run test:unit && npm run test:api",
     "test:all": "npm run check && npm run test && npm run test:browser",
     "build:exe": "node build-exe.mts",
-    "build:browser": "tsc -p tsconfig.browser.json",
+    "build:browser": "tsc -p tsconfig.browser.json && tsc -p tsconfig.worker.json",
     "prestart": "npm run build:browser"
   },
   "dependencies": {

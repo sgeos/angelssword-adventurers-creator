@@ -624,6 +624,26 @@ function initCharNameSync(): void {
     }
 }
 
+/**
+ * Publish the handoff singleton on the global object.
+ *
+ * ES modules create no globals, so nothing outside the module graph could see
+ * this otherwise. It is published deliberately rather than as a leftover: the
+ * handoff is the documented boundary between pipeline stages, and the
+ * characterization suite in test/integration/browser asserts against its
+ * shape. Everything else stays module-private.
+ *
+ * Object.defineProperty rather than an assignment through a cast: the lint
+ * configuration bans type assertions and `declare global`, and defineProperty
+ * needs neither.
+ */
+Object.defineProperty(globalThis, 'ASAdventurer', {
+    value: ASAdventurer,
+    writable: false,
+    enumerable: true,
+    configurable: true,
+});
+
 // ============================================
 // INIT
 // ============================================

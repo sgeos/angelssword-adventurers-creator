@@ -1,6 +1,6 @@
 /**
  * Optional helper: start the Express app for browser tests.
- * Prefer Playwright webServer (`node server.js` with PORT) — this helper
+ * Prefer Playwright webServer (`node server.mts` with PORT) — this helper
  * exists if a future require.main guard lands and tests need to require
  * the app without the listen/auto-open path.
  *
@@ -19,7 +19,7 @@ function startBrowserServer(opts = {}) {
   const cwd = opts.cwd || path.resolve(__dirname, '../..');
   const baseURL = `http://localhost:${port}`;
 
-  const child = spawn(process.execPath, ['server.js'], {
+  const child = spawn(process.execPath, ['server.mts'], {
     cwd,
     env: { ...process.env, PORT: port },
     stdio: ['ignore', 'pipe', 'pipe'],
