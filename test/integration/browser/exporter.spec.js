@@ -18,7 +18,8 @@ test.describe('F — Model exporter smoke', () => {
     await page.goto('/');
 
     const result = await page.evaluate(() => {
-      // ChromaKey currently lives as a non-exported class inside model-exporter.js
+      // ChromaKey is a module export of src/browser/chroma-key.mts and is not
+    // published on window, so this stays a conditional check.
       if (typeof window.ChromaKey === 'function') {
         try {
           const ck = new window.ChromaKey();

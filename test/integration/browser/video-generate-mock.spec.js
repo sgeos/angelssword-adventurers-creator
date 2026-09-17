@@ -56,7 +56,8 @@ test.describe('E — Mocked video generate → prep handoff', () => {
   test('videoPrepData contract shape fields are characterized', async ({ page }) => {
     await page.goto('/');
 
-    // Production shape from video-prep.js sendToExporter (without needing a real decodeable video)
+    // Production shape from src/browser/video-prep.mts sendToExporter
+      // (without needing a real decodeable video)
     const shape = await page.evaluate(() => {
       window.ASAdventurer.handoff.videoPrepData = {
         videoSrc: 'blob:http://localhost/mock',

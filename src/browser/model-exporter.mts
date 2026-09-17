@@ -135,7 +135,7 @@ const parsePersistedSliders = (raw: string): PersistedSliders | undefined => {
 export class ModelExporter {
     /* ─── Mode and preview ─── */
     mode: ExportMode = 'adventurer';
-    readonly chromaKey = new ChromaKey();
+    readonly chromaKey: ChromaKey = new ChromaKey();
     previewMode: PreviewMode = 'checker';
     eyedropperActive = false;
 

@@ -84,7 +84,13 @@ export class GifEncoder {
         this.writeByte(0x00); // Block terminator
     }
 
-    writeImageDescriptor(lctSizeField: number, left = 0, top = 0, w = this.width, h = this.height): void {
+    writeImageDescriptor(
+    lctSizeField: number,
+    left = 0,
+    top = 0,
+    w: number = this.width,
+    h: number = this.height,
+  ): void {
         this.writeByte(0x2C); // Image separator
         this.writeShort(left);
         this.writeShort(top);

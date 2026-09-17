@@ -43,6 +43,9 @@ export default defineConfig(
     // Add your own entries only with a reason you would defend: anything
     // ignored here is unlinted, and unlinted is where an agent that cannot
     // satisfy the rules will put the file.
+    // public/ is now build output (public/js/*.mjs, compiled from
+    // src/browser) plus static assets. The sources are linted; linting their
+    // emitted form would only report on the compiler's formatting.
     ignores: ["**/node_modules/**", "**/dist/**", "public/**", "tmp/**", "secret/**", "tools/probe/**"],
   },
 
@@ -81,7 +84,18 @@ export default defineConfig(
 
     languageOptions: {
       parserOptions: {
-        projectService: true,
+        projectService: {
+          // This file is JavaScript and cannot join a project: the root
+          // tsconfig dropped allowJs when the last .js source was converted,
+          // and allowJs is mutually exclusive with isolatedDeclarations.
+          // allowDefaultProject gives it inferred types so the type-aware
+          // rules still apply here rather than silently not running.
+          //
+          // Keep this list to config files. Anything a build or a test
+          // imports belongs in a real project, where its types are checked
+          // against everything else rather than inferred in isolation.
+          allowDefaultProject: ["eslint.config.mjs"],
+        },
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -379,19 +393,8 @@ export default defineConfig(
     },
   },
 
-  //
-  // Phase 1 of the migration covers new code only. These are untyped
-  // CommonJS, so the type-aware rules report on the absence of types
-  // rather than on anything an author did, which is noise rather than
-  // signal. They keep the syntactic rules and lose the type-aware ones
-  // until they are converted, at which point this block is deleted.
-  {
-    files: ["__none__.js"],
-    extends: [tseslint.configs.disableTypeChecked],
-    rules: {
-      "@typescript-eslint/no-require-imports": "off",
-      "@typescript-eslint/explicit-function-return-type": "off",
-      "@typescript-eslint/explicit-module-boundary-types": "off",
-    },
-  },
+  // The migration's phase-1 relief block stood here, exempting the untyped
+  // CommonJS sources from the type-aware rules. Every one of them has been
+  // converted, so it is gone. Reintroducing an exemption like it should take
+  // the same argument it originally took.
 );

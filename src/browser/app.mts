@@ -151,7 +151,7 @@ class NotificationSound {
     }
 }
 
-export const notificationSound = new NotificationSound();
+export const notificationSound: NotificationSound = new NotificationSound();
 
 /**
  * Show one pipeline stage and hide the others.

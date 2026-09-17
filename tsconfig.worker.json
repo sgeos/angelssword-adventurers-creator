@@ -16,7 +16,7 @@
     "outDir": "public/js",
     "rootDir": "src/browser",
     "sourceMap": true,
-    "declaration": false,
+    "declaration": true,
     "allowJs": false,
     "checkJs": false,
     "rewriteRelativeImportExtensions": true

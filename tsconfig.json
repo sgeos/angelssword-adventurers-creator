@@ -86,20 +86,21 @@
     "forceConsistentCasingInFileNames": true,
 
     // ---- Legacy JavaScript ------------------------------------------
-    // DELETE BOTH if you are starting from TypeScript. They exist only so
-    // the config has effect before any .ts file exists, and they are the
-    // reason the block above is needed in eslint.config.mjs.
+    // allowJs and checkJs stood here during the migration, so that .mts
+    // could import not-yet-converted .js. Nothing in this project's scope
+    // is JavaScript any more, so both are gone and isolatedDeclarations —
+    // which is mutually exclusive with allowJs — is on instead.
     //
-    // LIMITATION: allowJs is mutually exclusive with
-    // `isolatedDeclarations`, which would force explicit types on every
-    // export at the compiler level rather than the lint level. That is a
-    // concrete reason to finish the migration rather than leave checkJs
-    // on indefinitely.
-    // Phase 1 of the migration: JS stays resolvable so .mts can import it,
-    // but is not yet checked. Flip checkJs to true once the remaining build
-    // scripts are converted, then delete both.
-    "allowJs": true,
-    "checkJs": false
+    // Every exported symbol must now carry a type the compiler can write
+    // into a declaration without inferring it. That moves a guarantee the
+    // lint config was making down to the compiler, where it cannot be
+    // switched off per-file.
+    "isolatedDeclarations": true,
+    // Declarations are not published; isolatedDeclarations simply requires
+    // that they *could* be emitted without inference. They go to a gitignored
+    // directory so they never mix with the browser bundle.
+    "declaration": true,
+    "declarationDir": "dist/types"
   },
 
   // Recursive by construction. A directory-scoped list means a new
@@ -122,12 +123,11 @@
   // you can bear and treat every entry as a known gap.
   //
   // "dist" and "node_modules" are build output and vendored code. Add
-  // your own only with a reason you would defend in review. The example
-  // that follows is a browser-source directory, which is a real gap and
-  // not a safe one.
-  // public/ is browser code loaded by <script> tags with globals rather
-  // than modules. It is phase 2 and needs a module story first, so it is
-  // excluded here rather than silently half-checked.
+  // your own only with a reason you would defend in review.
+  //
+  // public/ holds static assets and the compiled output of src/browser.
+  // The sources are checked by tsconfig.browser.json; what lands in
+  // public/js is the compiler's own emit and is not checked again.
   "exclude": [
     "node_modules",
     "dist",
@@ -135,8 +135,8 @@
     "secret",
     "tools/probe",
     // Browser code and its end-to-end harness. Both need the DOM lib,
-    // which the server must not have, so they get their own project in
-    // phase 2 rather than being half-checked under this one.
+    // which the server must not have, so they have their own projects
+    // rather than being half-checked under this one.
     "public",
     "playwright.config.js",
     "test/integration/browser",

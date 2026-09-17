@@ -14,7 +14,9 @@
     "outDir": "public/js",
     "rootDir": "src/browser",
     "sourceMap": true,
-    "declaration": false,
+    // Inherits isolatedDeclarations, so declaration emit stays on; the
+    // root config sends the .d.ts to dist/types, clear of outDir.
+    "declaration": true,
     "allowJs": false,
     "checkJs": false,
     // Emit is on, so imports must be rewritten to the .js the browser will
