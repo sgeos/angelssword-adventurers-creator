@@ -39,19 +39,29 @@ if ! command -v node >/dev/null 2>&1; then
     exit 1
 fi
 
-# Node is available by this point, so let it compare its own version rather
-# than parsing a version string in the shell. A failure here means node is on
-# PATH but not working, which set -e would otherwise report as silence.
-NODE_MAJOR=$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null) || NODE_MAJOR=''
-case "$NODE_MAJOR" in
-    ''|*[!0-9]*)
-        printf 'Found node at %s but could not read its version.\n' "$(command -v node)" >&2
-        printf 'The installation appears to be broken.\n' >&2
-        exit 1 ;;
-esac
+# The server is TypeScript and runs through Node's native type stripping, with
+# no build step. That is unflagged from 22.18 and 23.6, and stable in 24 — so
+# the requirement is not a plain "major >= N" and a major-only check would wave
+# through 22.0 and fail later with a parse error instead of this message.
+#
+# Node does the comparison: it already knows its own version, and the shell
+# should not be parsing semver. A failure here means node is on PATH but not
+# working, which set -e would otherwise report as silence.
+NODE_OK=$(node -p '(() => {
+    const [major, minor] = process.versions.node.split(".").map(Number);
+    const ok = major >= 24 || (major === 23 && minor >= 6) || (major === 22 && minor >= 18);
+    return ok ? "yes" : "no";
+})()' 2>/dev/null) || NODE_OK=''
 
-if [ "$NODE_MAJOR" -lt 18 ]; then
-    printf 'AS Adventurer requires Node.js 18 or newer. Found %s.\n' "$(node --version)" >&2
+if [ "$NODE_OK" = '' ]; then
+    printf 'Found node at %s but could not read its version.\n' "$(command -v node)" >&2
+    printf 'The installation appears to be broken.\n' >&2
+    exit 1
+fi
+
+if [ "$NODE_OK" != 'yes' ]; then
+    printf 'AS Adventurer requires Node.js 22.18 or newer (24 recommended).\n' >&2
+    printf 'Found %s, which cannot run TypeScript directly.\n' "$(node --version)" >&2
     exit 1
 fi
 
@@ -68,8 +78,8 @@ if [ ! -d node_modules ]; then
     npm install
 fi
 
-# server.mts, not .js: Node 24 strips types natively, so TypeScript runs
-# directly with no build step.
+# server.mts, not .js: Node strips types natively, so TypeScript runs directly
+# with no build step. The version check above is what guarantees that works.
 #
 # exec so that the server replaces this shell and receives Ctrl+C directly.
 exec node server.mts

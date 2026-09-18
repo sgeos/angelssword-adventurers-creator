@@ -127,3 +127,99 @@ export const asCropRatio = (value: string): CropRatio | undefined =>
   value === "16:9" || value === "9:16"
     ? value
     : undefined;
+
+/* ────────────────────────────────────────────────────────────────────────
+ * Exporter settings: narrowing and stored-value validation.
+ *
+ * These live here rather than in model-exporter.mts because they are pure
+ * and this module is DOM-free, which is what makes them reachable from
+ * tests. model-exporter keeps only the helper that reads an input element.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/** Backdrop the preview canvas draws behind the keyed frame. */
+export type PreviewMode = 'checker' | 'black' | 'white' | 'original';
+
+/**
+ * Narrow a data-attribute string to a PreviewMode. Returns the value rather
+ * than a boolean; the lint configuration bans type predicates, which assert
+ * rather than check.
+ */
+export const asPreviewMode = (value: string): PreviewMode | undefined =>
+    value === 'checker' || value === 'black' || value === 'white' || value === 'original'
+        ? value
+        : undefined;
+
+/** Container the last export was written into. */
+export type ExportFormat = 'gif' | 'webm';
+/** A positive number, or the fallback when it is zero, negative, or NaN. */
+export const positiveOr = (value: number, fallback: number): number =>
+    Number.isFinite(value) && value > 0 ? value : fallback;
+
+/** localStorage key holding the slider positions between sessions. */
+export const SLIDER_STORAGE_KEY = 'ex_slider_values';
+
+/**
+ * Slider positions as they are stored. Every field may be absent: what is read
+ * back is whatever a previous version of this code wrote, or whatever else has
+ * been left under that key. Declared as `T | undefined` rather than optional
+ * because the parser always sets every key, and exactOptionalPropertyTypes
+ * draws a real distinction between the two.
+ */
+export interface PersistedSliders {
+    readonly similarity: number | undefined;
+    readonly smoothness: number | undefined;
+    readonly spillSuppress: number | undefined;
+    readonly scale: number | undefined;
+    readonly vOffset: number | undefined;
+    readonly saturation: number | undefined;
+    readonly brightness: number | undefined;
+    readonly edgeFade: number | undefined;
+    readonly antiAlias: boolean | undefined;
+    readonly smokeCleanup: boolean | undefined;
+}
+
+/**
+ * Coerce a stored field to a finite number.
+ *
+ * Accepts strings because earlier builds wrote input.value directly, which is
+ * a string; those entries are still in users' browsers. The old reader divided
+ * those strings by 100 and relied on JavaScript coercing them, so the values
+ * were never numbers at all. This normalises on read and writes numbers.
+ */
+export const storedNumber = (raw: unknown): number | undefined => {
+    if (typeof raw === 'number') return Number.isFinite(raw) ? raw : undefined;
+    if (typeof raw !== 'string' || raw.trim() === '') return undefined;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+export const storedBoolean = (raw: unknown): boolean | undefined =>
+    typeof raw === 'boolean' ? raw : undefined;
+
+/**
+ * Parse the stored slider positions, or undefined when the entry is absent,
+ * malformed, or not an object. localStorage is writable by anything running on
+ * the origin, so nothing read back is trusted; every field is checked.
+ */
+export const parsePersistedSliders = (raw: string): PersistedSliders | undefined => {
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(raw);
+    } catch {
+        return undefined;
+    }
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return undefined;
+    const source: Record<string, unknown> = { ...parsed };
+    return {
+        similarity: storedNumber(source['similarity']),
+        smoothness: storedNumber(source['smoothness']),
+        spillSuppress: storedNumber(source['spillSuppress']),
+        scale: storedNumber(source['scale']),
+        vOffset: storedNumber(source['vOffset']),
+        saturation: storedNumber(source['saturation']),
+        brightness: storedNumber(source['brightness']),
+        edgeFade: storedNumber(source['edgeFade']),
+        antiAlias: storedBoolean(source['antiAlias']),
+        smokeCleanup: storedBoolean(source['smokeCleanup']),
+    };
+};

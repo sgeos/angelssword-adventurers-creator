@@ -10,7 +10,7 @@
 
 AS Adventurer Creator is a standalone desktop tool that lets you create animated VTuber / PNGtuber assets from scratch. It walks you through a simple 4-step pipeline — from a static sprite all the way to a transparent, looping animated model ready for streaming.
 
-No installation required for the prebuilt binary. Run it and open your browser. From source, Node.js 18 or newer is the only prerequisite.
+No installation required for the prebuilt binary. Run it and open your browser. From source, Node.js 22.18 or newer is the only prerequisite.
 
 ---
 
@@ -156,23 +156,28 @@ The exported WebM files also work with any OBS browser source, PNGtuber app, or 
 ## System Requirements
 
 - **OS:** Windows 10/11, macOS, Linux, or FreeBSD/OpenBSD/NetBSD (64-bit)
-- **Node.js:** 18 or newer, required on every platform except when running a
-  prebuilt binary on Windows or macOS
+- **Node.js:** 22.18 or newer (24 recommended), required on every platform
+  except when running a prebuilt binary on Windows or macOS. The server is
+  TypeScript and runs through Node's native type stripping, with no build
+  step; 22.18 is the first release where that works without a flag. Node 23
+  needs 23.6 for the same reason.
 - **Browser:** Chrome, Edge, or Firefox (opens automatically)
 - **Internet:** Required only for AI generation steps (Steps 1-2). Steps 3-4 work fully offline.
 - **Disk Space:** ~40 MB for the application
 
 ### Building a standalone binary
 
-`node build-exe.js` produces a self-contained binary for the platform it is
-run on, into `dist/ASAdventurer/`. Windows, macOS, and Linux are supported.
-The BSDs are not, because `pkg` publishes no base binary for them; run the
-application with `npm start` there instead.
+**Currently unavailable.** `node build-exe.mts` refuses to build and explains
+why rather than emitting something broken: the server is now ESM TypeScript,
+and `pkg` — the tool the previous build used — is archived and rejects ESM.
+Restoring this means either bundling to CommonJS first or moving to Node's
+own single-executable applications. Until then, run from source with
+`npm start` on every platform.
 
-On macOS the build applies an ad-hoc code signature so the result runs on the
-machine that produced it. That is not notarization. Distributing the binary to
-another Mac requires an Apple Developer ID and a notarization step, or the
-recipient clearing the quarantine attribute by hand.
+When it worked, the build applied an ad-hoc code signature on macOS so the
+result ran on the machine that produced it. That was never notarization;
+distributing to another Mac needed an Apple Developer ID, or the recipient
+clearing the quarantine attribute by hand.
 
 ---
 
@@ -190,11 +195,62 @@ ASAdventurer/
 └── public/                           ← UI files (do not modify)
     ├── index.html
     ├── style.css
-    ├── sprite-prep.js
-    ├── video-prep.js
-    ├── model-exporter.js
+    ├── js/                           ← Compiled from src/browser
     └── assets/
 ```
+
+---
+
+## Working on the Source
+
+The application is TypeScript throughout. The two halves are built and run
+differently, because they have to be:
+
+- **Server** (`server.mts`) runs directly. Node strips the types as it loads
+  the file, so there is no build step and nothing to keep in sync.
+- **Browser** (`src/browser/*.mts`) is compiled to `public/js/*.mjs`, because
+  no browser strips types. `index.html` loads that output as ES modules.
+  `npm start` builds it first, so running the app never serves a stale bundle.
+
+```sh
+npm install
+npm start              # builds the browser half, then serves on :3001
+
+npm run check          # typecheck every project, then lint
+npm test               # unit and API tests
+npx playwright test    # browser tests (needs: npx playwright install chromium)
+npm run test:all       # all of the above
+```
+
+### Why four tsconfig projects
+
+They differ in which global types each half is allowed to see, and that
+separation is enforced rather than assumed:
+
+| Project | Covers | Sees |
+|---|---|---|
+| `tsconfig.json` | server and build scripts | Node, no DOM |
+| `tsconfig.browser.json` | `src/browser` | DOM, no Node |
+| `tsconfig.worker.json` | the two Web Workers | WebWorker, neither DOM nor Node |
+| `tsconfig.test.json` | tests | both |
+
+The worker project exists because the `WebWorker` and `DOM` libs both declare
+`self` and cannot be loaded together. Splitting it also proves the GIF codec
+is free of DOM dependencies, which is how a stray `document` reference in it
+was found.
+
+### The strictness is deliberate
+
+`eslint.config.mjs` carries roughly two thirds of the enforcement; the
+compiler settings alone cannot ban `any`, type assertions, or non-null
+assertions. `isolatedDeclarations` requires every exported symbol to state a
+type the compiler need not infer. Type predicates are banned, so code that
+narrows an untrusted string returns the narrowed value or `undefined` rather
+than asserting a relationship the compiler must take on trust.
+
+If a rule is in the way, the honest move is to argue for changing it, not to
+route around it — `eslint-disable` comments are disabled config-wide and will
+not work.
 
 ---
 

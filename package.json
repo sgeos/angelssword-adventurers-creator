@@ -4,14 +4,14 @@
   "description": "\u2694\ufe0f AS Adventurer \u2014 VTuber Creation Pipeline by Angel's Sword Studios",
   "main": "server.mts",
   "engines": {
-    "node": ">=18"
+    "node": "^22.18.0 || >=23.6.0"
   },
   "scripts": {
     "start": "node server.mts",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.browser.json --noEmit && tsc -p tsconfig.worker.json --noEmit && tsc -p tsconfig.test.json --noEmit",
     "lint": "eslint .",
     "check": "npm run typecheck && npm run lint",
-    "test:unit": "node --test test/unit/**/*.test.js test/unit/**/*.test.mts",
+    "test:unit": "node --test test/unit/*.test.mts",
     "test:api": "node --test test/integration/api/**/*.test.mjs",
     "test:browser": "playwright test",
     "test": "npm run test:unit && npm run test:api",
