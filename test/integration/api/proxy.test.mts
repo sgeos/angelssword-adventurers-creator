@@ -2,18 +2,18 @@ import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 
-import helpers from '../../helpers/mock-fetch.js';
-import { createApp } from '../../../server.mts';
-
-const {
-    resetMockFetch,
-    mockFetchResponse,
-    mockFetchReject,
+import {
+    callAt,
+    callBodyText,
     getFetchCalls,
-    wasFetchCalled,
     getFormBodyString,
-    mockFetch
-} = helpers;
+    mockFetch,
+    mockFetchReject,
+    mockFetchResponse,
+    resetMockFetch,
+    wasFetchCalled,
+} from '../../helpers/mock-fetch.mts';
+import { createApp } from '../../../server.mts';
 
 // The mock is a constructor argument, not a global. Nothing is patched and
 // the production module has no seam to patch.
@@ -106,11 +106,11 @@ describe('AS Adventurer API characterization', () => {
 
         const calls = getFetchCalls();
         assert.equal(calls.length, 1);
-        assert.equal(calls[0].url, 'https://api.openai.com/v1/images/generations');
-        assert.equal(calls[0].options.method, 'POST');
-        assert.equal(calls[0].options.headers.Authorization, 'Bearer sk-test');
-        assert.equal(calls[0].options.headers['Content-Type'], 'application/json');
-        assert.deepEqual(JSON.parse(calls[0].options.body), payload);
+        assert.equal(callAt().url, 'https://api.openai.com/v1/images/generations');
+        assert.equal(callAt().method, 'POST');
+        assert.equal(callAt().headers['Authorization'], 'Bearer sk-test');
+        assert.equal(callAt().headers['Content-Type'], 'application/json');
+        assert.deepEqual(JSON.parse(callBodyText()), payload);
     });
 
     // --- 7: /api/chat forwards; non-2xx passthrough ---
@@ -133,10 +133,10 @@ describe('AS Adventurer API characterization', () => {
 
         const calls = getFetchCalls();
         assert.equal(calls.length, 1);
-        assert.equal(calls[0].url, 'https://api.openai.com/v1/chat/completions');
-        assert.equal(calls[0].options.method, 'POST');
-        assert.equal(calls[0].options.headers.Authorization, 'Bearer sk-bad');
-        assert.deepEqual(JSON.parse(calls[0].options.body), payload);
+        assert.equal(callAt().url, 'https://api.openai.com/v1/chat/completions');
+        assert.equal(callAt().method, 'POST');
+        assert.equal(callAt().headers['Authorization'], 'Bearer sk-bad');
+        assert.deepEqual(JSON.parse(callBodyText()), payload);
     });
 
     // --- 8: /api/edits multipart conversion ---
@@ -161,11 +161,11 @@ describe('AS Adventurer API characterization', () => {
 
         const calls = getFetchCalls();
         assert.equal(calls.length, 1);
-        assert.equal(calls[0].url, 'https://api.openai.com/v1/images/edits');
-        assert.equal(calls[0].options.method, 'POST');
-        assert.equal(calls[0].options.headers.Authorization, 'Bearer sk-edit');
+        assert.equal(callAt().url, 'https://api.openai.com/v1/images/edits');
+        assert.equal(callAt().method, 'POST');
+        assert.equal(callAt().headers['Authorization'], 'Bearer sk-edit');
 
-        const formBody = await getFormBodyString(calls[0].options.body);
+        const formBody = await getFormBodyString(callAt().body);
         assert.match(formBody, /name="model"/);
         assert.match(formBody, /gpt-image-2/);
         assert.match(formBody, /filename="ref0\.png"/);
@@ -191,11 +191,11 @@ describe('AS Adventurer API characterization', () => {
         const calls = getFetchCalls();
         assert.equal(calls.length, 1);
         assert.equal(
-            calls[0].url,
+            callAt().url,
             'https://generativelanguage.googleapis.com/v1beta/interactions?key=google-secret'
         );
-        assert.equal(calls[0].options.method, 'POST');
-        assert.deepEqual(JSON.parse(calls[0].options.body), payload);
+        assert.equal(callAt().method, 'POST');
+        assert.deepEqual(JSON.parse(callBodyText()), payload);
     });
 
     // --- 10: /api/video/poll GET operation ---
@@ -214,10 +214,10 @@ describe('AS Adventurer API characterization', () => {
         const calls = getFetchCalls();
         assert.equal(calls.length, 1);
         assert.equal(
-            calls[0].url,
+            callAt().url,
             'https://generativelanguage.googleapis.com/v1beta/operations/op-123?key=poll-key'
         );
-        assert.equal(calls[0].options.method, 'GET');
+        assert.equal(callAt().method, 'GET');
     });
 
     // --- 11: fetch reject → 502 Proxy error ---
@@ -261,7 +261,9 @@ describe('AS Adventurer API characterization', () => {
         const res = await request(app).get('/');
 
         assert.equal(res.status, 200);
-        assert.match(res.headers['content-type'], /html/);
+        const contentType = res.headers['content-type'];
+        assert.ok(contentType !== undefined, 'response carried no content-type');
+        assert.match(contentType, /html/);
         assert.ok(typeof res.text === 'string' && res.text.length > 0);
         assert.match(res.text, /<!DOCTYPE html>|<html/i);
     });

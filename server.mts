@@ -68,7 +68,31 @@ const relay = async (res: Response, upstream: { status: number; text: () => Prom
  * including the ones carrying the user's API keys. A parameter is visible
  * only to whoever constructs the app.
  */
-type FetchLike = typeof nodeFetch;
+/** The response surface this server consumes. Nothing else is touched. */
+export interface UpstreamResponse {
+  readonly status: number;
+  readonly text: () => Promise<string>;
+}
+
+/** The request options this server sends. */
+export interface UpstreamInit {
+  readonly method: string;
+  readonly headers?: Readonly<Record<string, string>>;
+  /** A JSON string, or a form-data stream for multipart uploads. */
+  readonly body?: string | FormData;
+  readonly timeout?: number;
+}
+
+/**
+ * Narrowed to what the proxy actually uses — a status and a text body —
+ * rather than the whole of node-fetch. The default argument below is what
+ * checks that the real implementation still satisfies it.
+ *
+ * The narrow shape is also what lets a test supply a mock without asserting
+ * it into the full Response type. A mock that has to be cast into place is
+ * a mock the compiler has stopped checking.
+ */
+export type FetchLike = (url: string, init?: UpstreamInit) => Promise<UpstreamResponse>;
 
 // ── App ──────────────────────────────────────────────────────────────
 
