@@ -1,3 +1,5 @@
+import { channel, type RgbaBuffer } from "./pixels.mts";
+
 /**
  * Exporter math helpers.
  */
@@ -222,4 +224,56 @@ export const parsePersistedSliders = (raw: string): PersistedSliders | undefined
         antiAlias: storedBoolean(source['antiAlias']),
         smokeCleanup: storedBoolean(source['smokeCleanup']),
     };
+};
+
+/* ────────────────────────────────────────────────────────────────────────
+ * Reference-match saturation analysis.
+ *
+ * Moved here from model-exporter so it is reachable from tests. It took an
+ * ImageData, which a node test cannot construct; it only ever read the
+ * underlying buffer, so it takes that instead. Behaviour is unchanged.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/** A colour as the keyer and the swatches carry it. */
+export interface Rgb {
+  readonly r: number;
+  readonly g: number;
+  readonly b: number;
+}
+
+export const averageSaturation = (
+  rgba: RgbaBuffer,
+  bgColor: Rgb,
+  skipTransparent = false,
+): number => {
+  const keyCb = 128 + (-0.168736 * bgColor.r - 0.331264 * bgColor.g + 0.5 * bgColor.b);
+  const keyCr = 128 + (0.5 * bgColor.r - 0.418688 * bgColor.g - 0.081312 * bgColor.b);
+  const keyExcludeRange = 40; // Exclude pixels within this chroma distance of key
+
+  let totalSat = 0, count = 0;
+  for (let j = 0; j < rgba.length; j += 4) {
+      const alpha = channel(rgba, j + 3);
+      if (skipTransparent && alpha < 10) continue;
+      if (!skipTransparent && alpha < 200) continue; // For ref: only solid pixels
+
+      const dr = channel(rgba, j), dg = channel(rgba, j + 1), db = channel(rgba, j + 2);
+      const r = dr / 255, g = dg / 255, b = db / 255;
+      const maxC = Math.max(r, g, b), minC = Math.min(r, g, b);
+      const lum = (maxC + minC) / 2;
+
+      // Skip near-black and near-white (saturation is meaningless)
+      if (lum < 0.05 || lum > 0.95) continue;
+
+      // Skip key-colored pixels
+      const cb = 128 + (-0.168736 * dr - 0.331264 * dg + 0.5 * db);
+      const cr = 128 + (0.5 * dr - 0.418688 * dg - 0.081312 * db);
+      const chromaDist = Math.sqrt((cb - keyCb) ** 2 + (cr - keyCr) ** 2);
+      if (chromaDist < keyExcludeRange) continue;
+
+      // HSL saturation
+      const sat = maxC === minC ? 0 : (maxC - minC) / (1 - Math.abs(2 * lum - 1));
+      totalSat += Math.min(1, sat); // clamp
+      count++;
+  }
+  return count > 0 ? totalSat / count : 0;
 };

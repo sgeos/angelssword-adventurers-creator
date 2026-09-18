@@ -900,7 +900,7 @@ function runAdvKeyAnalysis(): void {
     // For each key color, calculate its minimum distance to any character pixel
     // Use CIE76 deltaE in Lab space for perceptual accuracy
     const results = KEY_COLORS.map(keyCol => {
-        const keyLab = rgbToLab(keyCol.r, keyCol.g, keyCol.b);
+        const keyLab = Core.rgbToLab(keyCol.r, keyCol.g, keyCol.b);
 
         let minDist = Infinity;
         let avgDist = 0;
@@ -911,7 +911,7 @@ function runAdvKeyAnalysis(): void {
             const qr = ((quantKey >> 12) & 0x3F) << 2;
             const qg = ((quantKey >> 6) & 0x3F) << 2;
             const qb = (quantKey & 0x3F) << 2;
-            const pixLab = rgbToLab(qr, qg, qb);
+            const pixLab = Core.rgbToLab(qr, qg, qb);
 
             const dist = Math.sqrt(
                 (keyLab.L - pixLab.L) ** 2 +
@@ -1001,35 +1001,6 @@ function displayAdvKeyResults(results: readonly KeyScore[]): void {
     }
 }
 
-// --- Color Science Helpers ---
-/** A colour in CIE Lab, where Euclidean distance approximates perception. */
-interface Lab {
-    readonly L: number;
-    readonly a: number;
-    readonly b: number;
-}
-
-function rgbToLab(r: number, g: number, b: number): Lab {
-    // sRGB → XYZ → Lab
-    let rr = r / 255, gg = g / 255, bb = b / 255;
-    rr = rr > 0.04045 ? Math.pow((rr + 0.055) / 1.055, 2.4) : rr / 12.92;
-    gg = gg > 0.04045 ? Math.pow((gg + 0.055) / 1.055, 2.4) : gg / 12.92;
-    bb = bb > 0.04045 ? Math.pow((bb + 0.055) / 1.055, 2.4) : bb / 12.92;
-
-    let x = (rr * 0.4124 + gg * 0.3576 + bb * 0.1805) / 0.95047;
-    let y = (rr * 0.2126 + gg * 0.7152 + bb * 0.0722) / 1.00000;
-    let z = (rr * 0.0193 + gg * 0.1192 + bb * 0.9505) / 1.08883;
-
-    x = x > 0.008856 ? Math.cbrt(x) : (7.787 * x) + 16 / 116;
-    y = y > 0.008856 ? Math.cbrt(y) : (7.787 * y) + 16 / 116;
-    z = z > 0.008856 ? Math.cbrt(z) : (7.787 * z) + 16 / 116;
-
-    return {
-        L: (116 * y) - 16,
-        a: 500 * (x - y),
-        b: 200 * (y - z)
-    };
-}
 
 // Init on DOM ready
 if (document.readyState === 'loading') {

@@ -14,6 +14,7 @@ const {
     findBottomOpaqueRow,
     computeSpriteDrawRect,
     buildPrompt,
+    defaultColorName,
     buildPromptWithRefs,
     buildGenerateRequest
 } = Core;
@@ -255,5 +256,35 @@ describe('computeSpriteDrawRect', () => {
             { zoomX: a.zoomX, zoomY: a.zoomY, drawW: a.drawW, drawH: a.drawH },
             { zoomX: b.zoomX, zoomY: b.zoomY, drawW: b.drawW, drawH: b.drawH }
         );
+    });
+});
+
+describe('defaultColorName', () => {
+    it('names each of the five key colours', () => {
+        assert.equal(defaultColorName('#00FF00'), 'Green');
+        assert.equal(defaultColorName('#FF00FF'), 'Magenta');
+        assert.equal(defaultColorName('#0000FF'), 'Blue');
+        assert.equal(defaultColorName('#FFFF00'), 'Yellow');
+        assert.equal(defaultColorName('#00FFFF'), 'Cyan');
+    });
+
+    it('is case-insensitive about the hex it is given', () => {
+        assert.equal(defaultColorName('#00ff00'), 'Green');
+        assert.equal(defaultColorName('#00Ff00'), 'Green');
+    });
+
+    it('falls back to the input for a colour it does not name', () => {
+        assert.equal(defaultColorName('#123456'), '#123456');
+        assert.equal(defaultColorName(''), '');
+    });
+
+    it('returns the original casing on fallback, not the upper-cased lookup key', () => {
+        assert.equal(defaultColorName('#abcdef'), '#abcdef');
+    });
+
+    it('does not resolve inherited object properties as colour names', () => {
+        // A plain record lookup would find these on Object.prototype.
+        assert.equal(defaultColorName('constructor'), 'constructor');
+        assert.equal(defaultColorName('toString'), 'toString');
     });
 });

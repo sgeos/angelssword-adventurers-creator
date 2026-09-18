@@ -10,9 +10,11 @@ import {
     DEFAULT_PROMPT,
     MODEL,
     buildVideoRequestBody,
+    detectMime,
     extractVideoPayload,
     pickHandoffVideo,
     parseGenCount,
+    stripDataUrl,
 } from '../../src/browser/video-gen-core.mts';
 
 describe('video-gen-core buildVideoRequestBody', () => {
@@ -185,3 +187,49 @@ describe('video-gen-core parseGenCount', () => {
 });
 
 // pollOperation is dead in production (never called) — no need to test poll.
+
+/**
+ * stripDataUrl and detectMime read strings the browser hands over from a file
+ * the user chose. Both were exercised only indirectly through
+ * buildVideoRequestBody until now.
+ */
+describe('stripDataUrl', () => {
+    it('drops the data-URL prefix and returns the payload', () => {
+        assert.equal(stripDataUrl('data:image/png;base64,AAAA'), 'AAAA');
+        assert.equal(stripDataUrl('data:image/jpeg;base64,/9j/4AAQ'), '/9j/4AAQ');
+    });
+
+    it('splits on the first comma, so a payload containing one survives', () => {
+        assert.equal(stripDataUrl('data:text/plain,a,b,c'), 'a,b,c');
+    });
+
+    it('returns the input unchanged when there is no comma', () => {
+        assert.equal(stripDataUrl('AAAA'), 'AAAA');
+        assert.equal(stripDataUrl(''), '');
+        assert.equal(stripDataUrl('data:image/png;base64'), 'data:image/png;base64');
+    });
+
+    it('yields an empty payload when the comma is last', () => {
+        assert.equal(stripDataUrl('data:image/png;base64,'), '');
+    });
+});
+
+describe('detectMime', () => {
+    it('reports png when the data URL declares it', () => {
+        assert.equal(detectMime('data:image/png;base64,AAAA'), 'image/png');
+    });
+
+    it('falls back to jpeg for anything else', () => {
+        assert.equal(detectMime('data:image/jpeg;base64,AAAA'), 'image/jpeg');
+        assert.equal(detectMime('data:image/webp;base64,AAAA'), 'image/jpeg');
+        assert.equal(detectMime(''), 'image/jpeg');
+    });
+
+    it('matches anywhere in the string, including inside the payload', () => {
+        // A substring check, not a prefix parse: base64 content that happens
+        // to contain "image/png" is reported as png. Recorded as current
+        // behaviour rather than endorsed — the inputs it sees are data URLs
+        // this app built itself.
+        assert.equal(detectMime('data:image/jpeg;base64,aW1hZ2image/pngUvcG5n'), 'image/png');
+    });
+});

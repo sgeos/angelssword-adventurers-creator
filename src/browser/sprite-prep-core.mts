@@ -240,3 +240,40 @@ export const buildGenerateRequest = (opts: {
     body: hasImages ? { ...base, images } : base,
   };
 };
+
+/* ────────────────────────────────────────────────────────────────────────
+ * Colour science.
+ *
+ * Moved here from sprite-prep so it is reachable from tests: it is pure, and
+ * a wrong constant in a colour-space conversion produces output that looks
+ * plausible indefinitely.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/** A colour in CIE Lab, where Euclidean distance approximates perception. */
+export interface Lab {
+    readonly L: number;
+    readonly a: number;
+    readonly b: number;
+}
+
+export function rgbToLab(r: number, g: number, b: number): Lab {
+    // sRGB → XYZ → Lab
+    let rr = r / 255, gg = g / 255, bb = b / 255;
+    rr = rr > 0.04045 ? Math.pow((rr + 0.055) / 1.055, 2.4) : rr / 12.92;
+    gg = gg > 0.04045 ? Math.pow((gg + 0.055) / 1.055, 2.4) : gg / 12.92;
+    bb = bb > 0.04045 ? Math.pow((bb + 0.055) / 1.055, 2.4) : bb / 12.92;
+
+    let x = (rr * 0.4124 + gg * 0.3576 + bb * 0.1805) / 0.95047;
+    let y = (rr * 0.2126 + gg * 0.7152 + bb * 0.0722) / 1.00000;
+    let z = (rr * 0.0193 + gg * 0.1192 + bb * 0.9505) / 1.08883;
+
+    x = x > 0.008856 ? Math.cbrt(x) : (7.787 * x) + 16 / 116;
+    y = y > 0.008856 ? Math.cbrt(y) : (7.787 * y) + 16 / 116;
+    z = z > 0.008856 ? Math.cbrt(z) : (7.787 * z) + 16 / 116;
+
+    return {
+        L: (116 * y) - 16,
+        a: 500 * (x - y),
+        b: 200 * (y - z)
+    };
+}

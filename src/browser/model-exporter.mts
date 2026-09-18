@@ -12,7 +12,7 @@ import {
     notificationSound,
     showToast,
 } from "./app.mts";
-import { debounce, hexToRgb, type Rgb } from "./app-utils.mts";
+import { debounce, hexToRgb } from "./app-utils.mts";
 import type { HandoffPayload } from "./video-prep-core.mts";
 import { ChromaKey } from "./chroma-key.mts";
 import { closestFrom, queryAll, require2d, requireEl } from "./dom.mts";
@@ -20,6 +20,7 @@ import { channel } from "./pixels.mts";
 import {
     MODE_LIMITS,
     asCropRatio,
+    averageSaturation,
     asExportMode,
     computeCropToCenter,
     formatBytes,
@@ -593,7 +594,7 @@ export class ModelExporter {
         refMatchBtn.addEventListener('click', () => {
             if (this._refImageData === null || !this.videoLoaded) return;
             const bgColor = { r: this.chromaKey.keyR, g: this.chromaKey.keyG, b: this.chromaKey.keyB };
-            const refAvgSat = this._computeAvgSaturation(this._refImageData, bgColor);
+            const refAvgSat = averageSaturation(this._refImageData.data, bgColor);
 
             // Get current processed output saturation
             const w = this.videoWidth, h = this.videoHeight;
@@ -609,7 +610,7 @@ export class ModelExporter {
             this.chromaKey.postSaturation = 1;
             this.chromaKey.process(outData);
             this.chromaKey.postSaturation = savedSat;
-            const outAvgSat = this._computeAvgSaturation(outData, bgColor, true);
+            const outAvgSat = averageSaturation(outData.data, bgColor, true);
 
             if (outAvgSat > 0.001) {
                 const ratio = refAvgSat / outAvgSat;
@@ -838,39 +839,6 @@ export class ModelExporter {
     // Compute average HSL saturation of an ImageData, excluding key-colored pixels
     // bgColor: { r, g, b } — the key color to exclude from analysis
     // skipTransparent: if true, skip alpha=0 pixels (for processed output)
-    private _computeAvgSaturation(imageData: ImageData, bgColor: Rgb, skipTransparent = false): number {
-        const d = imageData.data;
-        const keyCb = 128 + (-0.168736 * bgColor.r - 0.331264 * bgColor.g + 0.5 * bgColor.b);
-        const keyCr = 128 + (0.5 * bgColor.r - 0.418688 * bgColor.g - 0.081312 * bgColor.b);
-        const keyExcludeRange = 40; // Exclude pixels within this chroma distance of key
-
-        let totalSat = 0, count = 0;
-        for (let j = 0; j < d.length; j += 4) {
-            const alpha = channel(d, j + 3);
-            if (skipTransparent && alpha < 10) continue;
-            if (!skipTransparent && alpha < 200) continue; // For ref: only solid pixels
-
-            const dr = channel(d, j), dg = channel(d, j + 1), db = channel(d, j + 2);
-            const r = dr / 255, g = dg / 255, b = db / 255;
-            const maxC = Math.max(r, g, b), minC = Math.min(r, g, b);
-            const lum = (maxC + minC) / 2;
-
-            // Skip near-black and near-white (saturation is meaningless)
-            if (lum < 0.05 || lum > 0.95) continue;
-
-            // Skip key-colored pixels
-            const cb = 128 + (-0.168736 * dr - 0.331264 * dg + 0.5 * db);
-            const cr = 128 + (0.5 * dr - 0.418688 * dg - 0.081312 * db);
-            const chromaDist = Math.sqrt((cb - keyCb) ** 2 + (cr - keyCr) ** 2);
-            if (chromaDist < keyExcludeRange) continue;
-
-            // HSL saturation
-            const sat = maxC === minC ? 0 : (maxC - minC) / (1 - Math.abs(2 * lum - 1));
-            totalSat += Math.min(1, sat); // clamp
-            count++;
-        }
-        return count > 0 ? totalSat / count : 0;
-    }
 
     // ─── PREVIEW RENDERING ───
     updatePreview(): void {
