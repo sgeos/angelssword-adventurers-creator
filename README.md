@@ -232,7 +232,7 @@ separation is enforced rather than assumed:
 | `tsconfig.json` | server and build scripts | Node, no DOM |
 | `tsconfig.browser.json` | `src/browser` | DOM, no Node |
 | `tsconfig.worker.json` | the two Web Workers | WebWorker, neither DOM nor Node |
-| `tsconfig.test.json` | tests | both |
+| `tsconfig.test.json` | tests and the Playwright config | both |
 
 The worker project exists because the `WebWorker` and `DOM` libs both declare
 `self` and cannot be loaded together. Splitting it also proves the GIF codec
@@ -251,6 +251,26 @@ than asserting a relationship the compiler must take on trust.
 If a rule is in the way, the honest move is to argue for changing it, not to
 route around it — `eslint-disable` comments are disabled config-wide and will
 not work.
+
+### The tests are checked too
+
+Every source file is TypeScript apart from `eslint.config.mjs` itself, tests
+included, and the tests are linted with full type information rather than
+exempted from the type-aware rules. That matters because a test harness
+exempted from the rules is the obvious place for unchecked code to accumulate,
+and the harness is what everything else is trusted on.
+
+Two narrow exemptions exist, each named in the config with its reason:
+
+- `node:test`'s `describe`/`it` are exempted from `no-floating-promises` by
+  name. The runner owns those promises. The rule stays on everywhere else in a
+  test, so a forgotten `await` on a page action is still an error.
+- `require-await` is off in `test/helpers/mock-fetch.mts` alone, where a mock
+  satisfying a `Promise`-returning interface has nothing to await and the two
+  async rules cannot both be satisfied.
+
+Playwright compiles specs to CommonJS, so spec-side code uses `__dirname`
+rather than `import.meta.url`.
 
 ---
 
