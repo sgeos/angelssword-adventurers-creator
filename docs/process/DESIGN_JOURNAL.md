@@ -92,3 +92,71 @@ The general lesson is about adaptation rather than about git. Declining part
 of a convention borrowed from a working system requires a reason that the
 system itself does not already refute. The reason given here was a property of
 the reference that was never the reason the convention existed.
+
+## 2026-09-19 — Three-layer rearchitecture, first three increments
+
+The pattern comes from `~/projects/re/1830/`, whose architecture document
+states it in four lines and then says the useful part: the rule is enforceable
+by inspection, and if a core crate needs a clock or a socket it declares a
+trait method. What transfers is not the shape but that sentence. A layering
+nobody can check is a naming convention.
+
+The TypeScript equivalent of a crate is a project, and the equivalent of a
+manifest is its `lib` and `types`. Withholding both platform libraries gives
+`no_std` almost exactly, and where it falls short is worth recording, because
+the shortfall is not obvious. Rust's clock and generator live in `std`, so
+excluding `std` excludes them. `Math.random` and `Date` are the language, so
+no library setting can exclude them and a lint rule is the only instrument.
+The gap is small and it is exactly where non-determinism enters.
+
+Three findings that cost nothing to state now and would have been expensive to
+discover later.
+
+**A search and a compiler answer different questions.** A search over the
+sources, with comments and string literals stripped so that prose about
+`localStorage` would not count, reported twelve modules portable. The core
+project refused two of them. One named `ImageData` in nine signatures, which
+is a type and not a global, so no pattern for globals could have found it. The
+other built a query string with `URLSearchParams`. The search established what
+its patterns matched. Only the compiler established what the files required.
+
+**A module that reaches for a platform facility has not established that it
+needs one.** `gif-composite` said in its own header that it was the one part
+of Graphics Interchange Format handling that needed a canvas. It used a canvas
+as a scratch buffer, calling only `putImageData`, `getImageData`, and
+`clearRect`. Compositing under disposal rules is arithmetic. Rewritten against
+plain arrays it became core and gained twelve tests where it had none. The
+question to ask before declaring a capability is what the facility is being
+asked to compute.
+
+**Inverting a capability found three defects that were not what it was for.**
+Writing `KeyValueStore` revealed that four core parsers took `string | null`,
+which is the Web Storage return type rather than this project's convention, so
+the platform's idea of absence had reached into the core's signatures. It
+revealed that `hasCredential` returned a boolean and its caller therefore
+re-checked for absence on the next line, which is the shape the narrowing
+convention exists to prevent. And it revealed that none of the twenty-seven
+call sites handled a store that throws, which a browser with site data blocked
+supplies on the first property access, before any method runs.
+
+That last one is the argument for adapters stated concretely. Twenty-seven
+places each have to remember the failure mode. One adapter has to remember it
+once, and the reason it is one adapter rather than a convention is a lint rule
+naming the single exempt file.
+
+**What the entry layer cost.** Separating platform from entry was not a
+rename. All four stage modules imported `app.mts`, so the entry point was a
+dependency of everything that depended on it, and the property that makes an
+entry point one is that nothing imports it. The module split into a 790 line
+shell in the platform layer and a 54 line entry point. That the split was
+clean is not luck: the shared surface was the exported half and the bootstrap
+was the unexported half, which is what those two words had always meant.
+
+**On preserving behaviour.** Writing the first tests for `gif-composite` found
+two divergences from the format it implements. The temptation to correct them
+while moving the file was strong, the code being unreachable from production
+and the correct behaviour being published. It was not taken, because a
+refactor that quietly alters behaviour is a refactor nobody can review, and
+because the same reasoning governed the original conversion. The divergences
+are pinned by tests that say at their own site that they characterise rather
+than specify.

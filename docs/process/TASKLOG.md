@@ -11,20 +11,33 @@ bound.
 
 ## Active
 
-**Three-layer rearchitecture.** Portable core with inverted capabilities, a
-platform layer implementing them, and entry points. Specified in
-[HANDOFF.md](./HANDOFF.md). Not started. Reference projects to read first are
-`~/projects/rust/keleusma/` and `~/projects/re/1830/`.
+**Three-layer rearchitecture.** Structurally complete, one capability of six
+inverted. Specified in [HANDOFF.md](./HANDOFF.md) and designed in
+[../architecture/LAYERING.md](../architecture/LAYERING.md).
 
 Success is a portable core that names its required capabilities as interfaces
 rather than avoiding the need for them, a platform layer supplying them for
-the browser and for node, and the five currently untested stage modules
-brought under test as a consequence rather than as separate work.
+the browser and for node, and the currently untested stage modules brought
+under test as a consequence rather than as separate work.
+
+Done. The three layers exist as four directories under `src/`, and each
+boundary is checked rather than promised: `tsconfig.core.json` withholds both
+platform libraries, and two lint zones carry the import-direction rule no
+tsconfig can express. Storage is inverted end to end.
+
+Remaining, in the order the handoff argues for. The network, which the server
+has already inverted and which unlocks the twice-written ComfyUI call
+sequence. Time, which every polling loop reaches directly. Randomness, three
+sites. Logging and binary payloads, the latter being what blocks `Handoff`
+from moving to the core.
 
 ## Recently Completed
 
 | Task | Status | Verification |
 |---|---|---|
+| Storage capability inverted | Complete | 27 sites converted to 0; 37 new tests; ban exercised |
+| Platform and entry layers separated | Complete | Both import zones refuse a failing file; workers exercised |
+| Portable core established and enforced | Complete | Core project refuses a failing file; two couplings found |
 | Handoff validity anchored on commit N minus one | Complete | Ancestry check run against the anchor it records |
 | Container deployment, environment keys completed | Complete | Image built and run; 276/44/22 pass |
 | ComfyUI Wan image-to-video | Complete | Letterbox verified at 832x480 |

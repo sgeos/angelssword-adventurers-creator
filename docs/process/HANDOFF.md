@@ -2,10 +2,8 @@
 
 > **Navigation**: [Process](./README.md) | [Documentation Root](../README.md)
 
-**Refreshed 2026-09-19. The anchor is `2c0aef0`, the last commit before this
+**Refreshed 2026-09-19. The anchor is `9cf2a11`, the last commit before this
 refresh.** Read this block, run the validity check, then read the task below.
-It is a rearchitecture and should not be begun without reading the two
-reference projects named.
 
 ---
 
@@ -18,11 +16,11 @@ itself.
 
 ### Ancestry
 
-`main` should **contain** `2c0aef0`, the last commit before this refresh. Test
+`main` should **contain** `9cf2a11`, the last commit before this refresh. Test
 containment rather than equality.
 
 ```sh
-git merge-base --is-ancestor 2c0aef0 HEAD
+git merge-base --is-ancestor 9cf2a11 HEAD
 ```
 
 If that fails, this file predates a history rewrite and is stale. If it
@@ -42,18 +40,21 @@ of the list rather than taking the next unused number, and renumber when
 inserting, because a list whose numbers skip reads as though checks are
 missing.
 
-1. `git ls-files` reports **58** TypeScript files and exactly **one**
+1. `git ls-files` reports **69** TypeScript files and exactly **one**
    JavaScript file, `eslint.config.mjs`, which is deliberate.
-2. **Four** `tsconfig.*.json` projects exist at the repository root.
-3. `npm test` reports **276** unit tests and **44** application programming
+2. **Five** `tsconfig.*.json` projects exist at the repository root, and
+   `src/` holds exactly four directories, `core`, `platform-browser`,
+   `platform-worker`, and `entry-browser`.
+3. `npm test` reports **347** unit tests and **44** application programming
    interface tests, all passing.
-4. `npx playwright test` reports **22** passing browser specifications.
-5. `docker compose up --build` produces a container that serves on port 3001.
+4. `npx playwright test` reports **24** passing browser specifications.
+5. `tsc -p tsconfig.core.json` succeeds, and adding `localStorage` to any file
+   under `src/core/` makes it fail.
+6. `docker compose up --build` produces a container that serves on port 3001.
 
-Assertions 1 through 4 were re-executed at the anchor. Assertion 5 was last
-exercised one refresh earlier, at `69addb8`, and was judged too costly to
-repeat for a status check. It is recorded as unverified at the anchor rather
-than restated as though it had been run.
+Assertions 1 through 5 were executed at the anchor. Assertion 6 was last
+exercised at `69addb8`, two refreshes ago, and has not been repeated since. It
+is recorded as unverified rather than restated as though it had been run.
 
 If an assertion fails, this file is stale. Trust the repository and say so.
 
@@ -63,8 +64,10 @@ If an assertion fails, this file is stale. Trust the repository and say so.
 2. Read [AGENT_PITFALLS.md](./AGENT_PITFALLS.md). Short, and every entry is a
    mistake made in this repository. Two of them were repeated after being
    written down, so it is not merely decorative.
-3. Read the task below and the two reference projects.
-4. Stop and wait for a prompt.
+3. Read [../architecture/LAYERING.md](../architecture/LAYERING.md), which is
+   the design the current work implements.
+4. Read the task below.
+5. Stop and wait for a prompt.
 
 ## Current state
 
@@ -77,100 +80,89 @@ Sprites generate through OpenAI, Grok, or a local ComfyUI. Video generates
 through Gemini, Grok, or ComfyUI with Wan image-to-video. A local server
 proxies every outbound call.
 
-The whole of upstream pull request 1 has been reimplemented, deliberately
-excluding three things. Its OAuth flow presented as xAI's own command line
-client. Its ComfyUI restart route ran a shell command and needed the Docker
-socket mounted. Its video fetch attached the user's credential to any address
-a caller named. Each omission is recorded where the code would have gone.
+**The three-layer rearchitecture is structurally complete and has one
+capability inverted.** Three increments landed.
 
-Verification passes in full, and the container is verified by building and
-running rather than by reading.
+- `e579ee5` established `src/core/` and `tsconfig.core.json`, which withholds
+  the Document Object Model library and the node types together.
+- `5da3c11` separated `src/platform-browser/`, `src/platform-worker/`, and
+  `src/entry-browser/`, and added the import-direction rule that no tsconfig
+  can express.
+- `9cf2a11` inverted storage end to end, from `KeyValueStore` through a
+  browser adapter to twenty-seven converted call sites.
 
 ## The next task
 
-Rearchitect the project into three layers, matching the operator's Rust
-projects.
+Continue inverting capabilities. The order below is by value, not by size.
 
-- A portable core, free of platform assumptions, inverting control through
-  interfaces so that capabilities normally taken from the platform are
-  supplied to it.
-- A platform layer implementing those interfaces for a particular target,
-  which may use the platform's own facilities or delegate to a proprietary
-  library.
-- An entry point, which may be a command line tool, an application, or a
-  library.
+**The network, and it is the most valuable.** The server already inverted it
+as `FetchLike` in `server.mts`, and the browser has not inverted it at all.
+Those are the same interface and should be one, living in `src/core/ports/`.
+Doing this unlocks the real prize. The ComfyUI call sequence, meaning upload,
+queue, poll the history, retrieve, is written twice, once in `sprite-prep.mts`
+and once in `video-gen.mts`, and it is logic rather than presentation. So is
+the Grok polling loop, whose pure parts already sit in `grok-video-core.mts`
+while the loop that drives them sits in `video-gen`.
 
-Two reference projects almost certainly follow this pattern and should be read
-before starting.
+**Time, which the network work needs anyway.** Every polling loop reaches
+`setTimeout` directly, so none can be tested without waiting. A `Clock` with
+`now` and `sleep` is what makes a poll loop assertable.
 
-- `~/projects/rust/keleusma/`
-- `~/projects/re/1830/`
+**Randomness, which is three sites and an afternoon.** All three generate
+seeds. Inverting it makes a generation reproducible under test.
 
-Note that the first is also the source of this repository's knowledge graph
-and process protocol, so its conventions are already partly present here.
+**Logging and binary payloads**, the latter being `Blob`, `File`, and object
+URLs at thirty-eight sites. Binary payloads are what block `Handoff` from
+moving to the core, since it carries an `HTMLCanvasElement` and two `Blob`
+fields.
 
-### What is already true, and what is not
+### What is already true
 
-The shape exists in part and is worth measuring before moving anything.
-Classified by whether a browser interface appears in code rather than in a
-comment, which matters because several modules discuss `localStorage` in prose
-without touching it:
+Measured at the anchor over code with comments and string literals stripped.
+The core has **zero** references to a platform facility of any kind, which
+`tsconfig.core.json` also refuses to compile. What remains, by layer:
 
-**Portable today, fourteen modules.** `api`, `chroma-key`, `comfyui-core`,
-`exporter-math`, `gif-codec`, `gif-worker`, `gif-worker-core`,
-`grok-video-core`, `pixels`, `providers`, `sprite-prep-core`, `timer-worker`,
-`video-gen-core`, `video-prep-core`.
-
-**Coupled to the browser, eight modules.** `app`, `app-utils`, `dom`,
-`gif-composite`, `model-exporter`, `sprite-prep`, `video-gen`, `video-prep`.
-
-So a portable core largely exists and is unnamed. What does not exist is the
-inversion. The portable modules do not receive their capabilities through
-interfaces; they simply avoid needing any. Where a capability is genuinely
-required, the coupling sits in the stage module instead, which is why those
-eight are large and thinly tested.
-
-The clearest candidates for inverted capabilities, each currently reached
-directly rather than supplied:
-
-- **Storage.** `localStorage` is read and written in at least four modules.
-- **A drawing surface.** Canvas work forced the decision not to supply one in
-  tests, which is why five stage modules have no unit tests at all.
-- **The network.** Already inverted on the server through `createApp(fetchImpl)`,
-  and not inverted at all in the browser.
-- **Time and scheduling.** `setTimeout` appears in several polling loops.
-- **Randomness.** Seeds are drawn with `Math.random` inside generation paths.
-
-### Why this is worth doing here
-
-Not merely for symmetry with the Rust projects. Five modules totalling roughly
-4,700 lines have no unit tests, and the reason is uniformly that they reach
-for a canvas or the document. Inverting those capabilities is the same work as
-making them testable, so the architectural change and the coverage gap have
-one answer.
+| Capability | Entry | Platform | Worker |
+|---|---|---|---|
+| Binary payloads | 32 | 6 | 0 |
+| Time and scheduling | 24 | 5 | 2 |
+| Logging | 10 | 2 | 0 |
+| The network | 9 | 4 | 0 |
+| Randomness | 2 | 1 | 0 |
 
 ### Traps specific to this task
 
-`tsconfig.browser.json` withholds the node types and `tsconfig.json` withholds
-the document library, which already enforces part of this separation. A
-portable core needs a project that has neither, as `tsconfig.worker.json`
-already demonstrates for the workers. Expect the project layout to change, and
-expect `eslint.config.mjs` to need matching scopes, since it names projects
-explicitly.
+**Measure with a compiler, not with a search.** A search that stripped
+comments and strings reported twelve modules portable. The core project
+refused two of them, for `ImageData` and for `URLSearchParams`, neither of
+which the search had looked for. A search establishes what a pattern matches.
+A compiler establishes what a file requires.
 
-Do not move files before the interfaces exist. A rename that merely relocates
-the coupling costs the same review effort and buys nothing.
+**A module reaching for a platform facility has not established that it needs
+one.** `gif-composite` asserted in its own header that it needed a canvas. It
+used one as a scratch buffer and did not need one. Ask what the facility is
+being asked to compute, and whether the answer is arithmetic, before declaring
+a capability for it.
+
+**Preserve behaviour across a move, and characterise it.** Writing
+`gif-composite`'s first tests found two divergences from the format. Both were
+preserved and pinned, and the decision to correct them recorded in
+[../decisions/OPEN.md](../decisions/OPEN.md), because the change moved a
+module rather than altering one.
+
+**Check that a new rule fires.** Every gate added so far was exercised against
+a deliberately failing file before being believed.
 
 ## Open matters
 
-Recorded in [decisions/OPEN.md](../decisions/OPEN.md).
+Recorded in [../decisions/OPEN.md](../decisions/OPEN.md).
 
-- Five stage modules have no unit tests. See above; this task subsumes it.
+- The four stage modules have no unit tests, and this task subsumes it.
+- `gif-composite` diverges from the Graphics Interchange Format in two ways.
+- The format's decode path has no production consumer at all.
 - The Windows and Linux binary builds have never been run.
-- Nothing has been exercised against live keys, a real ComfyUI, or a real
-  Grok subscription. Every provider test uses mocked routes. The request
-  shapes are faithful to what upstream established empirically, but a
-  specification derived from another person's debugging is not verification.
+- Nothing has been exercised against live keys, a real ComfyUI, or a real Grok
+  subscription.
 - No release has been cut.
 
 ## Relationship to upstream

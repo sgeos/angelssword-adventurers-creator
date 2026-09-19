@@ -12,10 +12,96 @@ file is arranged this way rather than being rewritten wholesale.
 
 ## Last Updated
 
+2026-09-19. Three-layer rearchitecture, three increments. Structurally
+complete, one capability of six inverted.
+
+## Verification
+
+`npm run check` passes across all five projects. 347 unit tests, 44
+application programming interface tests, 24 browser specifications, all
+passing. Every gate added was exercised against a deliberately failing file
+before being believed: the core project, the two determinism bans, the two
+import-direction zones, and the storage ban. The container was not rebuilt and
+is marked unverified at the anchor in [HANDOFF.md](./HANDOFF.md).
+
+## Summary
+
+The pattern is taken from `~/projects/re/1830/`, whose architecture document
+states it plainly: a core holding all logic and declaring an interface for
+every capability it needs, a platform implementing those interfaces, and an
+entry point that constructs the platform and holds no logic.
+
+A TypeScript project is this codebase's crate, and its `lib` and `types`
+settings are its manifest. `tsconfig.core.json` withholds the Document Object
+Model library and the node types together, so `src/core/` sees the language
+and nothing else.
+
+Three increments landed. The core was established and enforced. The platform
+and entry layers were separated, which required splitting an 821 line module
+that all four stages imported, since an entry point nothing imports is the
+property that makes it one. Storage was inverted end to end, from
+`KeyValueStore` through a browser adapter to twenty-seven converted call
+sites, all of which are now tested against a Map.
+
+## Questions for Human Pilot
+
+Two decisions are recorded in [../decisions/OPEN.md](../decisions/OPEN.md) and
+neither is mine to take.
+
+The Graphics Interchange Format decode path has no production consumer at all.
+`GifDecoder` and `compositeFrames` are reached only by tests. Either an import
+path returns, which is what upstream had, or roughly 200 lines go.
+
+That decides the second. `gif-composite` diverges from the format in two ways,
+applying a frame's own disposal method rather than its predecessor's, and
+clearing the whole canvas for disposal 2 rather than the disposed frame's
+area. Both predate this fork and are now pinned by characterisation tests.
+Correcting them is only worth doing if the path is kept.
+
+## Technical Concerns
+
+The core's freedom from the platform is checked by the compiler, but three
+ECMAScript facilities are outside what any library setting can exclude, namely
+`Math.random`, `Date.now`, and `new Date`. A lint rule is the only thing
+standing between the core and an ambient source of non-determinism. Rust's
+`no_std` has no equivalent hole.
+
+The storage adapter drops a failed write silently. The judgement is that for a
+slider position or a remembered provider, a lost preference is a smaller harm
+than a page that will not load in a browser with site data blocked. For a
+credential that judgement is arguable, and the settings panel reading the value
+back is the only thing that surfaces it.
+
+Concerns carried forward unchanged. Nothing added for Grok or ComfyUI has run
+against a live service. The four stage modules still have no unit tests, which
+the remaining capability work subsumes.
+
+## Intended Next Step
+
+The network capability, argued for in [HANDOFF.md](./HANDOFF.md). The server
+already inverted it as `FetchLike`, the browser has not inverted it at all,
+and they are the same interface. It unlocks the ComfyUI call sequence, which
+is written twice and is logic rather than presentation.
+
+## Session Context
+
+`main` at `9cf2a11` before this refresh. Upstream carries two open pull
+requests and one open issue, all from this fork.
+
+---
+
+## Superseded history
+
+Nothing below this line describes the present.
+
+### Superseded 2026-09-19 — handoff validity anchored on commit N minus one
+
+#### Last Updated
+
 2026-09-19. Handoff validity corrected to anchor on commit N minus one.
 Complete.
 
-## Verification
+#### Verification
 
 `npm test` reports 276 unit tests and 44 application programming interface
 tests passing. `npx playwright test` reports 22 passing browser
@@ -24,7 +110,7 @@ the new ancestry check exercised against the anchor it records. The container
 assertion was not re-run and is marked unverified at the anchor in
 [HANDOFF.md](./HANDOFF.md) rather than restated.
 
-## Summary
+#### Summary
 
 The handoff previously validated by content alone, having judged that ancestry
 validation needed a long-lived version branch. That judgement was wrong, and
@@ -38,12 +124,12 @@ convention now governs the per-branch mailboxes. The reversal is recorded in
 [DESIGN_JOURNAL.md](./DESIGN_JOURNAL.md) and the failure mode in
 [AGENT_PITFALLS.md](./AGENT_PITFALLS.md).
 
-## Questions for Human Pilot
+#### Questions for Human Pilot
 
 None outstanding. The next task remains the rearchitecture stated in
 [HANDOFF.md](./HANDOFF.md).
 
-## Technical Concerns
+#### Technical Concerns
 
 The ancestry check detects a history rewrite and nothing else. It cannot tell
 that the content assertions have gone stale, which is why both halves exist
@@ -55,23 +141,17 @@ against a live service. Six tests were environment-dependent until a
 fallback reads the environment. Five stage modules totalling roughly 4,700
 lines still have no unit tests.
 
-## Intended Next Step
+#### Intended Next Step
 
 The three-layer rearchitecture described in [HANDOFF.md](./HANDOFF.md). Not
 started. Read the two reference projects first, and measure before moving
 anything, because a portable core already exists in fourteen modules without
 being named.
 
-## Session Context
+#### Session Context
 
 `main` at `2c0aef0` before this change. Upstream carries two open pull
 requests and one open issue, all from this fork.
-
----
-
-## Superseded history
-
-Nothing below this line describes the present.
 
 ### Superseded 2026-09-19 — upstream pull request 1 reimplemented
 
