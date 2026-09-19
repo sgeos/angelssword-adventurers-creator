@@ -1,0 +1,387 @@
+/**
+ * ComfyUI workflow construction and response reading.
+ *
+ * Reimplemented from upstream pull request 1 by @Manya3084. The node graphs
+ * below are the substance of that work. Their topology, and the settings that
+ * make Flux behave, were established there against a running ComfyUI over
+ * many corrective commits, and that is knowledge worth preserving.
+ *
+ * It is pure here, and therefore tested. Upstream built these graphs inline
+ * inside a generation routine, where nothing could reach them.
+ *
+ * ComfyUI takes a prompt as a map of node identifier to node. A node names a
+ * class and its inputs, and an input referencing another node is written as
+ * the pair [nodeId, outputIndex]. Nothing here talks to ComfyUI; the caller
+ * posts the result through the local proxy.
+ */
+
+/** One node in a ComfyUI prompt graph. */
+export interface ComfyNode {
+  readonly class_type: string;
+  readonly inputs: Readonly<Record<string, unknown>>;
+}
+
+/** A complete prompt graph, keyed by node identifier. */
+export type ComfyWorkflow = Readonly<Record<string, ComfyNode>>;
+
+/** A graph together with the node whose output the caller collects. */
+export interface BuiltWorkflow {
+  readonly workflow: ComfyWorkflow;
+  readonly saveNodeId: string;
+}
+
+/** A LoRA to apply, with the strength it applies at. */
+export interface LoraSlot {
+  readonly name: string;
+  readonly strength: number;
+}
+
+/** Sprite dimensions the pipeline expects downstream. */
+export const SPRITE_WIDTH = 1280;
+export const SPRITE_HEIGHT = 720;
+
+/**
+ * Allocates sequential node identifiers.
+ *
+ * ComfyUI accepts any string key. Sequential integers keep a graph readable
+ * when it is dumped for debugging, which is most of what one does with it.
+ */
+class NodeIds {
+  private next = 1;
+  take(): string {
+    const id = String(this.next);
+    this.next += 1;
+    return id;
+  }
+}
+
+export interface FluxOptions {
+  readonly unetName: string;
+  readonly clipName: string;
+  readonly t5Name: string;
+  readonly vaeName: string;
+  readonly positiveText: string;
+  readonly seed: number;
+  readonly steps: number;
+  readonly guidance: number;
+  readonly weightDtype: string;
+  readonly loras?: readonly LoraSlot[];
+  /** A reference image already uploaded to ComfyUI, enabling PuLID. */
+  readonly referenceFilename?: string;
+  readonly pulidFile?: string;
+  readonly pulidWeight?: number;
+  readonly insightFaceProvider?: string;
+}
+
+/**
+ * The Flux graph.
+ *
+ * Three settings are not free choices and were arrived at empirically.
+ * Classifier-free guidance is fixed at 1, because Flux carries its guidance
+ * through a FluxGuidance node instead. The sampler and scheduler pair is
+ * euler with simple. The latent is EmptySD3LatentImage rather than the
+ * ordinary empty latent, which Flux requires.
+ */
+export const buildFluxWorkflow = (opts: FluxOptions): BuiltWorkflow => {
+  const ids = new NodeIds();
+  const wf: Record<string, ComfyNode> = {};
+
+  const unetId = ids.take();
+  wf[unetId] = {
+    class_type: "UNETLoader",
+    inputs: { unet_name: opts.unetName, weight_dtype: opts.weightDtype },
+  };
+
+  const clipId = ids.take();
+  wf[clipId] = {
+    class_type: "DualCLIPLoader",
+    inputs: { clip_name1: opts.clipName, clip_name2: opts.t5Name, type: "flux" },
+  };
+
+  const vaeId = ids.take();
+  wf[vaeId] = { class_type: "VAELoader", inputs: { vae_name: opts.vaeName } };
+
+  // LoRAs chain model-only on Flux, each taking the previous one's output.
+  let modelRef: readonly [string, number] = [unetId, 0];
+  for (const lora of opts.loras ?? []) {
+    const id = ids.take();
+    wf[id] = {
+      class_type: "LoraLoaderModelOnly",
+      inputs: { lora_name: lora.name, strength_model: lora.strength, model: modelRef },
+    };
+    modelRef = [id, 0];
+  }
+
+  // PuLID carries a face from the reference image into the result. It only
+  // applies when a reference has been uploaded.
+  if (opts.referenceFilename !== undefined && opts.referenceFilename !== "") {
+    const loadId = ids.take();
+    wf[loadId] = { class_type: "LoadImage", inputs: { image: opts.referenceFilename } };
+    const pulidId = ids.take();
+    wf[pulidId] = {
+      class_type: "PulidFluxModelLoader",
+      inputs: { pulid_file: opts.pulidFile ?? "pulid_flux_v0.9.1.safetensors" },
+    };
+    const evaId = ids.take();
+    wf[evaId] = { class_type: "PulidFluxEvaClipLoader", inputs: {} };
+    const faceId = ids.take();
+    wf[faceId] = {
+      class_type: "PulidFluxInsightFaceLoader",
+      inputs: { provider: opts.insightFaceProvider ?? "CPU" },
+    };
+    const applyId = ids.take();
+    wf[applyId] = {
+      class_type: "ApplyPulidFlux",
+      inputs: {
+        model: modelRef,
+        pulid_flux: [pulidId, 0],
+        eva_clip: [evaId, 0],
+        face_analysis: [faceId, 0],
+        image: [loadId, 0],
+        weight: opts.pulidWeight ?? 0.9,
+        start_at: 0,
+        end_at: 1,
+      },
+    };
+    modelRef = [applyId, 0];
+  }
+
+  const posId = ids.take();
+  wf[posId] = {
+    class_type: "CLIPTextEncode",
+    inputs: { text: opts.positiveText, clip: [clipId, 0] },
+  };
+
+  // Flux takes an empty negative rather than a worded one.
+  const negId = ids.take();
+  wf[negId] = { class_type: "CLIPTextEncode", inputs: { text: "", clip: [clipId, 0] } };
+
+  const guideId = ids.take();
+  wf[guideId] = {
+    class_type: "FluxGuidance",
+    inputs: { guidance: opts.guidance, conditioning: [posId, 0] },
+  };
+
+  const latentId = ids.take();
+  wf[latentId] = {
+    class_type: "EmptySD3LatentImage",
+    inputs: { width: SPRITE_WIDTH, height: SPRITE_HEIGHT, batch_size: 1 },
+  };
+
+  const sampleId = ids.take();
+  wf[sampleId] = {
+    class_type: "KSampler",
+    inputs: {
+      seed: opts.seed,
+      steps: opts.steps,
+      // Fixed at 1. Flux guides through FluxGuidance, and a higher value here
+      // produces the burnt output upstream spent commits chasing.
+      cfg: 1,
+      sampler_name: "euler",
+      scheduler: "simple",
+      denoise: 1,
+      model: modelRef,
+      positive: [guideId, 0],
+      negative: [negId, 0],
+      latent_image: [latentId, 0],
+    },
+  };
+
+  const decodeId = ids.take();
+  wf[decodeId] = {
+    class_type: "VAEDecode",
+    inputs: { samples: [sampleId, 0], vae: [vaeId, 0] },
+  };
+
+  const saveId = ids.take();
+  wf[saveId] = {
+    class_type: "SaveImage",
+    inputs: { filename_prefix: "as_adventurer", images: [decodeId, 0] },
+  };
+
+  return { workflow: wf, saveNodeId: saveId };
+};
+
+export interface SdxlOptions {
+  readonly checkpoint: string;
+  readonly positiveText: string;
+  readonly negativeText: string;
+  readonly seed: number;
+  readonly steps: number;
+  readonly cfg: number;
+  readonly loras?: readonly LoraSlot[];
+  readonly referenceFilename?: string;
+  readonly ipAdapterFile?: string;
+  readonly clipVisionFile?: string;
+  readonly ipWeight?: number;
+}
+
+/**
+ * The SDXL graph, used for Pony and similar checkpoints.
+ *
+ * Differs from Flux in three ways that matter. The checkpoint loader supplies
+ * model, CLIP and VAE together, so LoRAs chain both model and CLIP. A worded
+ * negative prompt is used. Character likeness comes from IP-Adapter rather
+ * than PuLID.
+ */
+export const buildSdxlWorkflow = (opts: SdxlOptions): BuiltWorkflow => {
+  const ids = new NodeIds();
+  const wf: Record<string, ComfyNode> = {};
+
+  const ckptId = ids.take();
+  wf[ckptId] = {
+    class_type: "CheckpointLoaderSimple",
+    inputs: { ckpt_name: opts.checkpoint },
+  };
+
+  let modelRef: readonly [string, number] = [ckptId, 0];
+  let clipRef: readonly [string, number] = [ckptId, 1];
+  const vaeRef: readonly [string, number] = [ckptId, 2];
+
+  for (const lora of opts.loras ?? []) {
+    const id = ids.take();
+    wf[id] = {
+      class_type: "LoraLoader",
+      inputs: {
+        lora_name: lora.name,
+        strength_model: lora.strength,
+        strength_clip: lora.strength,
+        model: modelRef,
+        clip: clipRef,
+      },
+    };
+    modelRef = [id, 0];
+    clipRef = [id, 1];
+  }
+
+  if (opts.referenceFilename !== undefined && opts.referenceFilename !== "") {
+    const loadId = ids.take();
+    wf[loadId] = { class_type: "LoadImage", inputs: { image: opts.referenceFilename } };
+    const ipModelId = ids.take();
+    wf[ipModelId] = {
+      class_type: "IPAdapterModelLoader",
+      inputs: { ipadapter_file: opts.ipAdapterFile ?? "ip-adapter-plus_sdxl_vit-h.safetensors" },
+    };
+    const clipVisId = ids.take();
+    wf[clipVisId] = {
+      class_type: "CLIPVisionLoader",
+      inputs: { clip_name: opts.clipVisionFile ?? "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors" },
+    };
+    const applyId = ids.take();
+    wf[applyId] = {
+      class_type: "IPAdapterAdvanced",
+      inputs: {
+        model: modelRef,
+        ipadapter: [ipModelId, 0],
+        image: [loadId, 0],
+        clip_vision: [clipVisId, 0],
+        weight: opts.ipWeight ?? 0.8,
+        weight_type: "linear",
+        combine_embeds: "concat",
+        start_at: 0,
+        end_at: 1,
+      },
+    };
+    modelRef = [applyId, 0];
+  }
+
+  const posId = ids.take();
+  wf[posId] = { class_type: "CLIPTextEncode", inputs: { text: opts.positiveText, clip: clipRef } };
+  const negId = ids.take();
+  wf[negId] = { class_type: "CLIPTextEncode", inputs: { text: opts.negativeText, clip: clipRef } };
+
+  const latentId = ids.take();
+  wf[latentId] = {
+    class_type: "EmptyLatentImage",
+    inputs: { width: SPRITE_WIDTH, height: SPRITE_HEIGHT, batch_size: 1 },
+  };
+
+  const sampleId = ids.take();
+  wf[sampleId] = {
+    class_type: "KSampler",
+    inputs: {
+      seed: opts.seed,
+      steps: opts.steps,
+      cfg: opts.cfg,
+      sampler_name: "dpmpp_2m",
+      scheduler: "karras",
+      denoise: 1,
+      model: modelRef,
+      positive: [posId, 0],
+      negative: [negId, 0],
+      latent_image: [latentId, 0],
+    },
+  };
+
+  const decodeId = ids.take();
+  wf[decodeId] = { class_type: "VAEDecode", inputs: { samples: [sampleId, 0], vae: vaeRef } };
+  const saveId = ids.take();
+  wf[saveId] = {
+    class_type: "SaveImage",
+    inputs: { filename_prefix: "as_adventurer", images: [decodeId, 0] },
+  };
+
+  return { workflow: wf, saveNodeId: saveId };
+};
+
+/** An image ComfyUI has produced, as its history reports it. */
+export interface ComfyImageRef {
+  readonly filename: string;
+  readonly subfolder: string;
+  readonly type: string;
+}
+
+const record = (value: unknown): Record<string, unknown> | undefined =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+    ? { ...value }
+    : undefined;
+
+/** The prompt identifier a queue submission returns. */
+export const extractPromptId = (body: unknown): string | undefined => {
+  const top = record(body);
+  const value = top?.["prompt_id"];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+};
+
+/**
+ * Images a history entry reports for a given save node.
+ *
+ * The response nests prompt id, then outputs, then node id, then images. An
+ * absent path yields an empty list rather than throwing, because a history
+ * poll runs before the work finishes and that is not an error.
+ */
+export const extractHistoryImages = (
+  body: unknown,
+  promptId: string,
+  saveNodeId: string,
+): readonly ComfyImageRef[] => {
+  const entry = record(record(body)?.[promptId]);
+  const outputs = record(entry?.["outputs"]);
+  const node = record(outputs?.[saveNodeId]);
+  const images = node?.["images"];
+  if (!Array.isArray(images)) return [];
+
+  const result: ComfyImageRef[] = [];
+  for (const raw of images) {
+    const img = record(raw);
+    if (img === undefined) continue;
+    const filename = img["filename"];
+    if (typeof filename !== "string" || filename === "") continue;
+    const subfolder = img["subfolder"];
+    const type = img["type"];
+    result.push({
+      filename,
+      subfolder: typeof subfolder === "string" ? subfolder : "",
+      type: typeof type === "string" ? type : "output",
+    });
+  }
+  return result;
+};
+
+/** Query string for retrieving one image through the view endpoint. */
+export const viewQuery = (image: ComfyImageRef): string =>
+  new URLSearchParams({
+    filename: image.filename,
+    subfolder: image.subfolder,
+    type: image.type,
+  }).toString();

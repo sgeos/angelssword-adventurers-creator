@@ -13,7 +13,12 @@ import {
     resetMockFetch,
     wasFetchCalled,
 } from '../../helpers/mock-fetch.mts';
-import { createApp, isAllowedVideoUrl } from '../../../server.mts';
+import {
+    createApp,
+    isAllowedComfyRequest,
+    isAllowedVideoUrl,
+    normaliseComfyOrigin,
+} from '../../../server.mts';
 
 // The mock is a constructor argument, not a global. Nothing is patched and
 // the production module has no seam to patch.
@@ -482,5 +487,96 @@ describe('xAI video fetch route', () => {
             .send({});
         assert.equal(res.status, 400);
         assert.equal(wasFetchCalled(), false);
+    });
+});
+
+describe('ComfyUI address guard', () => {
+    it('accepts loopback and the private ranges', () => {
+        for (const addr of ['http://127.0.0.1:8188', 'http://localhost:8188/',
+                            'http://192.168.1.50:8188', 'http://10.0.0.5:8188',
+                            'http://172.16.0.1:8188', 'http://box.local:8188',
+                            'http://comfyui:8188']) {
+            assert.notEqual(normaliseComfyOrigin(addr), undefined, addr);
+        }
+    });
+
+    it('refuses public addresses, so this cannot fetch on a caller behalf', () => {
+        for (const addr of ['http://attacker.example:8188', 'https://api.openai.com',
+                            'http://8.8.8.8', 'http://172.32.0.1:8188']) {
+            assert.equal(normaliseComfyOrigin(addr), undefined, addr);
+        }
+    });
+
+    it('repairs a port written as a path, which is a common typo', () => {
+        assert.equal(normaliseComfyOrigin('http://192.168.1.50/8188'), 'http://192.168.1.50:8188');
+    });
+
+    it('refuses non-http schemes and malformed input', () => {
+        for (const bad of ['file:///etc/passwd', 'nonsense', '', 'ftp://10.0.0.1']) {
+            assert.equal(normaliseComfyOrigin(bad), undefined, bad);
+        }
+    });
+});
+
+describe('ComfyUI endpoint guard', () => {
+    it('allows the endpoints the client needs', () => {
+        assert.equal(isAllowedComfyRequest('/prompt', 'POST'), true);
+        assert.equal(isAllowedComfyRequest('/history/abc', 'GET'), true);
+        assert.equal(isAllowedComfyRequest('/view', 'GET'), true);
+        assert.equal(isAllowedComfyRequest('/system_stats', 'GET'), true);
+        assert.equal(isAllowedComfyRequest('/upload/image', 'POST'), true);
+    });
+
+    it('refuses an endpoint the client never uses', () => {
+        // Upstream forwarded any path, which makes this server a general
+        // actuator for anything on the private network.
+        for (const [p, m] of [['/queue', 'POST'], ['/interrupt', 'POST'],
+                              ['/../etc/passwd', 'GET'], ['/free', 'POST']] as const) {
+            assert.equal(isAllowedComfyRequest(p, m), false, `${m} ${p}`);
+        }
+    });
+
+    it('refuses a method the endpoint does not serve', () => {
+        assert.equal(isAllowedComfyRequest('/prompt', 'DELETE'), false);
+        assert.equal(isAllowedComfyRequest('/history/abc', 'DELETE'), false);
+        assert.equal(isAllowedComfyRequest('/view', 'POST'), false);
+    });
+});
+
+describe('ComfyUI proxy route', () => {
+    beforeEach(() => { resetMockFetch(); });
+
+    it('forwards an allowed request to a local address', async () => {
+        mockFetchResponse(200, { prompt_id: 'p-1' });
+        const res = await request(app)
+            .post('/api/comfyui/proxy')
+            .send({ baseUrl: 'http://127.0.0.1:8188', path: '/prompt', method: 'POST', body: { prompt: {} } });
+
+        assert.equal(res.status, 200);
+        assert.equal(callAt().url, 'http://127.0.0.1:8188/prompt');
+        assert.equal(callAt().method, 'POST');
+    });
+
+    it('refuses a public address without calling it', async () => {
+        const res = await request(app)
+            .post('/api/comfyui/proxy')
+            .send({ baseUrl: 'http://attacker.example', path: '/prompt', method: 'POST' });
+
+        assert.equal(res.status, 400);
+        assert.equal(wasFetchCalled(), false);
+    });
+
+    it('refuses an endpoint outside the allowlist without calling it', async () => {
+        const res = await request(app)
+            .post('/api/comfyui/proxy')
+            .send({ baseUrl: 'http://127.0.0.1:8188', path: '/interrupt', method: 'POST' });
+
+        assert.equal(res.status, 400);
+        assert.equal(wasFetchCalled(), false);
+    });
+
+    it('has no restart route, which would need the Docker socket mounted', async () => {
+        const res = await request(app).post('/api/comfyui/restart').send({});
+        assert.equal(res.status, 404);
     });
 });

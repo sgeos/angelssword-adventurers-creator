@@ -82,6 +82,66 @@ export const isAllowedVideoUrl = (raw: string): boolean => {
   );
 };
 
+/**
+ * ComfyUI endpoints this proxy will reach.
+ *
+ * Upstream pull request 1 forwarded whatever path and method the request
+ * body named. That turns the local server into a general actuator for
+ * anything on the user's private network, reachable by any page they have
+ * open, since the server answers every origin. Restricting the set to what
+ * the client actually needs contains that without costing any capability.
+ */
+const COMFY_ALLOWED_PATHS: Readonly<Record<string, readonly string[]>> = {
+  "/prompt": ["POST"],
+  "/history": ["GET"],
+  "/view": ["GET"],
+  "/system_stats": ["GET"],
+  "/upload/image": ["POST"],
+};
+
+/** Whether a path and method pair is one this proxy forwards. */
+export const isAllowedComfyRequest = (rawPath: string, method: string): boolean => {
+  // /history/<id> is the only parameterised form; everything else is exact.
+  const base = rawPath.startsWith("/history/") ? "/history" : rawPath;
+  const allowed = COMFY_ALLOWED_PATHS[base];
+  return allowed?.includes(method.toUpperCase()) === true;
+};
+
+/**
+ * Reduce a ComfyUI address to an origin, or reject it.
+ *
+ * Carried over from upstream, which had the right instinct here. A ComfyUI
+ * instance lives on the user's own machine or their local network, so a
+ * public address is either a mistake or an attempt to make this server fetch
+ * something on the caller's behalf. Loopback and the private ranges are
+ * permitted and nothing else is.
+ */
+export const normaliseComfyOrigin = (raw: string): string | undefined => {
+  const trimmed = raw.trim().replace(/\/$/, "");
+  // A common typo writes the port as a path. Repair it before parsing.
+  const repaired = trimmed.replace(/^(https?:\/\/[^/:]+)\/(\d+)$/i, "$1:$2");
+
+  let url: URL;
+  try {
+    url = new URL(repaired);
+  } catch {
+    return undefined;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+
+  const host = url.hostname;
+  const isPrivate =
+    host === "localhost"
+    || host === "127.0.0.1"
+    || host === "::1"
+    || host === "comfyui"
+    || host.endsWith(".local")
+    || host.startsWith("10.")
+    || host.startsWith("192.168.")
+    || /^172\.(1[6-9]|2\d|3[01])\./.test(host);
+  return isPrivate ? url.origin : undefined;
+};
+
 /** xAI's public API base. Requests reach it only through this proxy. */
 const XAI_API_BASE = "https://api.x.ai/v1";
 
@@ -476,6 +536,65 @@ app.post(
       res.status(200).type("application/json").send(JSON.stringify({ data: text }));
     } catch (err) {
       console.error("  [ERROR] xAI video fetch failed:", errorMessage(err));
+      res.status(502).json({ error: `Proxy error: ${errorMessage(err)}` });
+    }
+  }),
+);
+
+// ── ComfyUI ──────────────────────────────────────────────────────────
+
+/**
+ * Forward one request to a ComfyUI instance on the local network.
+ *
+ * A proxy is needed because the page and ComfyUI are different origins and
+ * ComfyUI does not send permissive headers unless configured to. Both the
+ * destination and the path are checked, so this cannot be used to reach an
+ * arbitrary service or an arbitrary endpoint.
+ *
+ * Upstream also offered a restart route that ran a shell command from an
+ * environment variable, with its compose file mounting the Docker socket to
+ * make that work. That is a container escape surface in exchange for a
+ * convenience button, and it is deliberately absent. Restart ComfyUI the way
+ * it was started.
+ */
+app.post(
+  "/api/comfyui/proxy",
+  route(async (req, res) => {
+    const body: unknown = req.body;
+    const fields: Record<string, unknown> =
+      typeof body === "object" && body !== null ? { ...body } : {};
+
+    const baseUrl = singleString(fields["baseUrl"]) ?? process.env["COMFYUI_URL"];
+    const origin = baseUrl === undefined ? undefined : normaliseComfyOrigin(baseUrl);
+    if (origin === undefined) {
+      res.status(400).json({ error: "ComfyUI address must be on the local network" });
+      return;
+    }
+
+    const rawPath = singleString(fields["path"]) ?? "/";
+    const targetPath = rawPath.startsWith("/") ? rawPath : `/${rawPath}`;
+    const method = (singleString(fields["method"]) ?? "GET").toUpperCase();
+    if (!isAllowedComfyRequest(targetPath.split("?")[0] ?? "", method)) {
+      console.warn(`  [ComfyUI] Refused ${method} ${targetPath}`);
+      res.status(400).json({ error: `Refusing to proxy ${method} ${targetPath}` });
+      return;
+    }
+
+    try {
+      const payload = fields["body"];
+      const init: UpstreamInit = method === "GET" || method === "HEAD"
+        ? { method, timeout: 120_000 }
+        : {
+            method,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+            timeout: 600_000,
+          };
+      console.log(`  [ComfyUI] ${method} ${origin}${targetPath}`);
+      const upstream = await fetchImpl(`${origin}${targetPath}`, init);
+      await relay(res, upstream);
+    } catch (err) {
+      console.error("  [ERROR] ComfyUI proxy failed:", errorMessage(err));
       res.status(502).json({ error: `Proxy error: ${errorMessage(err)}` });
     }
   }),
