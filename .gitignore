@@ -7,9 +7,18 @@ backup/
 test-results/
 playwright-report/
 blob-report/
+
+# Project-local scratch directory, committed via a .gitkeep marker with
+# its contents ignored. Use `tmp/` for transient files such as commit
+# messages, draft text, scratch scripts, and probe outputs.
 tmp/*
 !tmp/.gitkeep
+
+# Local, never-committed material such as credentials, API keys, and
+# environment-specific secrets. The marker is committed so that the
+# directory exists on a fresh clone; nothing else here ever is.
 secret/*
 !secret/.gitkeep
+
 # Build output of src/browser (npm run build:browser)
 public/js/
