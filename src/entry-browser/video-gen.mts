@@ -20,12 +20,12 @@ import { closestFrom, findEl, queryAll, require2d, requireEl } from "../platform
 import {
     buildWanI2VWorkflow,
     computeLetterbox,
-    extractHistoryImages,
-    extractPromptId,
     loadComfySettings,
     loadWanSettings,
-    viewQuery,
 } from "../core/comfyui-core.mts";
+import { runWorkflow, uploadReference } from "../core/comfyui-run.mts";
+import { runGrokVideo } from "../core/grok-video-run.mts";
+import { isOk, readJson } from "../core/ports/http.mts";
 import * as VideoGenCore from "../core/video-gen-core.mts";
 import {
     VIDEO_PROVIDERS,
@@ -35,15 +35,10 @@ import {
     saveVideoProvider,
 } from "../core/providers.mts";
 import { browserStore } from "../platform-browser/local-storage.mts";
-import {
-    MAX_POLL_ATTEMPTS,
-    POLL_INTERVAL_MS,
-    buildGrokVideoRequest,
-    classifyPoll,
-    describeError,
-    extractRequestId,
-    throttleBackoffMs,
-} from "../core/grok-video-core.mts";
+import { browserHttp } from "../platform-browser/http.mts";
+import { browserClock } from "../platform-browser/clock.mts";
+import { drawSeed } from "../platform-browser/random.mts";
+import { buildGrokVideoRequest } from "../core/grok-video-core.mts";
 
 /** Wan renders slowly, so this polls less often and waits far longer. */
 const WAN_POLL_INTERVAL_MS = 3_000;
@@ -278,84 +273,62 @@ async function letterboxForWan(dataUrl: string, width: number, height: number): 
     return canvas.toDataURL('image/png');
 }
 
-/** One call through the local ComfyUI proxy. */
-async function comfyCall(path: string, method: string, body?: unknown): Promise<Response> {
-    const baseUrl = loadComfySettings(browserStore).url;
-    return fetch(VIDEO_PROVIDERS.comfyui.generateRoute, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ baseUrl, path, method, body }),
-    });
-}
-
 /**
  * Generate one clip on the user's own ComfyUI, through Wan.
  *
- * Same four steps as the sprite path. Upload the letterboxed frame, queue the
- * graph, poll the history, retrieve the result.
+ * The four steps are shared with the sprite stage and live in
+ * `comfyui-run.mts`. What remains here is the graph, the far longer patience
+ * a video render needs, the progress text, and that the result is wanted as a
+ * Blob and an object URL.
+ *
+ * One behaviour is preserved deliberately. The sprite stage tolerates a
+ * reference upload that fails, falling back to a graph with no reference;
+ * this one refuses, because a Wan image-to-video graph has nothing to animate
+ * without it.
  */
 async function generateOneWanVideo(prompt: string): Promise<GeneratedVideo | null> {
     const reference = referenceImages[0];
     if (reference === undefined) throw new Error('ComfyUI video needs a reference image');
 
     const wan = loadWanSettings(browserStore);
+    const baseUrl = loadComfySettings(browserStore).url;
     const framed = await letterboxForWan(reference.dataUrl, wan.width, wan.height);
 
-    const uploaded = await comfyCall('/upload/image', 'POST', {
-        image: framed,
-        filename: `as_adventurer_wan_${Date.now().toString()}.png`,
-    });
-    const uploadBody: unknown = await uploaded.json().catch(() => ({}));
-    const uploadedName = typeof uploadBody === 'object' && uploadBody !== null && 'name' in uploadBody
-        ? { ...uploadBody }.name
-        : undefined;
-    if (typeof uploadedName !== 'string' || uploadedName === '') {
-        throw new Error('ComfyUI did not accept the reference image');
-    }
+    const imageName = await uploadReference(
+        browserHttp,
+        baseUrl,
+        framed,
+        `as_adventurer_wan_${Date.now().toString()}.png`,
+    );
+    if (imageName === undefined) throw new Error('ComfyUI did not accept the reference image');
 
     const built = buildWanI2VWorkflow(wan, {
-        imageName: uploadedName,
+        imageName,
         positiveText: prompt === ''
             ? 'Gentle breathing idle animation with slight body sway, seamless loop, static camera, full body in frame'
             : prompt,
-        seed: Math.floor(Math.random() * 1_000_000_000),
+        seed: drawSeed(),
     });
 
-    const queued = await comfyCall('/prompt', 'POST', { prompt: built.workflow });
-    const queuedBody: unknown = await queued.json().catch(() => ({}));
-    if (!queued.ok) throw new Error(describeError(queuedBody, queued.status));
-    const promptId = extractPromptId(queuedBody);
-    if (promptId === undefined) throw new Error('ComfyUI did not return a prompt id');
-
     const progressText = findEl('vgProgressText', HTMLElement);
-    for (let attempt = 0; attempt < WAN_MAX_POLLS; attempt++) {
-        if (isCancelled()) return null;
-        await wait(WAN_POLL_INTERVAL_MS);
-        if (isCancelled()) return null;
+    const outcome = await runWorkflow(browserHttp, browserClock, {
+        baseUrl,
+        built,
+        pollIntervalMs: WAN_POLL_INTERVAL_MS,
+        maxPolls: WAN_MAX_POLLS,
+        isCancelled,
+        onPoll: (_attempt, elapsedMs) => {
+            if (progressText === undefined) return;
+            progressText.textContent = `ComfyUI rendering… (${Math.floor(elapsedMs / 1000).toString()}s)`;
+        },
+    });
 
-        if (progressText !== undefined) {
-            const seconds = Math.floor(((attempt + 1) * WAN_POLL_INTERVAL_MS) / 1000);
-            progressText.textContent = `ComfyUI rendering… (${seconds.toString()}s)`;
-        }
+    if (outcome.kind === 'cancelled') return null;
+    if (outcome.kind === 'timedOut') throw new Error('ComfyUI video generation timed out');
 
-        const polled = await comfyCall(`/history/${promptId}`, 'GET');
-        if (!polled.ok) continue;
-        const history: unknown = await polled.json().catch(() => ({}));
-        const image = extractHistoryImages(history, promptId, built.saveNodeId)[0];
-        if (image === undefined) continue;
-
-        const view = await comfyCall(`/view?${viewQuery(image)}`, 'GET');
-        if (!view.ok) throw new Error('ComfyUI produced a clip that could not be retrieved');
-        const blob = await view.blob();
-        return { blob, url: URL.createObjectURL(blob) };
-    }
-
-    throw new Error('ComfyUI video generation timed out');
+    const blob = new Blob([outcome.bytes], { type: 'video/mp4' });
+    return { blob, url: URL.createObjectURL(blob) };
 }
-
-/** Sleep, so the poll loop yields between attempts. */
-const wait = async (ms: number): Promise<void> =>
-    new Promise((resolve) => { setTimeout(resolve, ms); });
 
 /**
  * Generate one clip through Grok.
@@ -383,75 +356,29 @@ async function generateOneGrokVideo(
         mode,
     });
 
-    const auth = `Bearer ${apiKey}`;
-    const started = await fetch(VIDEO_PROVIDERS.xai.generateRoute, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: auth },
-        body: JSON.stringify(body),
-    });
-    const startBody: unknown = await started.json().catch(() => ({}));
-    if (!started.ok) throw new Error(describeError(startBody, started.status));
-
-    const requestId = extractRequestId(startBody);
-    if (requestId === undefined) throw new Error('Grok did not return a generation id');
-
     const progressFill = findEl('vgProgressFill', HTMLElement);
     const progressText = findEl('vgProgressText', HTMLElement);
-    let consecutiveThrottles = 0;
 
-    for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
-        if (isCancelled()) return null;
-        await wait(POLL_INTERVAL_MS);
-        if (isCancelled()) return null;
-
-        if (progressFill !== undefined) {
-            const pct = Math.min(95, ((attempt + 1) / MAX_POLL_ATTEMPTS) * 100);
-            progressFill.style.width = `${pct.toString()}%`;
-        }
-        if (progressText !== undefined) {
-            const seconds = Math.floor(((attempt + 1) * POLL_INTERVAL_MS) / 1000);
-            progressText.textContent = `Grok video generating… (${seconds.toString()}s)`;
-        }
-
-        const polled = await fetch(`/api/xai/videos/${encodeURIComponent(requestId)}`, {
-            method: 'GET',
-            headers: { Authorization: auth },
-        });
-        const polledBody: unknown = await polled.json().catch(() => ({}));
-        const outcome = classifyPoll(polled.status, polledBody);
-
-        if (outcome.kind === 'ready') return fetchGrokVideo(auth, outcome.url);
-        if (outcome.kind === 'fatal' || outcome.kind === 'failed') throw new Error(outcome.reason);
-        if (outcome.kind === 'throttled') {
-            consecutiveThrottles++;
-            if (consecutiveThrottles >= 5) throw new Error('Grok throttled the request repeatedly');
-            await wait(throttleBackoffMs(consecutiveThrottles));
-            continue;
-        }
-        consecutiveThrottles = 0;
-    }
-
-    throw new Error('Grok video generation timed out');
-}
-
-/** Retrieve the finished asset through the proxy, which holds the credential. */
-async function fetchGrokVideo(auth: string, url: string): Promise<GeneratedVideo> {
-    const response = await fetch('/api/xai/video-fetch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: auth },
-        body: JSON.stringify({ url }),
+    const outcome = await runGrokVideo(browserHttp, browserClock, {
+        auth: `Bearer ${apiKey}`,
+        request: body,
+        isCancelled,
+        onPoll: (attempt, elapsedMs, maxAttempts) => {
+            if (progressFill !== undefined) {
+                const pct = Math.min(95, (attempt / maxAttempts) * 100);
+                progressFill.style.width = `${pct.toString()}%`;
+            }
+            if (progressText !== undefined) {
+                progressText.textContent =
+                    `Grok video generating… (${Math.floor(elapsedMs / 1000).toString()}s)`;
+            }
+        },
     });
-    const payload: unknown = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(describeError(payload, response.status));
 
-    const encoded = typeof payload === 'object' && payload !== null && 'data' in payload
-        ? { ...payload }.data
-        : undefined;
-    if (typeof encoded !== 'string' || encoded === '') {
-        throw new Error('Grok video download returned no data');
-    }
+    if (outcome.kind === 'cancelled') return null;
+    if (outcome.kind === 'timedOut') throw new Error('Grok video generation timed out');
 
-    const blob = base64ToBlob(encoded, 'video/mp4');
+    const blob = base64ToBlob(outcome.base64, 'video/mp4');
     return { blob, url: URL.createObjectURL(blob) };
 }
 
@@ -473,7 +400,7 @@ async function generateOneVideo(apiKey: string, prompt: string, _duration: numbe
     });
 
     // Send through proxy
-    const response = await fetch('/api/video/generate', {
+    const response = await browserHttp(VIDEO_PROVIDERS.google.generateRoute, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -482,12 +409,10 @@ async function generateOneVideo(apiKey: string, prompt: string, _duration: numbe
         body: JSON.stringify(requestBody)
     });
 
-    if (!response.ok) {
-        const err: unknown = await response.json().catch(() => ({}));
-        throw new Error(responseErrorMessage(err) ?? `API error: ${response.status.toString()}`);
+    const data = await readJson(response);
+    if (!isOk(response)) {
+        throw new Error(responseErrorMessage(data) ?? `API error: ${response.status.toString()}`);
     }
-
-    const data: unknown = await response.json();
     console.log('[VideoGen] Response:', JSON.stringify(data).substring(0, 500));
 
     // Direct response — extract video from Interactions response

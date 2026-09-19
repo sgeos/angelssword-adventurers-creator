@@ -39,6 +39,7 @@ import {
 } from "../core/exporter-math.mts";
 import { ColorQuantizer } from "../core/gif-codec.mts";
 import { browserStore } from "../platform-browser/local-storage.mts";
+import { fetchBlob } from "../platform-browser/binary.mts";
 import type { EncodeRequest, EncodeResponse, WorkerFrame } from "../core/gif-worker-core.mts";
 import type { TimerCommand } from "../platform-worker/timer-worker.mts";
 
@@ -284,9 +285,7 @@ export class ModelExporter {
                 const videoSource = data.videoSrc;
                 if (videoSource !== undefined && videoSource !== '') {
                     try {
-                        const resp = await fetch(videoSource);
-                        const blob = await resp.blob();
-                        this.loadVideo(blob);
+                        this.loadVideo(await fetchBlob(videoSource));
                     } catch (e) {
                         // Fallback: load video directly from URL
                         console.warn('[ModelExporter] Could not fetch video blob, loading from URL:',

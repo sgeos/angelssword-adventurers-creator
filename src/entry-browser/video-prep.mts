@@ -13,6 +13,7 @@ import {
     switchTab,
 } from "../platform-browser/shell.mts";
 import { findEl, require2d, requireEl } from "../platform-browser/dom.mts";
+import { fetchBlob } from "../platform-browser/binary.mts";
 import * as VideoPrepCore from "../core/video-prep-core.mts";
 
 /**
@@ -341,8 +342,7 @@ async function loadFromHandoff(): Promise<void> {
     } else if (handoff.videoUrl !== null) {
         // Fetch from URL → Blob → File
         try {
-            const resp = await fetch(handoff.videoUrl);
-            const blob = await resp.blob();
+            const blob = await fetchBlob(handoff.videoUrl);
             const f = new File([blob], 'generated.mp4', { type: blob.type === '' ? 'video/mp4' : blob.type });
             state.fromVideoGen = true;
             requireEl('vpFromVideoGen', HTMLElement).classList.remove('hidden');

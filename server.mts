@@ -8,6 +8,8 @@
 
 import express, { type Express, type Request, type RequestHandler, type Response } from "express";
 import nodeFetch from "node-fetch";
+
+import type { HttpClient, HttpRequest, HttpResponse } from "./src/core/ports/http.mts";
 import FormData from "form-data";
 import path from "node:path";
 import { execFile } from "node:child_process";
@@ -180,20 +182,26 @@ const relay = async (res: Response, upstream: { status: number; text: () => Prom
  * including the ones carrying the user's API keys. A parameter is visible
  * only to whoever constructs the app.
  */
-/** The response surface this server consumes. Nothing else is touched. */
-export interface UpstreamResponse {
-  readonly status: number;
-  readonly text: () => Promise<string>;
-}
+/**
+ * The response surface this server consumes. Nothing else is touched.
+ *
+ * Re-exported from the core rather than declared here. It was declared here
+ * first, and the browser half had no equivalent at all; the two are the same
+ * capability, so they are now the same interface. The alias is kept because
+ * the proxy's prose calls it an upstream response, which is what it is from
+ * this side.
+ */
+export type UpstreamResponse = HttpResponse;
 
-/** The request options this server sends. */
-export interface UpstreamInit {
-  readonly method: string;
-  readonly headers?: Readonly<Record<string, string>>;
-  /** A JSON string, or a form-data stream for multipart uploads. */
-  readonly body?: string | FormData;
-  readonly timeout?: number;
-}
+/**
+ * The request options this server sends.
+ *
+ * The body is a JSON string, or a form-data stream for multipart uploads.
+ * That second case is the whole reason the core's request type takes a body
+ * parameter: `FormData` is supplied by node, and the core compiles without
+ * the node types, so it cannot be named there.
+ */
+export type UpstreamInit = HttpRequest<string | FormData>;
 
 /**
  * Narrowed to what the proxy actually uses — a status and a text body —
@@ -204,7 +212,7 @@ export interface UpstreamInit {
  * it into the full Response type. A mock that has to be cast into place is
  * a mock the compiler has stopped checking.
  */
-export type FetchLike = (url: string, init?: UpstreamInit) => Promise<UpstreamResponse>;
+export type FetchLike = HttpClient<string | FormData>;
 
 // ── App ──────────────────────────────────────────────────────────────
 

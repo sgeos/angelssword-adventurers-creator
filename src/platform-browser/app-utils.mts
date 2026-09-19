@@ -34,6 +34,24 @@ export const base64ToBlob = (base64: string, mimeType = "image/png"): Blob => {
 };
 
 /**
+ * Encode bytes as a data URI.
+ *
+ * The inverse of `base64ToBlob`, and the platform's answer to a core function
+ * that yields a `Uint8Array`. The core produces bytes because bytes are the
+ * language's; what to wrap them in is decided here.
+ *
+ * Accumulated one character at a time rather than through
+ * `String.fromCharCode(...bytes)`, which exhausts the stack on a payload of
+ * any size. A generated sprite is hundreds of kilobytes, so the spread form
+ * would fail on real input and pass on every small test.
+ */
+export const bytesToDataUri = (bytes: Uint8Array, mimeType: string): string => {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return `data:${mimeType};base64,${btoa(binary)}`;
+};
+
+/**
  * Read a Blob as a data URI.
  *
  * `readAsDataURL` always yields a string, but `FileReader.result` is typed

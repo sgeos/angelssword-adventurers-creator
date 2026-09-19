@@ -7,6 +7,10 @@
 import type { HandoffPayload } from "../core/video-prep-core.mts";
 import { closestFrom, findEl, queryAll, requireEl } from "./dom.mts";
 import { browserStore } from "./local-storage.mts";
+import { browserHttp } from "./http.mts";
+import { fetchArrayBuffer } from "./binary.mts";
+import { isOk, readJson } from "../core/ports/http.mts";
+import { comfyCall } from "../core/comfyui-run.mts";
 import { PROVIDERS, VIDEO_PROVIDERS, loadCredential, saveCredential } from "../core/providers.mts";
 import {
     loadCharacterName,
@@ -129,8 +133,7 @@ class NotificationSound {
         if (ctx === null) return;
         for (const clip of this.clips) {
             try {
-                const resp = await fetch(`assets/sounds/${clip}`);
-                const buf = await resp.arrayBuffer();
+                const buf = await fetchArrayBuffer(`assets/sounds/${clip}`);
                 this.buffers[clip] = await ctx.decodeAudioData(buf);
             } catch (e) {
                 console.warn(`[Sound] Failed to preload ${clip}:`, e instanceof Error ? e.message : e);
@@ -288,7 +291,7 @@ export function initSettings(): void {
         openaiStatus.innerHTML = '<div class="status-msg info"><span class="spinner"></span> Testing connection...</div>';
 
         try {
-            const resp = await fetch('/api/chat', {
+            const resp = await browserHttp('/api/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -301,13 +304,12 @@ export function initSettings(): void {
                 })
             });
 
-            if (resp.ok) {
+            if (isOk(resp)) {
                 openaiStatus.innerHTML = '<div class="status-msg success">✅ Connection successful!</div>';
                 // Auto-save on successful test
                 saveCredential(browserStore, PROVIDERS.openai, key);
             } else {
-                const data: unknown = await resp.json().catch(() => ({}));
-                const msg = apiErrorMessage(data) ?? `HTTP ${resp.status.toString()}`;
+                const msg = apiErrorMessage(await readJson(resp)) ?? `HTTP ${resp.status.toString()}`;
                 openaiStatus.innerHTML = `<div class="status-msg error">❌ ${msg}</div>`;
             }
         } catch (err) {
@@ -354,13 +356,12 @@ export function initSettings(): void {
 
         try {
             // Simple test: list models
-            const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
-            if (resp.ok) {
+            const resp = await browserHttp(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+            if (isOk(resp)) {
                 googleStatus.innerHTML = '<div class="status-msg success">✅ Connection successful!</div>';
                 saveCredential(browserStore, VIDEO_PROVIDERS.google, key);
             } else {
-                const data: unknown = await resp.json().catch(() => ({}));
-                const msg = apiErrorMessage(data) ?? `HTTP ${resp.status.toString()}`;
+                const msg = apiErrorMessage(await readJson(resp)) ?? `HTTP ${resp.status.toString()}`;
                 googleStatus.innerHTML = `<div class="status-msg error">❌ ${msg}</div>`;
             }
         } catch (err) {
@@ -498,17 +499,14 @@ export function initSettings(): void {
         void (async (): Promise<void> => {
             comfyStatus.innerHTML = '<div class="status-msg info">Checking…</div>';
             try {
-                const response = await fetch('/api/comfyui/proxy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        baseUrl: readComfySettings().url,
-                        path: '/system_stats',
-                        method: 'GET',
-                    }),
-                });
-                const payload: unknown = await response.json().catch(() => ({}));
-                comfyStatus.innerHTML = response.ok
+                const response = await comfyCall(
+                    browserHttp,
+                    readComfySettings().url,
+                    '/system_stats',
+                    'GET',
+                );
+                const payload = await readJson(response);
+                comfyStatus.innerHTML = isOk(response)
                     ? '<div class="status-msg success">ComfyUI is reachable</div>'
                     : `<div class="status-msg error">${apiErrorMessage(payload) ?? `Not reachable (${response.status.toString()})`}</div>`;
             } catch (err) {

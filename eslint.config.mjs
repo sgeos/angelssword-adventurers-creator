@@ -391,15 +391,15 @@ export default defineConfig(
     },
   },
 
-  // One adapter per capability, and only one. The storage capability is
-  // implemented in platform-browser/local-storage.mts, which is the single
-  // place in the project that knows the bytes live in Web Storage. Before
-  // that adapter existed there were twenty-seven unguarded call sites, each
-  // with its own handling of an absent value and none with any handling of a
-  // store that throws.
+  // One adapter per capability, and only one. Each exemption below is by
+  // file, not by directory, so a second reach has to be argued for rather
+  // than added.
   //
-  // The exemption below is by file, not by directory, so a second reach for
-  // `localStorage` has to be argued for rather than added.
+  // Storage is implemented in platform-browser/local-storage.mts, which is
+  // the single place that knows the bytes live in Web Storage. Before that
+  // adapter existed there were twenty-seven unguarded call sites, each with
+  // its own handling of an absent value and none with any handling of a store
+  // that throws.
   {
     files: ["src/platform-browser/**/*.mts", "src/entry-browser/**/*.mts"],
     ignores: ["src/platform-browser/local-storage.mts"],
@@ -415,6 +415,32 @@ export default defineConfig(
           name: "sessionStorage",
           message:
             "Use the storage capability. If session-scoped storage is genuinely wanted, add a second adapter beside local-storage.mts rather than reaching for it here.",
+        },
+      ],
+    },
+  },
+
+  // The network is implemented in platform-browser/http.mts. Two files are
+  // exempt rather than one, and the second is not a second adapter: reading
+  // an object URL or a bundled asset is not a request the core reasons about,
+  // and platform-browser/binary.mts exists to give those a home so that they
+  // are not scattered. Its own header argues why they do not belong behind
+  // the HttpClient port.
+  {
+    files: ["src/platform-browser/**/*.mts", "src/entry-browser/**/*.mts"],
+    ignores: ["src/platform-browser/http.mts", "src/platform-browser/binary.mts"],
+    rules: {
+      "no-restricted-globals": [
+        "error",
+        {
+          name: "fetch",
+          message:
+            "Use the network capability. `browserHttp` from platform-browser/http.mts is the one adapter; for an object URL or a bundled asset use platform-browser/binary.mts.",
+        },
+        {
+          name: "XMLHttpRequest",
+          message:
+            "Use the network capability. `browserHttp` from platform-browser/http.mts is the one adapter.",
         },
       ],
     },

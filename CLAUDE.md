@@ -73,8 +73,13 @@ never an import. The compiler enforces the first half of that and
 `Math.random`, `Date.now`, and `new Date`.
 
 **A capability gets one adapter, and lint names it.** `localStorage` is
-reachable only from `src/platform-browser/local-storage.mts`. A second reach
-for a capability that already has an adapter has to be argued for.
+reachable only from `src/platform-browser/local-storage.mts`, and `fetch` only
+from `http.mts` and `binary.mts`. A second reach for a capability that already
+has an adapter has to be argued for.
+
+**A protocol is core, not presentation.** A request sequence, a poll loop, or
+a retry schedule goes in `src/core/*-run.mts` behind `HttpClient` and `Clock`,
+never inline beside the progress bar it updates.
 
 **Nothing imports an entry point.** `src/entry-browser/` is the top of the
 graph. Shared code belongs in the platform layer or the core.

@@ -2,13 +2,13 @@
 
 > **Navigation**: [Architecture](./README.md) | [Documentation Root](../README.md)
 
-Status. **Structurally complete. One capability inverted, five to go.** All
-three layers exist and each boundary is enforced by a check rather than by
-convention. Storage is inverted end to end, from a declared interface through
-a browser adapter to twenty-seven converted call sites. What remains is the
-long part: the four stage modules are entry points that still hold their
-logic, and time, the network, randomness, logging, and binary payloads are
-still reached directly. Capability interfaces are declared as their consumers
+Status. **Structurally complete. Three capabilities inverted, three to go.**
+All three layers exist and each boundary is enforced by a check rather than by
+convention. Storage, the network, and time are inverted end to end, from
+declared interfaces through browser adapters to every call site. Randomness
+needs no interface and is resolved. What remains is logging, binary payloads,
+and the largest part, the Document Object Model work still held inside the
+four stage modules. Capability interfaces are declared as their consumers
 arrive rather than in advance.
 
 ## The rule
@@ -128,16 +128,20 @@ discusses a facility.
 |---|---|---|
 | A raster to read and write | **Declared**, as `RgbaImage` in `src/core/pixels.mts` | Satisfied structurally by `ImageData`. No adapter exists or is wanted |
 | Storage | **Declared and implemented**, `KeyValueStore` and `local-storage.mts` | Platform 3, all inside the adapter. Entry 0, down from 27 |
+| The network | **Declared and implemented**, `HttpClient` and `http.mts` | Platform 3, in two named files. Entry 0, down from 9 |
+| Time and scheduling | **Declared and implemented**, `Clock` and `clock.mts` | Platform 7, entry 22, worker 2. Every polling loop is now core |
+| Randomness | **Resolved without an interface**, see below | Platform 2, entry 0, down from 2 |
 | A scratch surface to composite onto | **Not needed after all**, see below | Nothing. `gif-composite` used a canvas and did not need one |
-| Time and scheduling | Not declared | Entry 24, platform 5, worker 2 |
-| The network | Not declared in the browser | Entry 9, platform 4. Already inverted on the server as `FetchLike` |
-| Randomness | Not declared | Entry 2, platform 1, all generating seeds |
 | Logging | Not declared | Entry 10, platform 2 |
-| Binary payloads | Not declared | Entry 32, platform 6. `Blob`, `File`, and object URLs |
+| Binary payloads | Not declared | Entry 33, platform 7. `Blob`, `File`, and object URLs |
 
 The core column is absent from that table because every count in it is zero.
 That is checked rather than asserted, `tsconfig.core.json` refusing to compile
 a core module that names any of these.
+
+The remaining time count in the entry layer is not a polling loop. It is
+playback and animation, meaning `requestAnimationFrame` and the debounced
+redraws, which are presentation and belong where they are.
 
 `RgbaImage` is the model for a capability with no behaviour. The keyer and the
 exporters need somewhere to read and write pixels. They do not need a canvas, a
@@ -188,6 +192,60 @@ said the keyer reads three fields and nothing else, which was true and which
 the types could not express. The core now declares that shape, so the stand-in
 states exactly what it provides and the fabricated field is gone.
 
+## The network, and what inverting it was actually for
+
+The interface itself is small, and unifying the two halves was the easy part.
+`server.mts` had declared `FetchLike` before any of this began, and the
+browser had declared nothing. They are the same capability, so `server.mts`
+now imports the core's `HttpClient` and `nodeFetch` still satisfies it as the
+default argument, which the compiler checks.
+
+One design decision is worth stating. The request body is a type parameter.
+It is the one axis on which the two halves genuinely differ, the server
+additionally sending a multipart stream whose type comes from node and cannot
+be named in the core. A base interface the server extends does not work,
+because widening `body` from `string` to `string | FormData` in a subtype is
+not assignable, which the compiler refuses for the same reason this project
+wants it to.
+
+**The point was never the interface.** It was what the interface made
+possible. Two sequences moved into the core and became testable.
+
+`comfyui-run.mts` holds the ComfyUI exchange, meaning upload, queue, poll the
+history, retrieve. That sequence was written twice, once in the sprite stage
+and once in the video stage, and the two copies agreed on every step. They
+differed in which graph was built, how long they were willing to wait, and
+what they wrapped the result in, none of which is presentation. Neither copy
+had a test, because each sat in a module that needs a browser.
+
+`grok-video-run.mts` holds the Grok exchange. Its case is sharper and worth
+dwelling on. **Every pure part of it had already been extracted and covered**,
+namely the request shape, the classification of a poll response, the backoff
+schedule, the limits. What had not been extracted was the loop that uses them,
+because the loop needs a clock and a network. So the tested fraction looked
+healthy while the code that decides what actually happens was untested. That
+is the coverage gap this architecture exists to close, and it is invisible to
+a count of tests.
+
+Both now return bytes or base64 rather than a `Blob`. What to wrap a payload
+in is the platform's decision, and returning the language's own type is what
+lets one function serve two callers that want different wrappers.
+
+## Randomness, resolved without an interface
+
+The core draws no random number, and it has no `RandomSource` to be handed
+one. It takes a seed.
+
+That follows the reference project, whose rules crate states the property
+directly: a complete run is reproducible from a seed and an ordered list of
+inputs. A core that receives the value rather than the generator cannot be
+non-deterministic even by accident, and needs no interface to be handed one.
+The generator lives in `platform-browser/random.mts`, where `Math.random` is
+permitted, and the value crosses the boundary rather than the source.
+
+The general lesson is that not every capability wants an interface. Ask first
+whether the core needs to *call* the facility or only to *receive* its result.
+
 ## A capability that turned out not to be one
 
 `gif-composite` declared in its own header that it was the one part of
@@ -208,19 +266,20 @@ preserved rather than corrected, and both recorded in
 
 ## What remains
 
-- The four stage modules are entry points that still hold their logic. Moving
-  that logic into the core is the long part of this work, and it is the same
-  work as the untested-module problem.
-- Declare the clock, network, randomness, logging, and binary payload
-  interfaces as the logic that needs them moves into the core. The network is
-  the most valuable, being the one the server has already inverted.
+- The four stage modules are entry points that still hold their Document
+  Object Model work, which is 320 of the 372 platform references left outside
+  the platform layer. Some of it is presentation and belongs there. What does
+  not is the arithmetic still tangled with it, and separating the two is the
+  long part of this work.
+- Declare the logging and binary payload interfaces as the logic that needs
+  them moves into the core. Binary payloads are the larger of the two at
+  forty sites, and are what block `Handoff` from moving.
 - `Handoff` cannot move to the core as it stands, carrying an
   `HTMLCanvasElement` and two `Blob` fields. It moves when the drawing surface
   and the binary payload are inverted, not before.
 - There is no node platform layer. `server.mts` is an entry point with its
-  platform inline, and it already declares the one capability it inverts,
-  `FetchLike`. That interface and the browser's eventual network port are the
-  same interface and should be one.
+  platform inline. It now shares the core's network interface, so what remains
+  is a structural question rather than a duplication one.
 
 ## Related
 

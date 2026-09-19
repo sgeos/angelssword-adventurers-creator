@@ -14,17 +14,10 @@ import {
     showToast,
     switchTab,
 } from "../platform-browser/shell.mts";
-import { base64ToBlob, blobToBase64, colorName, debounce } from "../platform-browser/app-utils.mts";
+import { base64ToBlob, blobToBase64, bytesToDataUri, colorName, debounce } from "../platform-browser/app-utils.mts";
 import { closestFrom, fieldValue, queryAll, require2d, requireEl } from "../platform-browser/dom.mts";
 import * as Core from "../core/sprite-prep-core.mts";
-import {
-    buildWorkflowFor,
-    extractHistoryImages,
-    extractPromptId,
-    loadComfySettings,
-    viewQuery,
-    type ComfySettings,
-} from "../core/comfyui-core.mts";
+import { buildWorkflowFor, loadComfySettings } from "../core/comfyui-core.mts";
 import {
     PROVIDERS,
     asProviderId,
@@ -42,6 +35,11 @@ import {
     saveSpriteZoom,
 } from "../core/preferences.mts";
 import { browserStore } from "../platform-browser/local-storage.mts";
+import { browserHttp } from "../platform-browser/http.mts";
+import { browserClock } from "../platform-browser/clock.mts";
+import { drawSeed } from "../platform-browser/random.mts";
+import { runWorkflow, uploadReference } from "../core/comfyui-run.mts";
+import { isOk, readJson } from "../core/ports/http.mts";
 
 /** ComfyUI offers no completion callback, so the history is polled. */
 const COMFY_POLL_INTERVAL_MS = 2_000;
@@ -464,26 +462,13 @@ async function generate(): Promise<void> {
     }
 }
 
-/** One call through the local ComfyUI proxy. */
-async function comfyCall(
-    settings: ComfySettings,
-    path: string,
-    method: string,
-    body?: unknown,
-): Promise<Response> {
-    return fetch(PROVIDERS.comfyui.imageRoute, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ baseUrl: settings.url, path, method, body }),
-    });
-}
-
 /**
  * Generate one sprite on the user's own ComfyUI.
  *
- * Four steps. Upload the reference if there is one, queue the graph, poll the
- * history until the save node reports an image, then retrieve it. ComfyUI
- * offers no completion callback, so polling is the only option.
+ * The four steps, meaning upload, queue, poll, retrieve, now live in
+ * `comfyui-run.mts`, where they are shared with the video stage and tested.
+ * What remains here is what is genuinely this stage's: which graph to build,
+ * how long to wait, and that the result is wanted as a data URI.
  */
 async function generateOneComfy(
     prompt: string,
@@ -495,55 +480,31 @@ async function generateOneComfy(
     let referenceFilename: string | undefined;
     const first = images[0];
     if (typeof first === 'string' && first !== '') {
-        const uploaded = await comfyCall(settings, '/upload/image', 'POST', {
-            image: first,
-            filename: `as_adventurer_ref_${Date.now().toString()}.png`,
-        });
-        const uploadBody: unknown = await uploaded.json().catch(() => ({}));
-        if (uploaded.ok) {
-            const name = typeof uploadBody === 'object' && uploadBody !== null && 'name' in uploadBody
-                ? { ...uploadBody }.name
-                : undefined;
-            if (typeof name === 'string' && name !== '') referenceFilename = name;
-        }
+        referenceFilename = await uploadReference(
+            browserHttp,
+            settings.url,
+            first,
+            `as_adventurer_ref_${Date.now().toString()}.png`,
+        );
     }
 
-    const seed = Math.floor(Math.random() * 1_000_000_000);
     const built = buildWorkflowFor(settings, {
         positiveText: prompt,
-        seed,
+        seed: drawSeed(),
         ...(referenceFilename === undefined ? {} : { referenceFilename }),
     });
 
-    const queued = await comfyCall(settings, '/prompt', 'POST', { prompt: built.workflow });
-    const queuedBody: unknown = await queued.json().catch(() => ({}));
-    if (!queued.ok) {
-        throw new Error(responseErrorMessage(queuedBody) ?? `ComfyUI refused the job (${queued.status.toString()})`);
-    }
-    const promptId = extractPromptId(queuedBody);
-    if (promptId === undefined) throw new Error('ComfyUI did not return a prompt id');
+    const outcome = await runWorkflow(browserHttp, browserClock, {
+        baseUrl: settings.url,
+        built,
+        pollIntervalMs: COMFY_POLL_INTERVAL_MS,
+        maxPolls: COMFY_MAX_POLLS,
+        isCancelled: isGenCancelled,
+    });
 
-    for (let attempt = 0; attempt < COMFY_MAX_POLLS; attempt++) {
-        if (isGenCancelled()) return null;
-        await new Promise<void>((resolve) => { setTimeout(resolve, COMFY_POLL_INTERVAL_MS); });
-        if (isGenCancelled()) return null;
-
-        const polled = await comfyCall(settings, `/history/${promptId}`, 'GET');
-        if (!polled.ok) continue;
-        const history: unknown = await polled.json().catch(() => ({}));
-        const found = extractHistoryImages(history, promptId, built.saveNodeId);
-        const image = found[0];
-        if (image === undefined) continue;
-
-        const view = await comfyCall(settings, `/view?${viewQuery(image)}`, 'GET');
-        if (!view.ok) throw new Error('ComfyUI produced an image that could not be retrieved');
-        const bytes = await view.arrayBuffer();
-        let binary = '';
-        for (const byte of new Uint8Array(bytes)) binary += String.fromCharCode(byte);
-        return `data:image/png;base64,${btoa(binary)}`;
-    }
-
-    throw new Error('ComfyUI generation timed out');
+    if (outcome.kind === 'cancelled') return null;
+    if (outcome.kind === 'timedOut') throw new Error('ComfyUI generation timed out');
+    return bytesToDataUri(outcome.bytes, 'image/png');
 }
 
 async function generateOne(
@@ -564,7 +525,7 @@ async function generateOne(
             body: buildImageRequest(provider, { prompt, count: 1 }),
         };
 
-    const response = await fetch(endpoint, {
+    const response = await browserHttp(endpoint, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -573,12 +534,10 @@ async function generateOne(
         body: JSON.stringify(body)
     });
 
-    if (!response.ok) {
-        const err: unknown = await response.json().catch(() => ({}));
-        throw new Error(responseErrorMessage(err) ?? `API error: ${response.status.toString()}`);
+    const data = await readJson(response);
+    if (!isOk(response)) {
+        throw new Error(responseErrorMessage(data) ?? `API error: ${response.status.toString()}`);
     }
-
-    const data: unknown = await response.json();
     // The proxy returns { data: [{ b64_json }] }; narrow rather than chain
     // optional access through `any`.
     const entries: unknown =
