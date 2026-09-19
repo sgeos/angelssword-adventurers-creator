@@ -167,17 +167,24 @@ The exported WebM files also work with any OBS browser source, PNGtuber app, or 
 
 ### Building a standalone binary
 
-**Currently unavailable.** `node build-exe.mts` refuses to build and explains
-why rather than emitting something broken: the server is now ESM TypeScript,
-and `pkg` — the tool the previous build used — is archived and rejects ESM.
-Restoring this means either bundling to CommonJS first or moving to Node's
-own single-executable applications. Until then, run from source with
-`npm start` on every platform.
+```sh
+node build-exe.mts
+```
 
-When it worked, the build applied an ad-hoc code signature on macOS so the
-result ran on the machine that produced it. That was never notarization;
-distributing to another Mac needed an Apple Developer ID, or the recipient
-clearing the quarantine attribute by hand.
+Produces a self-contained binary for the platform it is run on, into
+`dist/ASAdventurer/`, alongside the UI files and a launcher. Windows, macOS,
+and Linux are supported. The BSDs are not, because `pkg` publishes no base
+binary for them; run the application with `npm start` there instead.
+
+The build bundles the server to CommonJS with esbuild before handing it to
+`pkg`. That step exists because the server is ESM TypeScript and `pkg` — which
+is archived, and whose final release predates `import.meta` — cannot consume
+it directly. The source stays ESM; only the binary target sees CommonJS.
+
+On macOS the build applies an ad-hoc code signature so the result runs on the
+machine that produced it. That is not notarization. Distributing the binary to
+another Mac requires an Apple Developer ID and a notarization step, or the
+recipient clearing the quarantine attribute by hand.
 
 ---
 
