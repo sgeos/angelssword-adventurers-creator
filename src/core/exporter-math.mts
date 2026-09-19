@@ -39,16 +39,20 @@ export const getOutputFrameCount = (
   end: number,
   skip: number,
   pingPong: boolean,
-): number => {
-  const step = Math.max(1, skip + 1);
+): number =>
+  // Counted by building the list rather than by a parallel loop. This had its
+  // own copy of the selection, which made it the fourth, and a count that can
+  // disagree with the export it describes is worse than no count: it is shown
+  // to the user as an estimate before an export they then wait for.
+  buildExportFrameList(start, end, strideFromSkip(skip), pingPong ? "pingpong" : "forward").length;
 
-  let count = 0;
-  for (let f = start; f <= end; f += step) count++;
-
-  // Ping-pong replays the interior frames, so both endpoints are not
-  // repeated.
-  return pingPong && count > 2 ? count + (count - 2) : count;
-};
+/**
+ * NOTE ON TWO CONVENTIONS. This takes a SKIP, as the field holds it, while
+ * `buildExportFrameList` takes a STRIDE. `strideFromSkip` is the conversion
+ * and the two names are deliberately different, a parameter that means
+ * "skip 0" in one place and "step 1" in another having caused enough trouble
+ * elsewhere.
+ */
 
 export const formatBytes = (bytes: number): string => {
   if (bytes < 1024) return `${bytes.toString()} B`;
@@ -506,3 +510,72 @@ export const viewportToPixel = (
     backingSize: number,
     displayedSize: number,
 ): number => Math.floor((pointerCoord - elementOrigin) * (backingSize / displayedSize));
+
+/* ────────────────────────────────────────────────────────────────────────
+ * Which frames an export emits.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/** How an export orders the frames it selected. */
+export type PlaybackMode = "forward" | "reverse" | "pingpong";
+
+/**
+ * Convert a skip count into a stride.
+ *
+ * The field asks how many frames to skip between the ones kept, so keeping
+ * every frame is a skip of zero and a stride of one. The maximum is what
+ * stops a negative or unparsable field producing a stride of zero, which
+ * would make the selection below loop forever.
+ */
+export const strideFromSkip = (skip: number): number =>
+    Math.max(1, (Number.isFinite(skip) ? skip : 0) + 1);
+
+/**
+ * The frame indices an export will emit, in order.
+ *
+ * # This existed three times
+ *
+ * The WebM path and the Graphics Interchange Format path each built it with
+ * the ordering, and the second path built the selection again without the
+ * ordering to find the unique frames it must decode. Three copies, and the
+ * third had to stay consistent with the first two by inspection.
+ *
+ * # Ordering
+ *
+ * Ping-pong returns through the interior, so neither endpoint repeats, and it
+ * applies only when there are more than two frames to turn around between.
+ * Reverse needs more than one. Below those counts each mode leaves the
+ * selection as it is, which is what the guards in the originals did.
+ */
+export const buildExportFrameList = (
+    startFrame: number,
+    endFrame: number,
+    stride: number,
+    mode: PlaybackMode,
+): readonly number[] => {
+    const frames: number[] = [];
+    const step = Math.max(1, stride);
+    for (let f = startFrame; f <= endFrame; f += step) frames.push(f);
+
+    if (mode === "pingpong" && frames.length > 2) {
+        for (let i = frames.length - 2; i >= 1; i--) {
+            const frame = frames[i];
+            if (frame !== undefined) frames.push(frame);
+        }
+    } else if (mode === "reverse" && frames.length > 1) {
+        frames.reverse();
+    }
+    return frames;
+};
+
+/**
+ * The frames an export must decode, each once, whatever the ordering.
+ *
+ * The ordering repeats frames; decoding does not need to. This is the same
+ * selection [`buildExportFrameList`] starts from, exposed so that the two
+ * cannot drift apart.
+ */
+export const selectExportFrames = (
+    startFrame: number,
+    endFrame: number,
+    stride: number,
+): readonly number[] => buildExportFrameList(startFrame, endFrame, stride, "forward");

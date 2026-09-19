@@ -22,6 +22,10 @@ import { channel } from "../core/pixels.mts";
 import {
     MODE_LIMITS,
     asCropRatio,
+    buildExportFrameList,
+    selectExportFrames,
+    strideFromSkip,
+    type PlaybackMode,
     clampCropOrigin,
     cropOverlayPercent,
     estimateExportBytes,
@@ -133,9 +137,13 @@ export class ModelExporter {
     lastExportBlob: Blob | null = null;
     lastExportFormat: ExportFormat | null = null;
 
-    /* ─── Ping-pong and reverse, set from the Video Prep handoff ─── */
-    pingPongMode = false;
-    reverseMode = false;
+    /**
+     * How the export orders its frames, set from the Video Prep handoff.
+     *
+     * One field rather than the two booleans it replaced. Those could both be
+     * true, which meant nothing, and every reader had to know which won.
+     */
+    playbackMode: PlaybackMode = 'forward';
 
     /** Reference still for auto-detect, when the user supplies one. */
     private _refImageData: ImageData | null = null;
@@ -303,16 +311,10 @@ export class ModelExporter {
                     }
                     fromVP.classList.remove('hidden');
 
-                    if (data.loopMode === 'pingpong') {
-                        this.pingPongMode = true;
-                        this.reverseMode = false;
-                    } else if (data.loopMode === 'reverse') {
-                        this.pingPongMode = false;
-                        this.reverseMode = true;
-                    } else {
-                        this.pingPongMode = false;
-                        this.reverseMode = false;
-                    }
+                    this.playbackMode =
+                        data.loopMode === 'pingpong' ? 'pingpong'
+                        : data.loopMode === 'reverse' ? 'reverse'
+                        : 'forward';
 
                     // Store FPS from Video Prep if available
                     if (data.fps !== undefined && data.fps > 0) {
@@ -1080,7 +1082,7 @@ export class ModelExporter {
         const start = intFromField('exStartFrame', 0);
         const end = intFromField('exEndFrame', 0);
         const skip = intFromField('exFrameSkip', 0);
-        return getOutputFrameCount(start, end, skip, this.pingPongMode);
+        return getOutputFrameCount(start, end, skip, this.playbackMode === 'pingpong');
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -1117,18 +1119,11 @@ export class ModelExporter {
         const exportFps = intFromField('exFPS', this.fps);
         const startFrame = intFromField('exStartFrame', 0);
         const endFrame = intFromField('exEndFrame', 0);
-        const skip = Math.max(1, (intFromField('exFrameSkip', 0)) + 1);
+        const skip = strideFromSkip(intFromField('exFrameSkip', 0));
         const videoScale = positiveOr(this.videoScale, 1);
         const videoOffset = Number.isFinite(this.videoOffset) ? this.videoOffset : 0;
 
-        // Build frame list
-        const frameList = [];
-        for (let f = startFrame; f <= endFrame; f += skip) frameList.push(f);
-        if (this.pingPongMode && frameList.length > 2) {
-            for (let i = frameList.length - 2; i >= 1; i--) frameList.push(frameList[i]);
-        } else if (this.reverseMode && frameList.length > 1) {
-            frameList.reverse();
-        }
+        const frameList = buildExportFrameList(startFrame, endFrame, skip, this.playbackMode);
         const totalFrames = frameList.length;
 
         this.isExporting = true;
@@ -1320,18 +1315,11 @@ export class ModelExporter {
         const delayCentiseconds = Math.max(2, Math.round(100 / exportFps));
         const startFrame = intFromField('exStartFrame', 0);
         const endFrame = intFromField('exEndFrame', 0);
-        const skip = Math.max(1, (intFromField('exFrameSkip', 0)) + 1);
+        const skip = strideFromSkip(intFromField('exFrameSkip', 0));
         const videoScale = positiveOr(this.videoScale, 1);
         const videoOffset = Number.isFinite(this.videoOffset) ? this.videoOffset : 0;
 
-        // Build frame list
-        const frameList = [];
-        for (let f = startFrame; f <= endFrame; f += skip) frameList.push(f);
-        if (this.pingPongMode && frameList.length > 2) {
-            for (let i = frameList.length - 2; i >= 1; i--) frameList.push(frameList[i]);
-        } else if (this.reverseMode && frameList.length > 1) {
-            frameList.reverse();
-        }
+        const frameList = buildExportFrameList(startFrame, endFrame, skip, this.playbackMode);
         const totalFrames = frameList.length;
 
         this.isExporting = true;
@@ -1396,8 +1384,10 @@ export class ModelExporter {
             // ── Phase 2: Extract & process all UNIQUE frames ──
             progressText.textContent = 'Extracting frames...';
 
-            const uniqueFrames = [];
-            for (let f = startFrame; f <= endFrame; f += skip) uniqueFrames.push(f);
+            // The same selection the ordering above starts from, so the two
+            // cannot drift. Decoding needs each frame once; the ordering may
+            // repeat them.
+            const uniqueFrames = selectExportFrames(startFrame, endFrame, skip);
 
             const frameCache = new Map<number, WorkerFrame>();
             // Nearest-palette-index cache, keyed by packed RGB, shared across frames.
