@@ -1,7 +1,7 @@
 /**
  * Sprite Prep core: pure logic, no DOM and no fetch.
  */
-import { channel, type RgbaBuffer } from "./pixels.mts";
+import { channel, type RgbaBuffer, type RgbaImage } from "./pixels.mts";
 import { colorName } from "./color.mts";
 
 export interface KeyColor {
@@ -277,3 +277,136 @@ export function rgbToLab(r: number, g: number, b: number): Lab {
         b: 200 * (y - z)
     };
 }
+
+/* ────────────────────────────────────────────────────────────────────────
+ * Scoring the key colours against a sampled region.
+ *
+ * This was ninety lines inside a click handler on the advanced key dialogue.
+ * It is colour science and nothing else: the only part that needed a browser
+ * was one call to read the selected rectangle's pixels.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Bits kept per channel when building the histogram.
+ *
+ * Six, so a channel becomes one of sixty-four buckets and three channels pack
+ * into eighteen bits. The purpose is speed rather than noise: a region of any
+ * size collapses to at most 262,144 entries, and each candidate colour is
+ * then compared against buckets rather than against pixels.
+ *
+ * A bucket is identified by its FLOOR, not its centre. A channel of 251 and
+ * one of 255 both become 252. That biases every reconstructed colour slightly
+ * dark, by up to three levels, and it is preserved from the original because
+ * correcting it would move every score.
+ */
+export const HISTOGRAM_BITS = 6;
+
+/** Alpha at or above which a pixel counts as part of the subject. */
+export const OPAQUE_ALPHA_MIN = 128;
+
+/**
+ * Fewer opaque pixels than this and the analysis refuses.
+ *
+ * A handful of pixels produces scores that swing wildly with the selection,
+ * which reads as authoritative and is not. Refusing is better than reporting.
+ */
+export const MIN_ANALYSIS_PIXELS = 100;
+
+/**
+ * Below this CIE76 distance, a subject colour is counted as endangered.
+ *
+ * Thirty is roughly where a difference stops being obvious to the eye, so a
+ * subject colour nearer than this to the key colour is at risk of being keyed
+ * away with the background.
+ */
+export const DANGER_DELTA_E = 30;
+
+/**
+ * How the score weighs the nearest colour against the average.
+ *
+ * Mostly the nearest, because one subject colour close to the key colour is
+ * enough to punch a hole in the subject, and an average cannot see that. Some
+ * weight on the average, because a subject that is broadly near the key
+ * colour keys badly even with no single collision.
+ */
+export const SCORE_MIN_WEIGHT = 0.6;
+export const SCORE_AVG_WEIGHT = 0.4;
+
+/** A key colour scored against a sampled region. */
+export interface KeyScore extends KeyColor {
+  /** CIE76 distance to the nearest subject colour. Higher is safer. */
+  readonly minDist: number;
+  /** Distance to the average subject colour, weighted by pixel count. */
+  readonly avgDist: number;
+  /** Share of subject pixels within `DANGER_DELTA_E`, as a percentage. */
+  readonly dangerPercent: number;
+  /** The weighted verdict. Higher is better. */
+  readonly score: number;
+}
+
+/** One decimal place, which is the precision the results are shown at. */
+const toTenth = (value: number): number => Math.round(value * 10) / 10;
+
+/**
+ * Score every candidate key colour against a region of the subject.
+ *
+ * Returns undefined when the region holds fewer than [`MIN_ANALYSIS_PIXELS`]
+ * opaque pixels, which is the case the dialogue reports rather than scoring.
+ *
+ * Results are ordered best first. Ties keep the order of [`KEY_COLORS`],
+ * `Array.prototype.sort` being stable, which is what makes the list read
+ * consistently across runs on the same input.
+ */
+export const scoreKeyColors = (image: RgbaImage): readonly KeyScore[] | undefined => {
+  const shift = 8 - HISTOGRAM_BITS;
+  const mask = (1 << HISTOGRAM_BITS) - 1;
+  const { data } = image;
+
+  const counts = new Map<number, number>();
+  let opaquePixels = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    if (channel(data, i + 3) < OPAQUE_ALPHA_MIN) continue;
+    const key =
+      ((channel(data, i) >> shift) << (HISTOGRAM_BITS * 2)) |
+      ((channel(data, i + 1) >> shift) << HISTOGRAM_BITS) |
+      (channel(data, i + 2) >> shift);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+    opaquePixels += 1;
+  }
+
+  if (opaquePixels < MIN_ANALYSIS_PIXELS) return undefined;
+
+  const scored = KEY_COLORS.map((keyColor): KeyScore => {
+    const keyLab = rgbToLab(keyColor.r, keyColor.g, keyColor.b);
+    let minDist = Infinity;
+    let weightedTotal = 0;
+    let dangerPixels = 0;
+
+    for (const [bucket, count] of counts) {
+      const pixelLab = rgbToLab(
+        ((bucket >> (HISTOGRAM_BITS * 2)) & mask) << shift,
+        ((bucket >> HISTOGRAM_BITS) & mask) << shift,
+        (bucket & mask) << shift,
+      );
+      const dist = Math.sqrt(
+        (keyLab.L - pixelLab.L) ** 2 +
+        (keyLab.a - pixelLab.a) ** 2 +
+        (keyLab.b - pixelLab.b) ** 2,
+      );
+      if (dist < minDist) minDist = dist;
+      weightedTotal += dist * count;
+      if (dist < DANGER_DELTA_E) dangerPixels += count;
+    }
+
+    const avgDist = weightedTotal / opaquePixels;
+    return {
+      ...keyColor,
+      minDist: toTenth(minDist),
+      avgDist: toTenth(avgDist),
+      dangerPercent: toTenth((dangerPixels / opaquePixels) * 100),
+      score: toTenth(minDist * SCORE_MIN_WEIGHT + avgDist * SCORE_AVG_WEIGHT),
+    };
+  });
+
+  return [...scored].sort((a, b) => b.score - a.score);
+};

@@ -21,8 +21,13 @@ import { channel } from "../core/pixels.mts";
 import {
     MODE_LIMITS,
     asCropRatio,
+    clampCropOrigin,
+    cropOverlayPercent,
+    estimateExportBytes,
+    lockedDimension,
     matchedSaturationPercent,
     placeScaled,
+    viewportToPixel,
     averageSaturation,
     asExportMode,
     computeCropToCenter,
@@ -428,17 +433,15 @@ export class ModelExporter {
             if (!this.eyedropperActive || !this.videoLoaded) return;
 
             const rect = this.previewCanvas.getBoundingClientRect();
-            const scaleX = this.previewCanvas.width / rect.width;
-            const scaleY = this.previewCanvas.height / rect.height;
-            const x = Math.floor((e.clientX - rect.left) * scaleX);
-            const y = Math.floor((e.clientY - rect.top) * scaleY);
+            const x = viewportToPixel(e.clientX, rect.left, this.previewCanvas.width, rect.width);
+            const y = viewportToPixel(e.clientY, rect.top, this.previewCanvas.height, rect.height);
 
             // Sample from original video frame (not the keyed preview)
             this.workCtx.drawImage(this.video, 0, 0, this.videoWidth, this.videoHeight);
             const pixel = this.workCtx.getImageData(x, y, 1, 1).data;
 
-            const [r, g, b] = [channel(pixel, 0), channel(pixel, 1), channel(pixel, 2)];
-            const hex = '#' + [r, g, b].map(c => c.toString(16).padStart(2, '0')).join('');
+            const r = channel(pixel, 0), g = channel(pixel, 1), b = channel(pixel, 2);
+            const hex = rgbToHex({ r, g, b });
             this.chromaKey.setKeyColor(r, g, b);
             this._selectSwatch(hex);
 
@@ -909,14 +912,11 @@ export class ModelExporter {
             if (!dragging) return;
             const canvas = this.previewCanvas;
             const canvasRect = canvas.getBoundingClientRect();
-            const scaleX = this.videoWidth / canvasRect.width;
-            const scaleY = this.videoHeight / canvasRect.height;
+            const dx = (e.clientX - dragStartX) * (this.videoWidth / canvasRect.width);
+            const dy = (e.clientY - dragStartY) * (this.videoHeight / canvasRect.height);
 
-            const dx = (e.clientX - dragStartX) * scaleX;
-            const dy = (e.clientY - dragStartY) * scaleY;
-
-            this.cropX = Math.round(Math.max(0, Math.min(this.videoWidth - this.cropW, startCropX + dx)));
-            this.cropY = Math.round(Math.max(0, Math.min(this.videoHeight - this.cropH, startCropY + dy)));
+            this.cropX = clampCropOrigin(startCropX, dx, this.cropW, this.videoWidth);
+            this.cropY = clampCropOrigin(startCropY, dy, this.cropH, this.videoHeight);
 
             this.updateCropOverlay();
         });
@@ -952,16 +952,17 @@ export class ModelExporter {
         const overlay = requireEl('exCropOverlay', HTMLElement);
         const region = requireEl('exCropRegion', HTMLElement);
 
-        // Convert video coords to percentage-based positioning (works regardless of canvas CSS size)
-        const pctLeft = (this.cropX / this.videoWidth) * 100;
-        const pctTop = (this.cropY / this.videoHeight) * 100;
-        const pctWidth = (this.cropW / this.videoWidth) * 100;
-        const pctHeight = (this.cropH / this.videoHeight) * 100;
-
-        region.style.left = `${pctLeft.toString()}%`;
-        region.style.top = `${pctTop.toString()}%`;
-        region.style.width = `${pctWidth.toString()}%`;
-        region.style.height = `${pctHeight.toString()}%`;
+        // Percentages rather than pixels, so the overlay tracks the canvas
+        // whatever size the page decides to display it at.
+        const pct = cropOverlayPercent(
+            { cropX: this.cropX, cropY: this.cropY, cropW: this.cropW, cropH: this.cropH },
+            this.videoWidth,
+            this.videoHeight,
+        );
+        region.style.left = `${pct.left.toString()}%`;
+        region.style.top = `${pct.top.toString()}%`;
+        region.style.width = `${pct.width.toString()}%`;
+        region.style.height = `${pct.height.toString()}%`;
 
         overlay.classList.remove('hidden');
     }
@@ -976,7 +977,7 @@ export class ModelExporter {
         widthInput.addEventListener('change', () => {
             if (aspectLock.checked && this.videoLoaded) {
                 const ratio = this.videoHeight / this.videoWidth;
-                heightInput.value = String(Math.round(parseInt(widthInput.value) * ratio));
+                heightInput.value = String(lockedDimension(parseInt(widthInput.value), ratio));
             }
             this.updateSizeEstimate();
         });
@@ -984,7 +985,7 @@ export class ModelExporter {
         heightInput.addEventListener('change', () => {
             if (aspectLock.checked && this.videoLoaded) {
                 const ratio = this.videoWidth / this.videoHeight;
-                widthInput.value = String(Math.round(parseInt(heightInput.value) * ratio));
+                widthInput.value = String(lockedDimension(parseInt(heightInput.value), ratio));
             }
             this.updateSizeEstimate();
         });
@@ -1051,19 +1052,13 @@ export class ModelExporter {
         const count = this.getOutputFrameCount();
         estFrames.textContent = `Frames: ${count.toString()}`;
 
-        const limits = MODE_LIMITS[this.mode];
-        const w = intFromField('exWidth', this.videoWidth);
-        const h = intFromField('exHeight', this.videoHeight);
-
-        if (limits.format === 'gif') {
-            // Rough GIF estimate: ~0.3 bytes per pixel per frame (with LZW + transparency)
-            const est = count * w * h * 0.3;
-            estSize.textContent = `Est. Size: ~${formatBytes(est)}`;
-        } else {
-            // WebM: ~0.1 bytes per pixel per frame
-            const est = count * w * h * 0.1;
-            estSize.textContent = `Est. Size: ~${formatBytes(est)}`;
-        }
+        const est = estimateExportBytes(
+            count,
+            intFromField('exWidth', this.videoWidth),
+            intFromField('exHeight', this.videoHeight),
+            MODE_LIMITS[this.mode].format,
+        );
+        estSize.textContent = `Est. Size: ~${formatBytes(est)}`;
     }
 
     updateVideoInfo(): void {

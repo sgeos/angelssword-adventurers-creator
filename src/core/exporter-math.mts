@@ -395,3 +395,114 @@ export const matchedSaturationPercent = (
     const ratio = referenceAverage / outputAverage;
     return Math.round(Math.max(0, Math.min(SATURATION_MAX_PERCENT, ratio * 100)));
 };
+
+/* ────────────────────────────────────────────────────────────────────────
+ * Estimating the output size.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Bytes per pixel per frame, by container.
+ *
+ * **These are heuristics and nothing here establishes them.** They came from
+ * the code this was extracted from, whose only justification was a comment
+ * saying roughly. They are stated as named constants rather than buried in an
+ * expression so that a measurement, if anyone makes one, has somewhere to go.
+ *
+ * The estimate is shown to a user before an export, so being wrong by a
+ * factor costs a surprise rather than a failure.
+ */
+export const BYTES_PER_PIXEL_PER_FRAME: Readonly<Record<ExportFormat, number>> = {
+    gif: 0.3,
+    webm: 0.1,
+};
+
+/**
+ * Roughly how large an export will be.
+ *
+ * Returns 0 for a degenerate request rather than NaN, so the displayed
+ * estimate reads as nothing rather than as a fault. A frame count or a
+ * dimension that is not a usable number is treated as zero, which is what the
+ * inputs that feed this can produce when a field is cleared.
+ */
+export const estimateExportBytes = (
+    frameCount: number,
+    width: number,
+    height: number,
+    format: ExportFormat,
+): number => {
+    const usable = (value: number): number => (Number.isFinite(value) && value > 0 ? value : 0);
+    return usable(frameCount) * usable(width) * usable(height) * BYTES_PER_PIXEL_PER_FRAME[format];
+};
+
+/* ────────────────────────────────────────────────────────────────────────
+ * The crop rectangle, as the user drags it.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Where a dragged crop rectangle ends up on one axis.
+ *
+ * Clamped so the rectangle cannot leave the frame on either side, and rounded
+ * so the crop is always whole pixels. A crop wider than the frame would give
+ * a negative upper bound, which `Math.min` then makes the winner, so the
+ * result is clamped below at zero afterwards rather than before.
+ */
+export const clampCropOrigin = (
+    startOrigin: number,
+    delta: number,
+    cropSize: number,
+    frameSize: number,
+): number => Math.round(Math.max(0, Math.min(frameSize - cropSize, startOrigin + delta)));
+
+/** The crop rectangle as percentages of the frame, for positioning an overlay. */
+export interface CropOverlay {
+    readonly left: number;
+    readonly top: number;
+    readonly width: number;
+    readonly height: number;
+}
+
+/**
+ * Express a crop rectangle as percentages of the frame.
+ *
+ * Percentages rather than pixels because the overlay sits over a canvas whose
+ * displayed size is decided by the page's layout and is not the canvas's own
+ * width. A pixel offset would be right only at one zoom level.
+ */
+export const cropOverlayPercent = (
+    crop: CropBox,
+    frameWidth: number,
+    frameHeight: number,
+): CropOverlay => ({
+    left: (crop.cropX / frameWidth) * 100,
+    top: (crop.cropY / frameHeight) * 100,
+    width: (crop.cropW / frameWidth) * 100,
+    height: (crop.cropH / frameHeight) * 100,
+});
+
+/**
+ * The other dimension, when the aspect ratio is locked.
+ *
+ * `ratio` is the other dimension over this one, so a caller asking for a new
+ * height from a width passes height over width. Rounded, because the field it
+ * is written into holds an integer.
+ */
+export const lockedDimension = (value: number, ratio: number): number =>
+    Math.round(value * ratio);
+
+/**
+ * Convert a pointer position into a pixel coordinate on a canvas.
+ *
+ * A canvas has a backing size and a displayed size and they are rarely equal.
+ * A click arrives in page coordinates, so it is made relative to the element
+ * and then scaled by the ratio between the two.
+ *
+ * Floored rather than rounded, because the result indexes a pixel: rounding
+ * would let a click on the right half of the last pixel address one past the
+ * end.
+ */
+export const viewportToPixel = (
+    pointerCoord: number,
+    elementOrigin: number,
+    backingSize: number,
+    displayedSize: number,
+): number => Math.floor((pointerCoord - elementOrigin) * (backingSize / displayedSize));

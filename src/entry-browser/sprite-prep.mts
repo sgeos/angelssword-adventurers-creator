@@ -976,101 +976,28 @@ function initAdvKeyRectSelection(): void {
 function runAdvKeyAnalysis(): void {
     if (advKeyRect === null || advKeyImg === null) return;
 
-    const canvas = requireEl('advKeyCanvas', HTMLCanvasElement);
-    const ctx = require2d(canvas);
+    const ctx = require2d(requireEl('advKeyCanvas', HTMLCanvasElement));
     const { x, y, w, h } = advKeyRect;
 
-    // Extract pixel data from the selection region
-    const imageData = ctx.getImageData(x, y, w, h);
-    const pixels = imageData.data;
-
-    // Build a histogram of unique colors (quantized to 6-bit per channel for speed)
-    const colorMap = new Map<number, number>();
-    let totalPixels = 0;
-
-    for (let i = 0; i < pixels.length; i += 4) {
-        const r = channel(pixels, i);
-        const g = channel(pixels, i + 1);
-        const b = channel(pixels, i + 2);
-        if (channel(pixels, i + 3) < 128) continue; // skip transparent pixels
-
-        // Quantize to reduce noise
-        const qr = r >> 2, qg = g >> 2, qb = b >> 2;
-        const key = (qr << 12) | (qg << 6) | qb;
-        colorMap.set(key, (colorMap.get(key) ?? 0) + 1);
-        totalPixels++;
-    }
-
-    if (totalPixels < 100) {
+    // The scoring is core. Histogram, CIE76 distances, danger share and the
+    // weighted verdict all live in sprite-prep-core, where they are tested.
+    // Reading the selected rectangle is the only part that needs a canvas.
+    const results = Core.scoreKeyColors(ctx.getImageData(x, y, w, h));
+    if (results === undefined) {
         showToast('Selection too small or mostly transparent', 'warning');
         return;
     }
-
-    // For each key color, calculate its minimum distance to any character pixel
-    // Use CIE76 deltaE in Lab space for perceptual accuracy
-    const results = KEY_COLORS.map(keyCol => {
-        const keyLab = Core.rgbToLab(keyCol.r, keyCol.g, keyCol.b);
-
-        let minDist = Infinity;
-        let avgDist = 0;
-        let dangerPixels = 0;
-        const threshold = 30; // Pixels closer than this are "dangerous"
-
-        for (const [quantKey, count] of colorMap) {
-            const qr = ((quantKey >> 12) & 0x3F) << 2;
-            const qg = ((quantKey >> 6) & 0x3F) << 2;
-            const qb = (quantKey & 0x3F) << 2;
-            const pixLab = Core.rgbToLab(qr, qg, qb);
-
-            const dist = Math.sqrt(
-                (keyLab.L - pixLab.L) ** 2 +
-                (keyLab.a - pixLab.a) ** 2 +
-                (keyLab.b - pixLab.b) ** 2
-            );
-
-            if (dist < minDist) minDist = dist;
-            avgDist += dist * count;
-            if (dist < threshold) dangerPixels += count;
-        }
-
-        avgDist /= totalPixels;
-        const dangerPercent = (dangerPixels / totalPixels) * 100;
-
-        // Score = weighted combination: mostly minimum distance, some average
-        const score = minDist * 0.6 + avgDist * 0.4;
-
-        return {
-            ...keyCol,
-            minDist: Math.round(minDist * 10) / 10,
-            avgDist: Math.round(avgDist * 10) / 10,
-            dangerPercent: Math.round(dangerPercent * 10) / 10,
-            score: Math.round(score * 10) / 10
-        };
-    });
-
-    // Sort by score descending (higher = better separation)
-    results.sort((a, b) => b.score - a.score);
-
-    // Display results
     displayAdvKeyResults(results);
 }
 
-/** A key colour scored against the sampled region. */
-interface KeyScore extends Core.KeyColor {
-    readonly minDist: number;
-    readonly avgDist: number;
-    readonly dangerPercent: number;
-    readonly score: number;
-}
-
-function displayAdvKeyResults(results: readonly KeyScore[]): void {
+function displayAdvKeyResults(results: readonly Core.KeyScore[]): void {
     const container = requireEl('advKeyResultsList', HTMLElement);
     const wrapper = requireEl('advKeyResults', HTMLElement);
     wrapper.classList.remove('hidden');
 
     const maxScore = results[0]?.score ?? 1;
 
-    container.innerHTML = results.map((r: KeyScore, i: number) => {
+    container.innerHTML = results.map((r: Core.KeyScore, i: number) => {
         const pct = (r.score / maxScore * 100).toFixed(0);
         const barColor = i === 0 ? 'var(--accent-gold)' :
                          i === 1 ? 'var(--accent-teal)' : 'rgba(255,255,255,0.2)';
