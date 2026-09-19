@@ -6,22 +6,27 @@ Matters not settled. Each states what would resolve it.
 
 ## Five modules have no unit tests
 
-Measured on 2026-09-19: `model-exporter` at 1,662 lines, `sprite-prep` at
-1,162, `video-prep` at 952, `shell` at 790, and `video-gen` at 748. Every
-figure here was stale before that measurement, three of them by more than a
-hundred lines, so treat them as of their date rather than as current. All five
-are coupled to `document` and to a live canvas, which the test environment
-does not provide.
+Measured after the capability work on 2026-09-19: `model-exporter` at 1,660
+lines, `sprite-prep` at 1,119, `video-prep` at 914, `shell` at 784, and
+`video-gen` at 671. Treat these as of their date. All five are coupled to
+`document` and to a live canvas, which the test environment does not provide.
 
 Two routes exist. Continue extracting pure logic into the core, which is
 slower but adds nothing. Or supply a canvas implementation, which reaches more
 code at the cost of asserting against a surface whose fidelity is unknown.
 
 The rearchitecture in [../architecture/LAYERING.md](../architecture/LAYERING.md)
-takes the first route, and `gif-composite` is the first instance of it
-resolving. That module asserted in its own header that it needed a canvas. It
-did not, and rewriting it against plain arrays moved it to the core and gave
-it twelve tests where it had none.
+takes the first route and has carried it as far as the capabilities go. What
+has come out so far, with the tests it brought: the Graphics Interchange
+Format compositor, the ComfyUI exchange, the Grok exchange, the storage round
+trips, and the video stage's loop arithmetic.
+
+**The remaining work needs no new interface.** Every capability the core needs
+is inverted, so what is left is separating the arithmetic still tangled with
+the Document Object Model in each stage. That is ordinary work rather than
+architectural work, and the two routes above are no longer a choice between
+approaches; the second, supplying a canvas, would now only reach what the
+first has deliberately left as presentation.
 
 ## The disposal handling in `gif-composite` does not match the format
 

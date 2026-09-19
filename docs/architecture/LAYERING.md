@@ -2,14 +2,17 @@
 
 > **Navigation**: [Architecture](./README.md) | [Documentation Root](../README.md)
 
-Status. **Structurally complete. Three capabilities inverted, three to go.**
-All three layers exist and each boundary is enforced by a check rather than by
-convention. Storage, the network, and time are inverted end to end, from
-declared interfaces through browser adapters to every call site. Randomness
-needs no interface and is resolved. What remains is logging, binary payloads,
-and the largest part, the Document Object Model work still held inside the
-four stage modules. Capability interfaces are declared as their consumers
-arrive rather than in advance.
+Status. **Structurally complete, and every capability the core needs is
+inverted.** All three layers exist and each boundary is enforced by a check
+rather than by convention. Storage, the network, and time are inverted end to
+end, from declared interfaces through browser adapters to every call site.
+Randomness is resolved without an interface, and two entries on the original
+list turned out not to be capabilities at all.
+
+What remains is not architectural. It is the ordinary work of separating the
+arithmetic still tangled with the Document Object Model inside the four stage
+modules, which is what makes those modules testable. That work no longer needs
+a new interface; it needs doing.
 
 ## The rule
 
@@ -132,8 +135,8 @@ discusses a facility.
 | Time and scheduling | **Declared and implemented**, `Clock` and `clock.mts` | Platform 7, entry 22, worker 2. Every polling loop is now core |
 | Randomness | **Resolved without an interface**, see below | Platform 2, entry 0, down from 2 |
 | A scratch surface to composite onto | **Not needed after all**, see below | Nothing. `gif-composite` used a canvas and did not need one |
-| Logging | Not declared | Entry 10, platform 2 |
-| Binary payloads | Not declared | Entry 33, platform 7. `Blob`, `File`, and object URLs |
+| Logging | **Not a capability**, see below | Entry 10, platform 2 |
+| Binary payloads | **Not a capability**, see below | Entry 33, platform 7 |
 
 The core column is absent from that table because every count in it is zero.
 That is checked rather than asserted, `tsconfig.core.json` refusing to compile
@@ -142,6 +145,33 @@ a core module that names any of these.
 The remaining time count in the entry layer is not a polling loop. It is
 playback and animation, meaning `requestAnimationFrame` and the debounced
 redraws, which are presentation and belong where they are.
+
+## Two entries on that list were never capabilities
+
+The list began as a count of what the browser layers reach for. That is not
+the same question as what the core needs handed to it, and conflating the two
+was a mistake in the original survey rather than a discovery made later.
+
+Each of the remaining two was examined before an interface was written for it,
+and neither survived.
+
+**Logging.** All twelve sites are user interface diagnostics. They report that
+a module initialised, that an export failed, or what a response looked like.
+No core module logs anything, so a `Logger` interface would have a declaration,
+an implementation, and no caller.
+
+**Binary payloads.** All forty sites construct a `File` for a video element or
+an object URL for a `src` attribute. That is element wiring. The core deals in
+`Uint8Array` and base64 and hands them outward, which is precisely so that it
+never needs a `Blob`.
+
+The test is worth stating for whatever comes next. **A capability is something
+the core would call. A facility the platform uses on its own account is not a
+capability, and giving it an interface adds indirection while buying nothing.**
+
+An interface is declared when a core consumer exists. That rule was already
+written down here, and applying it honestly means the list gets shorter as
+often as it gets shorter by being done.
 
 `RgbaImage` is the model for a capability with no behaviour. The keyer and the
 exporters need somewhere to read and write pixels. They do not need a canvas, a
@@ -271,12 +301,13 @@ preserved rather than corrected, and both recorded in
   the platform layer. Some of it is presentation and belongs there. What does
   not is the arithmetic still tangled with it, and separating the two is the
   long part of this work.
-- Declare the logging and binary payload interfaces as the logic that needs
-  them moves into the core. Binary payloads are the larger of the two at
-  forty sites, and are what block `Handoff` from moving.
-- `Handoff` cannot move to the core as it stands, carrying an
-  `HTMLCanvasElement` and two `Blob` fields. It moves when the drawing surface
-  and the binary payload are inverted, not before.
+- Nothing further to declare. Every capability the core needs is inverted;
+  see above for why logging and binary payloads are not among them.
+- `Handoff` carries an `HTMLCanvasElement` and two `Blob` fields, so it stays
+  in the platform layer. That is the right place for it: it is a set of handles
+  to things the browser owns, passed between stages that all run in a browser.
+  Moving it would mean wrapping each handle in an opaque token for the benefit
+  of a core that does not read any of them.
 - There is no node platform layer. `server.mts` is an entry point with its
   platform inline. It now shares the core's network interface, so what remains
   is a structural question rather than a duplication one.

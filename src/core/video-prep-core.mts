@@ -23,6 +23,93 @@ export const getOutputFrameCount = (opts: FrameCountOptions): number => {
   return opts.loopMode === "pingpong" ? n + Math.max(0, n - 2) : n;
 };
 
+/**
+ * How a loop mode is described in the information panel.
+ *
+ * The stage carried two label vocabularies for the same three modes, one on
+ * the loop control and one in the panel, and they disagreed in wording while
+ * agreeing in meaning. Both now come from here, so a fourth mode would be
+ * added once.
+ */
+export const LOOP_MODE_LABELS: Readonly<Record<LoopMode, string>> = {
+  none: "No Loop (forward only)",
+  reverse: "Reverse (N→0)",
+  pingpong: "Ping-Pong (0→N→0)",
+};
+
+/** What a set loop point produces, for display and for the export. */
+export interface LoopSummary {
+  /** Frames the export will emit. */
+  readonly outputFrames: number;
+  /** The loop control's label, naming the actual endpoints. */
+  readonly label: string;
+  /** The information panel's label, naming the mode. */
+  readonly modeLabel: string;
+}
+
+/**
+ * Describe a set loop point.
+ *
+ * # One duplication removed, and it was not a defect
+ *
+ * The stage computed its own output frame count in a three-case switch beside
+ * the label, while [`getOutputFrameCount`] computed the same thing from a
+ * different formula. The switch read `loopPoint * 2` for ping-pong and the
+ * core read `n + max(0, n - 2)` with `n = loopPoint + 1`.
+ *
+ * **They agree**, which was checked rather than assumed: for a loop point of
+ * `L` at least 1 the core expression is `(L + 1) + (L - 1)`, which is `2L`,
+ * and the control refuses a loop point below 2. So nothing was wrong and one
+ * of the two was still going to drift the first time either was edited.
+ */
+export const loopSummary = (
+  loopMode: string,
+  loopPoint: number,
+  totalFrames: number,
+): LoopSummary => {
+  const outputFrames = getOutputFrameCount({ loopPoint, loopMode, totalFrames });
+  const end = loopPoint.toString();
+  const label = loopMode === "pingpong"
+    ? `Ping-Pong: 0 → ${end} → 0`
+    : loopMode === "reverse"
+      ? `Reverse: ${end} → 0`
+      : `Forward: 0 → ${end}`;
+  const known = loopMode === "none" || loopMode === "reverse" || loopMode === "pingpong"
+    ? loopMode
+    : undefined;
+  return {
+    outputFrames,
+    label,
+    modeLabel: known === undefined ? loopMode : LOOP_MODE_LABELS[known],
+  };
+};
+
+/**
+ * The playback time of one frame, kept clear of the very end of the clip.
+ *
+ * The millisecond of slack matters. Seeking exactly to `duration` lands past
+ * the last decodable frame in several browsers and yields either the previous
+ * frame or nothing, so the final frame of a clip would not render. It is
+ * preserved from the original rather than rounded off.
+ */
+export const FRAME_SEEK_EPSILON_SECONDS = 0.001;
+
+/** Where in a clip a frame index sits. */
+export const frameTime = (frameIndex: number, fps: number, duration: number): number =>
+  Math.min(frameIndex / fps, duration - FRAME_SEEK_EPSILON_SECONDS);
+
+/**
+ * Move a frame index by one step, stopping at the ends.
+ *
+ * Returns the index unchanged at a boundary rather than wrapping, which is
+ * what the two navigation buttons did with a guard each.
+ */
+export const stepFrame = (current: number, delta: number, totalFrames: number): number => {
+  const next = current + delta;
+  if (next < 0 || next > totalFrames - 1) return current;
+  return next;
+};
+
 /** Playback order of frame indices for a loop mode. */
 export const buildLoopSequence = (cachedLength: number, loopMode: string): number[] => {
   const sequence: number[] = [];

@@ -174,17 +174,12 @@ function updateVideoInfo(): void {
     `;
 
     if (state.loopPoint >= 2) {
-        const modeLabels: Readonly<Record<string, string>> = {
-            none: 'No Loop (forward only)',
-            pingpong: 'Ping-Pong (0→N→0)',
-            reverse: 'Reverse (N→0)',
-        };
-        const outputFrames = getOutputFrameCount();
+        const summary = VideoPrepCore.loopSummary(state.loopMode, state.loopPoint, state.totalFrames);
         html += `
             <hr style="border-color:rgba(255,255,255,0.1);margin:0.4rem 0">
             <div><strong>Loop Point:</strong> Frame ${state.loopPoint.toString()}</div>
-            <div><strong>Mode:</strong> ${modeLabels[state.loopMode] ?? state.loopMode}</div>
-            <div><strong>Output Frames:</strong> ${outputFrames.toString()}</div>
+            <div><strong>Mode:</strong> ${summary.modeLabel}</div>
+            <div><strong>Output Frames:</strong> ${summary.outputFrames.toString()}</div>
         `;
     }
 
@@ -201,15 +196,6 @@ function updateVideoInfo(): void {
     }
 
     el.innerHTML = html;
-}
-
-/** Get output frame count based on loop mode and loop point */
-function getOutputFrameCount(): number {
-    return VideoPrepCore.getOutputFrameCount({
-        loopPoint: state.loopPoint,
-        loopMode: state.loopMode,
-        totalFrames: state.totalFrames,
-    });
 }
 
 // ================================================================
@@ -402,7 +388,7 @@ async function autoCacheFrames(): Promise<void> {
 
 function seekToFrame(frameIdx: number): void {
     if (!state.videoLoaded) return;
-    const time = Math.min(frameIdx / state.fps, state.duration - 0.001);
+    const time = VideoPrepCore.frameTime(frameIdx, state.fps, state.duration);
 
     // Update scrubber and info
     const info = requireEl('vpFrameInfo', HTMLElement);
@@ -427,22 +413,14 @@ function seekToFrame(frameIdx: number): void {
     if (state.video !== null) state.video.currentTime = time;
 }
 
-function prevFrame(): void {
+/** Move one frame, stopping at the ends rather than wrapping. */
+function stepFrame(delta: number): void {
     pauseVideo();
     stopPreview();
-    if (state.currentFrame > 0) {
-        state.currentFrame--;
-        seekToFrame(state.currentFrame);
-    }
-}
-
-function nextFrame(): void {
-    pauseVideo();
-    stopPreview();
-    if (state.currentFrame < state.totalFrames - 1) {
-        state.currentFrame++;
-        seekToFrame(state.currentFrame);
-    }
+    const next = VideoPrepCore.stepFrame(state.currentFrame, delta, state.totalFrames);
+    if (next === state.currentFrame) return;
+    state.currentFrame = next;
+    seekToFrame(state.currentFrame);
 }
 
 // ================================================================
@@ -508,25 +486,9 @@ function setLoopPoint(): void {
     }
     state.loopPoint = state.currentFrame;
 
-    let totalOutput, loopLabel;
-    switch (state.loopMode) {
-        case 'reverse':
-            totalOutput = state.loopPoint + 1;
-            loopLabel = `Reverse: ${state.loopPoint.toString()} → 0`;
-            break;
-        case 'pingpong':
-            totalOutput = state.loopPoint * 2;
-            loopLabel = `Ping-Pong: 0 → ${state.loopPoint.toString()} → 0`;
-            break;
-        case 'none':
-        default:
-            totalOutput = state.loopPoint + 1;
-            loopLabel = `Forward: 0 → ${state.loopPoint.toString()}`;
-            break;
-    }
-
+    const summary = VideoPrepCore.loopSummary(state.loopMode, state.loopPoint, state.totalFrames);
     const loopInfo = requireEl('vpLoopInfo', HTMLElement);
-    loopInfo.textContent = `${loopLabel} · ${totalOutput.toString()} output frames`;
+    loopInfo.textContent = `${summary.label} · ${summary.outputFrames.toString()} output frames`;
 
     requireEl('vpPreviewLoopBtn', HTMLButtonElement).disabled = false;
     requireEl('vpClearLoopBtn', HTMLButtonElement).disabled = false;
@@ -838,8 +800,8 @@ function init(): void {
     });
 
     // ── Frame Navigation ──
-    requireEl('vpPrevFrame', HTMLElement).addEventListener('click', prevFrame);
-    requireEl('vpNextFrame', HTMLElement).addEventListener('click', nextFrame);
+    requireEl('vpPrevFrame', HTMLElement).addEventListener('click', () => { stepFrame(-1); });
+    requireEl('vpNextFrame', HTMLElement).addEventListener('click', () => { stepFrame(1); });
 
     // ── Play / Pause ──
     requireEl('vpPlayBtn', HTMLElement).addEventListener('click', () => {
