@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  // ===================================================================
+  // The portable core. This project is the layering rule, made
+  // executable.
+  //
+  // It withholds BOTH the DOM lib and the node types, so the core sees
+  // the ECMAScript language and nothing else. A core module that reaches
+  // for `document`, `localStorage`, `fetch`, `setTimeout`, `console`,
+  // `URLSearchParams`, `Blob` or `process` fails to compile here. That is
+  // the whole mechanism: the boundary is checked rather than promised,
+  // and it was checked the first time this project was run, which is how
+  // `ImageData` in the keyer and `URLSearchParams` in the ComfyUI module
+  // came to light after a search of the sources had reported both clean.
+  //
+  // WHAT THIS PROJECT CANNOT CATCH
+  //
+  // `Math.random`, `Date.now` and `new Date` are ECMAScript, not platform
+  // facilities, so no lib setting excludes them. Rust's `no_std` has no
+  // equivalent gap because its clock and its generator live in `std`.
+  // Those three are banned for this directory in eslint.config.mjs
+  // instead, and that ban is the only thing standing between the core and
+  // an ambient source of non-determinism.
+  //
+  // It emits nothing. The browser and worker projects compile the core
+  // sources they import, which is the arrangement those two already had
+  // for the shared encoder. This project exists to answer one question
+  // and does not need an artefact to answer it.
+  // ===================================================================
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": [],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true
+  },
+  "include": ["src/core/**/*.mts"],
+  "exclude": []
+}

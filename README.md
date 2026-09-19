@@ -237,7 +237,7 @@ ASAdventurer/
 └── public/                           ← UI files (do not modify)
     ├── index.html
     ├── style.css
-    ├── js/                           ← Compiled from src/browser
+    ├── js/                           ← Compiled from src/, one directory per layer
     └── assets/
 ```
 
@@ -281,7 +281,8 @@ index.
 | If the question is | Start here |
 |---|---|
 | How the stages fit together | [Pipeline](./docs/architecture/PIPELINE.md) |
-| Why there are four TypeScript projects | [Project Structure](./docs/architecture/PROJECT_STRUCTURE.md) |
+| Why there are five TypeScript projects | [Project Structure](./docs/architecture/PROJECT_STRUCTURE.md) |
+| How the core, platform, and entry layers are separated | [Layering](./docs/architecture/LAYERING.md) |
 | Why something is the way it is | [Resolved Decisions](./docs/decisions/RESOLVED.md) |
 | What is still unresolved | [Open Questions](./docs/decisions/OPEN.md) |
 
@@ -297,7 +298,7 @@ differently, because they have to be:
 
 - **Server** (`server.mts`) runs directly. Node strips the types as it loads
   the file, so there is no build step and nothing to keep in sync.
-- **Browser** (`src/browser/*.mts`) is compiled to `public/js/*.mjs`, because
+- **Browser** (`src/core` and `src/browser`) is compiled to `public/js/`, because
   no browser strips types. `index.html` loads that output as ES modules.
   `npm start` builds it first, so running the app never serves a stale bundle.
 
@@ -319,6 +320,7 @@ separation is enforced rather than assumed:
 | Project | Covers | Sees |
 |---|---|---|
 | `tsconfig.json` | server and build scripts | Node, no DOM |
+| `tsconfig.core.json` | `src/core` | Neither. ECMAScript alone |
 | `tsconfig.browser.json` | `src/browser` | DOM, no Node |
 | `tsconfig.worker.json` | the two Web Workers | WebWorker, neither DOM nor Node |
 | `tsconfig.test.json` | tests and the Playwright config | both |

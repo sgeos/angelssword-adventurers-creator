@@ -13,10 +13,10 @@ import {
     showToast,
 } from "./app.mts";
 import { debounce, hexToRgb } from "./app-utils.mts";
-import type { HandoffPayload } from "./video-prep-core.mts";
-import { ChromaKey } from "./chroma-key.mts";
+import type { HandoffPayload } from "../core/video-prep-core.mts";
+import { ChromaKey } from "../core/chroma-key.mts";
 import { closestFrom, queryAll, require2d, requireEl } from "./dom.mts";
-import { channel } from "./pixels.mts";
+import { channel } from "../core/pixels.mts";
 import {
     MODE_LIMITS,
     asCropRatio,
@@ -36,9 +36,9 @@ import {
     type ExportMode,
     type PersistedSliders,
     type PreviewMode,
-} from "./exporter-math.mts";
-import { ColorQuantizer } from "./gif-codec.mts";
-import type { EncodeRequest, EncodeResponse, WorkerFrame } from "./gif-worker-core.mts";
+} from "../core/exporter-math.mts";
+import { ColorQuantizer } from "../core/gif-codec.mts";
+import type { EncodeRequest, EncodeResponse, WorkerFrame } from "../core/gif-worker-core.mts";
 import type { TimerCommand } from "./timer-worker.mts";
 
 /**

@@ -39,7 +39,7 @@ TypeScript throughout, a hard fork of a JavaScript upstream that is dormant.
 - **Element types come from the markup.** Read the tag in
   `public/index.html`. Inferring an element type from an identifier has
   already produced five runtime failures here.
-- **The server needs no build. The browser half does.** `src/browser/*.mts`
+- **The server needs no build. The browser half does.** `src/**/*.mts`
   compiles to `public/js/*.mjs`. Editing the compiled output is pointless.
 - **Node 22.18 or newer**, which is what native type stripping requires.
 - **Verify by exit code.** Grepping output for the word error has already

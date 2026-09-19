@@ -1,7 +1,7 @@
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { installDom, type DomEnvironment } from '../helpers/dom-env.mts';
-import { ChromaKey } from '../../src/browser/chroma-key.mts';
+import { ChromaKey } from '../../src/core/chroma-key.mts';
 
 /**
  * Covers the key colour handoff, which was unreachable before.

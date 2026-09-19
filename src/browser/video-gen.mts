@@ -15,7 +15,7 @@ import {
 } from "./app.mts";
 import { base64ToBlob } from "./app-utils.mts";
 
-import { reasonText, responseErrorMessage } from "./api.mts";
+import { reasonText, responseErrorMessage } from "../core/api.mts";
 import { closestFrom, findEl, queryAll, require2d, requireEl } from "./dom.mts";
 import {
     COMFY_SETTINGS_KEY,
@@ -27,13 +27,13 @@ import {
     parseComfySettings,
     parseWanSettings,
     viewQuery,
-} from "./comfyui-core.mts";
-import * as VideoGenCore from "./video-gen-core.mts";
+} from "../core/comfyui-core.mts";
+import * as VideoGenCore from "../core/video-gen-core.mts";
 import {
     VIDEO_PROVIDERS,
     asVideoProviderId,
     videoProviderFrom,
-} from "./providers.mts";
+} from "../core/providers.mts";
 import {
     MAX_POLL_ATTEMPTS,
     POLL_INTERVAL_MS,
@@ -42,7 +42,7 @@ import {
     describeError,
     extractRequestId,
     throttleBackoffMs,
-} from "./grok-video-core.mts";
+} from "../core/grok-video-core.mts";
 
 /** Where the chosen video provider is remembered between sessions. */
 const VIDEO_PROVIDER_PREFERENCE_KEY = 'video_provider';

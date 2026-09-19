@@ -1,5 +1,5 @@
 import { at } from "./at.mts";
-import type { RequestInput, RequestPart } from "../../src/browser/video-gen-core.mts";
+import type { RequestInput, RequestPart } from "../../src/core/video-gen-core.mts";
 
 /**
  * A request body's input is either a bare prompt string or structured

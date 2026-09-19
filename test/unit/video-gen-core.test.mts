@@ -15,7 +15,7 @@ import {
     pickHandoffVideo,
     parseGenCount,
     stripDataUrl,
-} from '../../src/browser/video-gen-core.mts';
+} from '../../src/core/video-gen-core.mts';
 
 describe('video-gen-core buildVideoRequestBody', () => {
     it('reference body strips data-URL prefix, sets image_to_video, detects png mime', () => {

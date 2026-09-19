@@ -6,7 +6,7 @@
  * call it directly. Compiled by tsconfig.worker.json, which supplies the
  * WebWorker lib that this file — and only this file — needs.
  */
-import { encode, type EncodeRequest, type EncodeResponse } from "./gif-worker-core.mts";
+import { encode, type EncodeRequest, type EncodeResponse } from "../core/gif-worker-core.mts";
 
 self.addEventListener('message', (event: MessageEvent<EncodeRequest>): void => {
     const post = (message: EncodeResponse, transfer?: readonly Transferable[]): void => {

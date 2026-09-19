@@ -6,7 +6,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { at } from '../helpers/at.mts';
 
-import * as Core from '../../src/browser/sprite-prep-core.mts';
+import * as Core from '../../src/core/sprite-prep-core.mts';
 
 const {
     KEY_COLORS,

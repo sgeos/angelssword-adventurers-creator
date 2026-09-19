@@ -4,9 +4,9 @@
  * Tab switching, settings, toasts, notification sounds, keyboard
  * shortcuts, and the shared handoff state passed between stages.
  */
-import type { HandoffPayload } from "./video-prep-core.mts";
+import type { HandoffPayload } from "../core/video-prep-core.mts";
 import { closestFrom, findEl, queryAll, requireEl } from "./dom.mts";
-import { PROVIDERS } from "./providers.mts";
+import { PROVIDERS } from "../core/providers.mts";
 import {
     COMFY_DEFAULTS,
     COMFY_SETTINGS_KEY,
@@ -17,7 +17,7 @@ import {
     type ComfySettings,
     type WanSettings,
     type WorkflowKind,
-} from "./comfyui-core.mts";
+} from "../core/comfyui-core.mts";
 
 /**
  * The `error.message` an API returned, if it sent one.

@@ -7,7 +7,7 @@
  *
  * Output goes to: dist/ASAdventurer/
  *   ├── ASAdventurer[.exe]
- *   ├── public/          (UI, including js/ compiled from src/browser)
+ *   ├── public/          (UI, including js/ compiled from src/)
  *   └── Start AS Adventurer.[bat|command|sh]
  *
  * ── How the binary is produced ──────────────────────────────────────────

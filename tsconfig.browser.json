@@ -1,8 +1,19 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  // The browser half. Separate from the root project because it needs the
-  // DOM lib, which the server must not have, and because it emits: no
-  // browser strips types the way Node 24 does.
+  // The browser platform and entry layer. Separate from the root project
+  // because it needs the DOM lib, which the server must not have, and because
+  // it emits: no browser strips types the way Node 24 does.
+  //
+  // `rootDir` is `src` rather than `src/browser` because these modules import
+  // the core, which sits beside them. A rootDir that excluded the core would
+  // refuse the import outright. The consequence is that emitted paths gain a
+  // layer segment, so `public/js/browser/` and `public/js/core/` rather than a
+  // flat `public/js/`, and index.html names them accordingly.
+  //
+  // This project compiles the core sources it imports, and so does the worker
+  // project. The two overlap on what they share and emit identical output for
+  // it, which is the arrangement that already held for the encoder before the
+  // core existed.
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
@@ -12,7 +23,7 @@
     "moduleResolution": "Bundler",
     "noEmit": false,
     "outDir": "public/js",
-    "rootDir": "src/browser",
+    "rootDir": "src",
     "sourceMap": true,
     // Inherits isolatedDeclarations, so declaration emit stays on; the
     // root config sends the .d.ts to dist/types, clear of outDir.

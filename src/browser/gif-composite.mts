@@ -6,7 +6,7 @@
  * WebWorker lib, where no document exists; tsconfig.worker.json is what
  * enforces that separation rather than leaving it to convention.
  */
-import type { DecodedGif } from "./gif-codec.mts";
+import type { DecodedGif } from "../core/gif-codec.mts";
 
 /** One fully composited frame, ready to draw or re-encode. */
 export interface CompositedFrame {

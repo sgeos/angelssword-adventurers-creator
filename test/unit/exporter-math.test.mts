@@ -6,7 +6,7 @@ import {
     getOutputFrameCount,
     computeCropToCenter,
     sanitizeFilename
-} from '../../src/browser/exporter-math.mts';
+} from '../../src/core/exporter-math.mts';
 
 describe('exporter-math', () => {
     it('MODE_LIMITS: adventurer webm Infinity; normal gif 120/1000; premium gif 600/4000', () => {

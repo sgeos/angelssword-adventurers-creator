@@ -9,7 +9,7 @@ import {
     positiveOr,
     storedBoolean,
     storedNumber,
-} from '../../src/browser/exporter-math.mts';
+} from '../../src/core/exporter-math.mts';
 
 /**
  * These cover the narrowing and validation added during the TypeScript

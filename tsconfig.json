@@ -146,6 +146,10 @@
     // Browser sources belong to tsconfig.browser.json, which supplies the
     // DOM lib and withholds the node types. Checking them here too would
     // report every DOM global as missing.
-    "src/browser"
+    "src/browser",
+    // The core belongs to tsconfig.core.json, which withholds BOTH the DOM lib
+    // and the node types. Checking it here would hand it the node types and
+    // silently permit exactly what that project exists to refuse.
+    "src/core"
   ]
 }

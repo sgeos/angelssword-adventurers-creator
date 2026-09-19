@@ -15,6 +15,8 @@
  * posts the result through the local proxy.
  */
 
+import { formUrlEncode } from "./urlencode.mts";
+
 /** One node in a ComfyUI prompt graph. */
 export interface ComfyNode {
   readonly class_type: string;
@@ -380,11 +382,11 @@ export const extractHistoryImages = (
 
 /** Query string for retrieving one image through the view endpoint. */
 export const viewQuery = (image: ComfyImageRef): string =>
-  new URLSearchParams({
-    filename: image.filename,
-    subfolder: image.subfolder,
-    type: image.type,
-  }).toString();
+  formUrlEncode([
+    ["filename", image.filename],
+    ["subfolder", image.subfolder],
+    ["type", image.type],
+  ]);
 
 /* ────────────────────────────────────────────────────────────────────────
  * Settings.

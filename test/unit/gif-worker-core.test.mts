@@ -1,9 +1,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { at } from '../helpers/at.mts';
-import type { Rgb } from '../../src/browser/gif-codec.mts';
-import { GifDecoder } from '../../src/browser/gif-codec.mts';
-import { encode, type EncodeRequest, type WorkerFrame } from '../../src/browser/gif-worker-core.mts';
+import type { Rgb } from '../../src/core/gif-codec.mts';
+import { GifDecoder } from '../../src/core/gif-codec.mts';
+import { encode, type EncodeRequest, type WorkerFrame } from '../../src/core/gif-worker-core.mts';
 
 /**
  * These cover the encoder that replaced the blob-URL worker string. That code

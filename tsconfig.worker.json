@@ -14,20 +14,22 @@
     "moduleResolution": "Bundler",
     "noEmit": false,
     "outDir": "public/js",
-    "rootDir": "src/browser",
+    "rootDir": "src",
     "sourceMap": true,
     "declaration": true,
     "allowJs": false,
     "checkJs": false,
     "rewriteRelativeImportExtensions": true
   },
-  // gif-codec is shared with the browser project; it is DOM-free by
-  // construction, and this project is what proves that stays true.
+  // The two workers are platform adapters and live with the browser half. The
+  // encoder they drive is core, and tsconfig.core.json is now what proves it
+  // stays free of the DOM; this project continues to prove it survives the
+  // WebWorker lib, which is a different claim.
   "include": [
     "src/browser/gif-worker.mts",
     "src/browser/timer-worker.mts",
-    "src/browser/gif-worker-core.mts",
-    "src/browser/gif-codec.mts"
+    "src/core/gif-worker-core.mts",
+    "src/core/gif-codec.mts"
   ],
   "exclude": []
 }

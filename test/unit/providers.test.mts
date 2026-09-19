@@ -7,7 +7,7 @@ import {
     buildImageRequest,
     hasCredential,
     providerFrom,
-} from '../../src/browser/providers.mts';
+} from '../../src/core/providers.mts';
 
 describe('asProviderId', () => {
     it('accepts the known providers', () => {

@@ -19,7 +19,7 @@ import {
     parseComfySettings,
     viewQuery,
     type ComfyWorkflow,
-} from '../../src/browser/comfyui-core.mts';
+} from '../../src/core/comfyui-core.mts';
 
 const FLUX = {
     unetName: 'flux1-dev-fp8.safetensors',

@@ -35,15 +35,16 @@ complete.
 | Path | Contains |
 |---|---|
 | `server.mts` | Express server and the proxy. Runs directly, no build |
-| `src/browser/*.mts` | Browser sources, compiled to `public/js/*.mjs` |
-| `src/browser/*-core.mts` | Pure logic with no Document Object Model. Where tests reach |
+| `src/core/*.mts` | The portable core. No platform at all. Where tests reach |
+| `src/browser/*.mts` | Browser platform and entry, compiled to `public/js/browser/` |
 | `test/unit/` | Unit tests |
 | `test/integration/` | Server and browser tests |
 | `build-exe.mts` | Standalone binary build |
 | `docs/` | Knowledge graph |
 
-Four TypeScript projects separate which globals each half may see. See
-[`docs/architecture/PROJECT_STRUCTURE.md`](./docs/architecture/PROJECT_STRUCTURE.md).
+Five TypeScript projects separate which globals each layer may see. See
+[`docs/architecture/PROJECT_STRUCTURE.md`](./docs/architecture/PROJECT_STRUCTURE.md)
+and [`docs/architecture/LAYERING.md`](./docs/architecture/LAYERING.md).
 
 ## Conventions
 
@@ -61,8 +62,13 @@ returns the narrowed value or `undefined`.
 **Types come from the source of truth.** Element types come from the tag in
 `public/index.html`, never from what an identifier suggests.
 
-**Pure logic belongs in a core module.** If it needs no Document Object Model,
-it goes in the `*-core.mts` sibling, where a test can reach it.
+**Pure logic belongs in the core.** If it needs no platform, it goes in
+`src/core/`, which compiles without the Document Object Model and without the
+node types, and where a test can reach it. A capability the core genuinely
+needs becomes an interface the platform implements, never an import. The
+compiler enforces the first half of that and `eslint.config.mjs` bans the
+three ECMAScript facilities it cannot, namely `Math.random`, `Date.now`, and
+`new Date`.
 
 **Verification is by exit code**, and a claim states what was not covered. See
 [`docs/process/VERIFICATION.md`](./docs/process/VERIFICATION.md).

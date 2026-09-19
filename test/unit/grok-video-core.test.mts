@@ -9,7 +9,7 @@ import {
     extractRequestId,
     extractVideoUrl,
     throttleBackoffMs,
-} from '../../src/browser/grok-video-core.mts';
+} from '../../src/core/grok-video-core.mts';
 
 const DATA_URI = 'data:image/png;base64,AAAA';
 

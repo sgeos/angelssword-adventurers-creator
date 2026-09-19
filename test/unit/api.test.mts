@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { reasonText, responseErrorMessage } from '../../src/browser/api.mts';
+import { reasonText, responseErrorMessage } from '../../src/core/api.mts';
 
 /**
  * Both helpers read values the app does not control: a rejection reason, and a

@@ -340,6 +340,57 @@ export default defineConfig(
   // Build scripts not yet converted. Named individually, never a
   // "**/*.js" glob, so a NEW .js file gets no relief from the rules and
   // this list can only shrink.
+  // The core lives in its own project, which withholds BOTH the DOM lib and
+  // the node types. That project is the layering rule made executable, and it
+  // catches every platform facility that arrives as a global.
+  //
+  // It cannot catch three, because they are ECMAScript rather than platform:
+  // `Math.random`, `Date.now` and `new Date`. Rust's `no_std` has no
+  // equivalent hole, its clock and its generator living in `std`. So the ban
+  // is here, and it is the only thing standing between the core and an ambient
+  // source of non-determinism.
+  //
+  // The core does not go without time or randomness. It receives them, which
+  // is the whole point: a capability the core needs becomes a parameter the
+  // platform supplies, and a core that cannot reach the ambient one has no
+  // way to quietly skip that step. The same reasoning makes the core testable,
+  // since an injected clock can be driven and an ambient one cannot.
+  {
+    files: ["src/core/**/*.mts"],
+    languageOptions: {
+      parserOptions: {
+        projectService: false,
+        project: "./tsconfig.core.json",
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      "no-restricted-properties": [
+        "error",
+        {
+          object: "Math",
+          property: "random",
+          message:
+            "The core does not draw randomness. Take a seed or a RandomSource from the caller; the platform owns the generator.",
+        },
+        {
+          object: "Date",
+          property: "now",
+          message:
+            "The core does not read the clock. Take the instant from the caller; the platform owns the clock.",
+        },
+      ],
+      "no-restricted-globals": [
+        "error",
+        {
+          name: "Date",
+          message:
+            "The core does not read the clock. Take the instant from the caller; the platform owns the clock.",
+        },
+      ],
+    },
+  },
+
   // Browser sources live in a second TypeScript project, which supplies
   // the DOM lib and withholds the node types. The project service resolves
   // against the root config alone, so these files name theirs explicitly.

@@ -16,7 +16,7 @@ import {
 } from "./app.mts";
 import { base64ToBlob, blobToBase64, colorName, debounce } from "./app-utils.mts";
 import { closestFrom, fieldValue, queryAll, require2d, requireEl } from "./dom.mts";
-import * as Core from "./sprite-prep-core.mts";
+import * as Core from "../core/sprite-prep-core.mts";
 import {
     COMFY_SETTINGS_KEY,
     buildWorkflowFor,
@@ -25,7 +25,7 @@ import {
     parseComfySettings,
     viewQuery,
     type ComfySettings,
-} from "./comfyui-core.mts";
+} from "../core/comfyui-core.mts";
 import {
     PROVIDERS,
     asProviderId,
@@ -33,7 +33,7 @@ import {
     hasCredential,
     providerFrom,
     type Provider,
-} from "./providers.mts";
+} from "../core/providers.mts";
 
 /** Where the chosen provider is remembered between sessions. */
 const PROVIDER_PREFERENCE_KEY = 'sprite_provider';
@@ -41,8 +41,8 @@ const PROVIDER_PREFERENCE_KEY = 'sprite_provider';
 /** ComfyUI offers no completion callback, so the history is polled. */
 const COMFY_POLL_INTERVAL_MS = 2_000;
 const COMFY_MAX_POLLS = 150;
-import { channel } from "./pixels.mts";
-import { responseErrorMessage } from "./api.mts";
+import { channel } from "../core/pixels.mts";
+import { responseErrorMessage } from "../core/api.mts";
 
 
 // ============================================

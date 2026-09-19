@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { PROVIDER_ORDER, VIDEO_PROVIDER_ORDER } from '../../../src/browser/providers.mts';
+import { PROVIDER_ORDER, VIDEO_PROVIDER_ORDER } from '../../../src/core/providers.mts';
 
 
 /**

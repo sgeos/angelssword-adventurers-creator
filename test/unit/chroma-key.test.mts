@@ -2,7 +2,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { at } from '../helpers/at.mts';
 import { alphaAt, makeImageData, pixelAt, solid } from '../helpers/image-data.mts';
-import { ChromaKey } from '../../src/browser/chroma-key.mts';
+import { ChromaKey } from '../../src/core/chroma-key.mts';
+import type { RgbaImage } from '../../src/core/pixels.mts';
 
 describe('ChromaKey', () => {
     it('setKeyColorHex(#FF00FF) updates keyR/G/B', () => {
@@ -348,7 +349,7 @@ describe('ChromaKey.applyAntiAlias', () => {
 
     it('reuses its scratch buffer across calls without corrupting results', () => {
         const ck = new ChromaKey();
-        const build = (): ImageData => makeImageData(6, 6, (x) => x < 3 ? RED : [0, 0, 0, 0]);
+        const build = (): RgbaImage => makeImageData(6, 6, (x) => x < 3 ? RED : [0, 0, 0, 0]);
         const first = build();
         ck.applyAntiAlias(first);
         const second = build();

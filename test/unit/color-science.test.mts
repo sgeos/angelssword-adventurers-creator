@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { rgbToLab } from '../../src/browser/sprite-prep-core.mts';
-import { averageSaturation } from '../../src/browser/exporter-math.mts';
+import { rgbToLab } from '../../src/core/sprite-prep-core.mts';
+import { averageSaturation } from '../../src/core/exporter-math.mts';
 
 /**
  * Both functions were module-private inside stage modules until this change,

@@ -1,8 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { at } from '../helpers/at.mts';
-import type { Rgb } from '../../src/browser/gif-codec.mts';
-import { GifEncoder, ColorQuantizer, GifDecoder } from '../../src/browser/gif-codec.mts';
+import type { Rgb } from '../../src/core/gif-codec.mts';
+import { GifEncoder, ColorQuantizer, GifDecoder } from '../../src/core/gif-codec.mts';
 
 function solidRgba(w: number, h: number, r: number, g: number, b: number, a = 255): Uint8ClampedArray {
     const rgba = new Uint8ClampedArray(w * h * 4);

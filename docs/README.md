@@ -22,7 +22,8 @@ memory an assistant reads in place of rediscovering the project each session.
 |---|---|
 | What is this project for | [architecture/PRODUCT_BRIEF.md](./architecture/PRODUCT_BRIEF.md) |
 | How the stages fit together | [architecture/PIPELINE.md](./architecture/PIPELINE.md) |
-| Why there are four TypeScript projects | [architecture/PROJECT_STRUCTURE.md](./architecture/PROJECT_STRUCTURE.md) |
+| Why there are five TypeScript projects | [architecture/PROJECT_STRUCTURE.md](./architecture/PROJECT_STRUCTURE.md) |
+| How the core, platform, and entry layers are separated | [architecture/LAYERING.md](./architecture/LAYERING.md) |
 | How to build the standalone binary | [architecture/PROJECT_STRUCTURE.md](./architecture/PROJECT_STRUCTURE.md) |
 | What a resuming session does first | [process/HANDOFF.md](./process/HANDOFF.md) |
 | How human and assistant communicate | [process/COMMUNICATION.md](./process/COMMUNICATION.md) |

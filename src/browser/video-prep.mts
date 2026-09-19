@@ -13,7 +13,7 @@ import {
     switchTab,
 } from "./app.mts";
 import { findEl, require2d, requireEl } from "./dom.mts";
-import * as VideoPrepCore from "./video-prep-core.mts";
+import * as VideoPrepCore from "../core/video-prep-core.mts";
 
 /**
  * Start playback, reporting the rejection the browser raises when an

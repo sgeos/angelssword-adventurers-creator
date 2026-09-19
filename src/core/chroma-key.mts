@@ -1,7 +1,7 @@
 /**
  * ChromaKey — multi-pass chroma key processor.
  */
-import { channel, type RgbaBuffer } from "./pixels.mts";
+import { channel, type RgbaBuffer, type RgbaImage } from "./pixels.mts";
 
 /** A background colour to match against. */
 export interface Rgb {
@@ -137,7 +137,7 @@ export class ChromaKey {
     //  MAIN PROCESS — Clean 4-step pipeline
     // ═══════════════════════════════════════════════════════════════
 
-    process(imageData: ImageData): void {
+    process(imageData: RgbaImage): void {
         const bgColor = { r: this.keyR, g: this.keyG, b: this.keyB };
         const tolerance = this.similarity * 110;
 
@@ -170,7 +170,7 @@ export class ChromaKey {
     //  handled separately from outer background.
     // ═══════════════════════════════════════════════════════════════
 
-    edgeFloodFill(imageData: ImageData, bgColor: Rgb, tolerance: number): ImageData {
+    edgeFloodFill(imageData: RgbaImage, bgColor: Rgb, tolerance: number): RgbaImage {
         const { data, width, height } = imageData;
         const totalPixels = width * height;
         const visited = new Uint8Array(totalPixels);
@@ -243,7 +243,7 @@ export class ChromaKey {
     //  Replaces old Steps 2-3.6 with a single clean pass.
     // ═══════════════════════════════════════════════════════════════
 
-    private _obsChromaKey(imageData: ImageData): void {
+    private _obsChromaKey(imageData: RgbaImage): void {
         const { data, width, height } = imageData;
         const total = width * height;
         const sim = this.similarity;
@@ -327,7 +327,7 @@ export class ChromaKey {
     //  key color contamination at boundaries should become outline.
     // ═══════════════════════════════════════════════════════════════
 
-    private _peripheryBlackout(imageData: ImageData, bgColor: Rgb): void {
+    private _peripheryBlackout(imageData: RgbaImage, bgColor: Rgb): void {
         const d = imageData.data;
         const w = imageData.width;
         const h = imageData.height;
@@ -403,7 +403,7 @@ export class ChromaKey {
     //  Protected body zone prevents interior damage.
     // ═══════════════════════════════════════════════════════════════
 
-    private _smokeCleanup(imageData: ImageData, bgColor: Rgb): void {
+    private _smokeCleanup(imageData: RgbaImage, bgColor: Rgb): void {
         const d = imageData.data;
         const w = imageData.width;
         const h = imageData.height;
@@ -483,7 +483,7 @@ export class ChromaKey {
     //  POST-PROCESSING: Saturation + Brightness
     // ═══════════════════════════════════════════════════════════════
 
-    private _postProcess(imageData: ImageData): void {
+    private _postProcess(imageData: RgbaImage): void {
         const d = imageData.data;
         const sat = this.postSaturation;
         const bright = this.postBrightness;
@@ -514,7 +514,7 @@ export class ChromaKey {
     //  EDGE FADE — Fade alpha near left/right/top borders
     // ═══════════════════════════════════════════════════════════════
 
-    applyEdgeFade(imageData: ImageData, fadeWidth: number): void {
+    applyEdgeFade(imageData: RgbaImage, fadeWidth: number): void {
         if (fadeWidth <= 0) return;
         const { data, width, height } = imageData;
 
@@ -550,7 +550,7 @@ export class ChromaKey {
     //  O(n) single pass, ~1-3ms per 1080p frame.
     // ═══════════════════════════════════════════════════════════════
 
-    applyAntiAlias(imageData: ImageData): void {
+    applyAntiAlias(imageData: RgbaImage): void {
         const { data, width, height } = imageData;
         const total = width * height;
 

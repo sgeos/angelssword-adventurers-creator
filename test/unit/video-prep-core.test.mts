@@ -5,13 +5,13 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { at } from '../helpers/at.mts';
-import type { VideoPrepState } from '../../src/browser/video-prep-core.mts';
+import type { VideoPrepState } from '../../src/core/video-prep-core.mts';
 import {
     getOutputFrameCount,
     buildLoopSequence,
     buildCrossfadeAlphas,
     buildVideoPrepHandoffPayload,
-} from '../../src/browser/video-prep-core.mts';
+} from '../../src/core/video-prep-core.mts';
 
 describe('video-prep-core getOutputFrameCount', () => {
     it('loopPoint -1 (unset) → totalFrames', () => {

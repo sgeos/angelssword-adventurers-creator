@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { alphaAt, channel } from '../../src/browser/pixels.mts';
+import { alphaAt, channel } from '../../src/core/pixels.mts';
 
 /**
  * These helpers exist because noUncheckedIndexedAccess types every index read

@@ -395,7 +395,7 @@ app.post(
  *
  * Reimplemented from upstream pull request 1 by @Manya3084. The body is
  * forwarded unchanged, because the caller builds it through
- * `buildImageRequest` in src/browser/providers.mts, which knows that xAI
+ * `buildImageRequest` in src/core/providers.mts, which knows that xAI
  * rejects a request carrying a `size`.
  *
  * Authentication is a bearer key, from the request header or from XAI_API_KEY.

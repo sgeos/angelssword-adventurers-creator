@@ -9,28 +9,46 @@ there is no build step and nothing to keep synchronised. This requires Node
 22.18 or newer, which is the first release where type stripping works without
 a flag.
 
-The browser half is compiled, because no browser strips types.
-`src/browser/*.mts` becomes `public/js/*.mjs`, which `public/index.html` loads
-as modules. `npm start` builds it first, so the application never serves a
-stale bundle.
+The browser half is compiled, because no browser strips types. `src/` becomes
+`public/js/`, one directory per layer, so `src/core/pixels.mts` becomes
+`public/js/core/pixels.mjs` and `src/browser/app.mts` becomes
+`public/js/browser/app.mjs`. `public/index.html` loads the five entry modules
+from there. `npm start` builds first, so the application never serves a stale
+bundle.
 
-## Four TypeScript projects
+The layer segment in the emitted path is a consequence of the browser project
+rooting at `src` rather than at `src/browser`, which it must do because those
+modules import the core beside them.
 
-They differ in which global types each half may see, and that separation is
-enforced rather than assumed.
+## Five TypeScript projects
+
+They differ in which global types each may see, and that separation is
+enforced rather than assumed. A project is this codebase's equivalent of a
+crate, and its `lib` and `types` settings are its manifest.
 
 | Project | Covers | Sees |
 |---|---|---|
+| `tsconfig.core.json` | `src/core` | ECMAScript alone. Neither node nor the Document Object Model |
 | `tsconfig.json` | Server and build scripts | Node, no Document Object Model |
-| `tsconfig.browser.json` | `src/browser` | Document Object Model, no Node |
-| `tsconfig.worker.json` | The two Web Workers | WebWorker, neither |
-| `tsconfig.test.json` | Tests and the Playwright configuration | Both |
+| `tsconfig.browser.json` | `src/browser` | Document Object Model, no node |
+| `tsconfig.worker.json` | The two Web Workers and the encoder they drive | WebWorker, neither |
+| `tsconfig.test.json` | Tests and the Playwright configuration | Everything |
+
+The core project is the layering rule made executable and is described in
+[LAYERING.md](./LAYERING.md). It emits nothing, existing to answer one
+question, and it refused two modules the first time it was run.
 
 The worker project exists because the WebWorker and Document Object Model
 libraries both declare `self` and cannot be loaded together. Splitting it also
 proved that the Graphics Interchange Format codec was not free of Document
 Object Model dependencies, which is how a stray `document` reference in it was
-found.
+found. The core project now makes the stronger claim about that codec, and the
+worker project continues to make the narrower one, that it survives the
+WebWorker library.
+
+The browser and worker projects both compile the core sources they import, and
+emit identical output for what they share. That overlap predates the core,
+having already held for the shared encoder.
 
 ## Strictness
 
