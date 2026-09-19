@@ -25,6 +25,31 @@ import {
 const app = createApp(mockFetch);
 
 /**
+ * Run a block with the given environment variables absent.
+ *
+ * The proxy falls back to an environment key when a request carries none, so
+ * a test asserting the no-key path is otherwise at the mercy of whatever the
+ * developer happens to have exported. Continuous integration has none of
+ * these set and a workstation frequently does, which is the worst arrangement
+ * for reproducing a failure.
+ */
+async function withoutEnv(names: readonly string[], body: () => Promise<void>): Promise<void> {
+    const saved = new Map<string, string | undefined>();
+    for (const name of names) {
+        saved.set(name, process.env[name]);
+        Reflect.deleteProperty(process.env, name);
+    }
+    try {
+        await body();
+    } finally {
+        for (const [name, value] of saved) {
+            if (value === undefined) Reflect.deleteProperty(process.env, name);
+            else process.env[name] = value;
+        }
+    }
+}
+
+/**
  * The `error` string from a proxy error body. supertest types `res.body` as
  * `any`, so this narrows once rather than letting `any` spread through every
  * assertion that touches it.
@@ -48,55 +73,65 @@ describe('AS Adventurer API characterization', () => {
     // --- 1–2: Auth required on OpenAI proxies ---
 
     it('POST /api/generate without Authorization → 401 and fetch not called', async () => {
-        const res = await request(app)
-            .post('/api/generate')
-            .send({ prompt: 'test' });
+        await withoutEnv(['OPENAI_API_KEY'], async () => {
+            const res = await request(app)
+                .post('/api/generate')
+                .send({ prompt: 'test' });
 
-        assert.equal(res.status, 401);
-        assert.deepEqual(res.body, { error: 'No Authorization header provided' });
-        assert.equal(wasFetchCalled(), false);
+            assert.equal(res.status, 401);
+            assert.deepEqual(res.body, { error: 'No Authorization header provided' });
+            assert.equal(wasFetchCalled(), false);
+        });
     });
 
     it('POST /api/edits without Authorization → 401 and fetch not called', async () => {
-        const res = await request(app)
-            .post('/api/edits')
-            .send({ prompt: 'test' });
+        await withoutEnv(['OPENAI_API_KEY'], async () => {
+            const res = await request(app)
+                .post('/api/edits')
+                .send({ prompt: 'test' });
 
-        assert.equal(res.status, 401);
-        assert.deepEqual(res.body, { error: 'No Authorization header provided' });
-        assert.equal(wasFetchCalled(), false);
+            assert.equal(res.status, 401);
+            assert.deepEqual(res.body, { error: 'No Authorization header provided' });
+            assert.equal(wasFetchCalled(), false);
+        });
     });
 
     it('POST /api/chat without Authorization → 401 and fetch not called', async () => {
-        const res = await request(app)
-            .post('/api/chat')
-            .send({ messages: [] });
+        await withoutEnv(['OPENAI_API_KEY'], async () => {
+            const res = await request(app)
+                .post('/api/chat')
+                .send({ messages: [] });
 
-        assert.equal(res.status, 401);
-        assert.deepEqual(res.body, { error: 'No Authorization header provided' });
-        assert.equal(wasFetchCalled(), false);
+            assert.equal(res.status, 401);
+            assert.deepEqual(res.body, { error: 'No Authorization header provided' });
+            assert.equal(wasFetchCalled(), false);
+        });
     });
 
     // --- 3–5: Video key / operationName validation ---
 
     it('POST /api/video/generate without key → 401', async () => {
-        const res = await request(app)
-            .post('/api/video/generate')
-            .send({ model: 'x' });
+        await withoutEnv(['GOOGLE_API_KEY'], async () => {
+            const res = await request(app)
+                .post('/api/video/generate')
+                .send({ model: 'x' });
 
-        assert.equal(res.status, 401);
-        assert.deepEqual(res.body, { error: 'No Google API key provided' });
-        assert.equal(wasFetchCalled(), false);
+            assert.equal(res.status, 401);
+            assert.deepEqual(res.body, { error: 'No Google API key provided' });
+            assert.equal(wasFetchCalled(), false);
+        });
     });
 
     it('POST /api/video/poll without key → 401', async () => {
-        const res = await request(app)
-            .post('/api/video/poll')
-            .send({ operationName: 'operations/abc' });
+        await withoutEnv(['GOOGLE_API_KEY'], async () => {
+            const res = await request(app)
+                .post('/api/video/poll')
+                .send({ operationName: 'operations/abc' });
 
-        assert.equal(res.status, 401);
-        assert.deepEqual(res.body, { error: 'No Google API key provided' });
-        assert.equal(wasFetchCalled(), false);
+            assert.equal(res.status, 401);
+            assert.deepEqual(res.body, { error: 'No Google API key provided' });
+            assert.equal(wasFetchCalled(), false);
+        });
     });
 
     it('POST /api/video/poll with key but no operationName → 400', async () => {
@@ -307,12 +342,14 @@ describe('AS Adventurer API characterization', () => {
     });
 
     it('POST /api/xai/images/generations rejects with 401 when no key is available', async () => {
-        const res = await request(app)
-            .post('/api/xai/images/generations')
-            .send({ prompt: 'x', n: 1 });
+        await withoutEnv(['XAI_API_KEY'], async () => {
+            const res = await request(app)
+                .post('/api/xai/images/generations')
+                .send({ prompt: 'x', n: 1 });
 
-        assert.equal(res.status, 401);
-        assert.equal(wasFetchCalled(), false, 'no upstream call without a key');
+            assert.equal(res.status, 401);
+            assert.equal(wasFetchCalled(), false, 'no upstream call without a key');
+        });
     });
 
     it('POST /api/xai/images/generations passes an upstream non-2xx through unchanged', async () => {

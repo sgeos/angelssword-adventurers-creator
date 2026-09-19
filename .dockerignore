@@ -1,0 +1,29 @@
+# Everything the image must not contain.
+#
+# Without this file, `COPY . .` puts secret/ and any local .env into the
+# image, where they survive in a layer even if a later step removes them.
+# That is the first entry for a reason.
+secret/
+tmp/
+.env
+*.log
+
+# Rebuilt inside the image, and copying a host build risks shipping one made
+# for a different platform.
+node_modules/
+dist/
+public/js/
+
+# Not needed at runtime and large.
+.git/
+.github/
+test/
+test-results/
+playwright-report/
+blob-report/
+docs/
+backup/
+
+# Build inputs the runtime stage has no use for.
+playwright.config.ts
+eslint.config.mjs

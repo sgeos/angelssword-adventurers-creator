@@ -1,0 +1,54 @@
+# Running AS Adventurer in a container.
+#
+# `docker compose up --build` serves the application on port 3001.
+#
+# The ComfyUI service is commented out rather than removed. It is optional,
+# its correct image depends on the graphics hardware present, and starting a
+# large model server nobody asked for is not a reasonable default.
+
+services:
+  as-adventurer:
+    build: .
+    ports:
+      - "3001:3001"
+    environment:
+      # Optional. Supplying a key here lets one deployment serve several
+      # people without each of them holding their own. A key sent from a
+      # browser takes precedence, so these are a fallback rather than an
+      # override. Values come from the host environment or a .env file, which
+      # is gitignored.
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      GOOGLE_API_KEY: "${GOOGLE_API_KEY:-}"
+      XAI_API_KEY: "${XAI_API_KEY:-}"
+      # Only set this if the ComfyUI service below is enabled. The proxy
+      # accepts local addresses only, and the compose service name qualifies.
+      # COMFYUI_URL: "http://comfyui:8188"
+    restart: unless-stopped
+
+    # Upstream mounted /var/run/docker.sock here so that a button in the
+    # interface could restart the ComfyUI container. That grants this
+    # container effective root on the host, which is a poor trade for a
+    # convenience, so neither the mount nor the button exists. Restart
+    # ComfyUI the way it was started.
+
+  # Optional local generation. Uncomment, choose the image that matches the
+  # hardware, and set COMFYUI_URL above.
+  #
+  # comfyui:
+  #   image: yanwk/comfyui-boot:xpu     # Intel Arc
+  #   # image: comfyui/comfyui:latest   # NVIDIA
+  #   ports:
+  #     - "8188:8188"
+  #   volumes:
+  #     - comfyui_models:/root/ComfyUI/models
+  #     - comfyui_output:/root/ComfyUI/output
+  #   restart: unless-stopped
+  #   # Intel Arc needs the render device and a large shared memory segment.
+  #   devices:
+  #     - /dev/dri:/dev/dri
+  #   ipc: host
+  #   shm_size: "16gb"
+  #
+  # volumes:
+  #   comfyui_models:
+  #   comfyui_output:

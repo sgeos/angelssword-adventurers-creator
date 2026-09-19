@@ -243,6 +243,35 @@ ASAdventurer/
 
 ---
 
+## Running in a container
+
+```sh
+docker compose up --build
+```
+
+Serves on port 3001. The image is built in two stages, so the browser modules
+are compiled with the development dependencies and the runtime image carries
+neither them nor the compiler.
+
+API keys may be supplied to the container so that one deployment serves
+several people without each of them holding a key.
+
+```sh
+OPENAI_API_KEY=... GOOGLE_API_KEY=... XAI_API_KEY=... docker compose up
+```
+
+A key sent from a browser takes precedence over one in the environment, so
+these are a fallback rather than an override.
+
+A ComfyUI service is present in `docker-compose.yml` but commented out. It is
+optional, the correct image depends on the graphics hardware, and starting a
+large model server that was not asked for is not a reasonable default.
+Uncomment it, choose the image, and set `COMFYUI_URL` alongside it.
+
+The container runs unprivileged and mounts nothing from the host.
+
+---
+
 ## Documentation
 
 Fuller documentation lives in [`docs/`](./docs/README.md), structured as a

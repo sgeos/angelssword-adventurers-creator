@@ -239,7 +239,7 @@ app.use(express.static(path.join(APP_DIR, "public")));
 app.post(
   "/api/generate",
   route(async (req, res) => {
-    const authHeader = singleString(req.headers.authorization);
+    const authHeader = resolveAuth(req.headers.authorization, process.env["OPENAI_API_KEY"]);
     if (authHeader === undefined) {
       res.status(401).json({ error: "No Authorization header provided" });
       return;
@@ -291,7 +291,7 @@ const classifyImage = (entry: unknown): ImageEntry => {
 app.post(
   "/api/edits",
   route(async (req, res) => {
-    const authHeader = singleString(req.headers.authorization);
+    const authHeader = resolveAuth(req.headers.authorization, process.env["OPENAI_API_KEY"]);
     if (authHeader === undefined) {
       res.status(401).json({ error: "No Authorization header provided" });
       return;
@@ -366,7 +366,7 @@ app.post(
 app.post(
   "/api/chat",
   route(async (req, res) => {
-    const authHeader = singleString(req.headers.authorization);
+    const authHeader = resolveAuth(req.headers.authorization, process.env["OPENAI_API_KEY"]);
     if (authHeader === undefined) {
       res.status(401).json({ error: "No Authorization header provided" });
       return;
@@ -602,9 +602,15 @@ app.post(
 
 // ── Gemini ───────────────────────────────────────────────────────────
 
-/** Both Gemini routes accept the key by header or query string. */
+/**
+ * Both Gemini routes accept the key by header, by query string, or from the
+ * environment. A key supplied by the caller wins, so one held only in a
+ * browser never has to reach the server's configuration.
+ */
 const geminiKey = (req: Request): string | undefined =>
-  singleString(req.headers["x-api-key"]) ?? singleString(req.query["key"]);
+  singleString(req.headers["x-api-key"])
+  ?? singleString(req.query["key"])
+  ?? singleString(process.env["GOOGLE_API_KEY"]);
 
 app.post(
   "/api/video/generate",
