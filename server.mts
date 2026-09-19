@@ -55,6 +55,33 @@ const resolveAuth = (
   return fromEnv === undefined ? undefined : `Bearer ${fromEnv}`;
 };
 
+/**
+ * Hosts a generated video may be fetched from.
+ *
+ * Upstream pull request 1 proxied whatever address the request body named,
+ * attaching the caller's bearer token to it. Any page the user had open could
+ * therefore post an address it controlled to the local server and receive the
+ * user's xAI credential, since the server also answers every origin. Failing
+ * closed against an allowlist is the fix. A video served from a host not
+ * listed here is refused rather than fetched, which is the correct direction
+ * to be wrong in.
+ */
+const XAI_VIDEO_HOSTS: readonly string[] = ["x.ai", "api.x.ai", "assets.x.ai", "imgen.x.ai"];
+
+/** Whether a URL is one this proxy will attach a credential to. */
+export const isAllowedVideoUrl = (raw: string): boolean => {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== "https:") return false;
+  return XAI_VIDEO_HOSTS.some(
+    (host) => parsed.hostname === host || parsed.hostname.endsWith(`.${host}`),
+  );
+};
+
 /** xAI's public API base. Requests reach it only through this proxy. */
 const XAI_API_BASE = "https://api.x.ai/v1";
 
@@ -339,6 +366,116 @@ app.post(
       await relay(res, upstream);
     } catch (err) {
       console.error("  [ERROR] xAI image proxy failed:", errorMessage(err));
+      res.status(502).json({ error: `Proxy error: ${errorMessage(err)}` });
+    }
+  }),
+);
+
+/** Start a Grok video generation. The body is built by grok-video-core. */
+app.post(
+  "/api/xai/videos/generations",
+  route(async (req, res) => {
+    const authHeader = resolveAuth(req.headers.authorization, process.env["XAI_API_KEY"]);
+    if (authHeader === undefined) {
+      res.status(401).json({ error: "No xAI API key provided" });
+      return;
+    }
+    try {
+      console.log("  [PROXY] POST /api/xai/videos/generations → xAI");
+      const upstream = await fetchImpl(`${XAI_API_BASE}/videos/generations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: authHeader },
+        body: JSON.stringify(req.body),
+        timeout: 600_000,
+      });
+      console.log(`  [PROXY] xAI /v1/videos/generations → ${upstream.status.toString()}`);
+      await relay(res, upstream);
+    } catch (err) {
+      console.error("  [ERROR] xAI video proxy failed:", errorMessage(err));
+      res.status(502).json({ error: `Proxy error: ${errorMessage(err)}` });
+    }
+  }),
+);
+
+/** Poll a generation. The client classifies the result with classifyPoll. */
+app.get(
+  "/api/xai/videos/:id",
+  route(async (req, res) => {
+    const authHeader = resolveAuth(req.headers.authorization, process.env["XAI_API_KEY"]);
+    if (authHeader === undefined) {
+      res.status(401).json({ error: "No xAI API key provided" });
+      return;
+    }
+    const id = singleString(req.params["id"]);
+    if (id === undefined) {
+      res.status(400).json({ error: "No generation id provided" });
+      return;
+    }
+    try {
+      const upstream = await fetchImpl(
+        `${XAI_API_BASE}/videos/${encodeURIComponent(id)}`,
+        { method: "GET", headers: { Authorization: authHeader }, timeout: 60_000 },
+      );
+      await relay(res, upstream);
+    } catch (err) {
+      console.error("  [ERROR] xAI video poll failed:", errorMessage(err));
+      res.status(502).json({ error: `Proxy error: ${errorMessage(err)}` });
+    }
+  }),
+);
+
+/**
+ * Fetch a finished video, attaching the caller's credential.
+ *
+ * A proxy is needed because the asset requires the bearer token and a browser
+ * cannot attach one to a media element. The address is checked against
+ * XAI_VIDEO_HOSTS first, so the credential cannot be directed at a host the
+ * caller chooses. See the note on that constant for what this prevents.
+ */
+app.post(
+  "/api/xai/video-fetch",
+  route(async (req, res) => {
+    const authHeader = resolveAuth(req.headers.authorization, process.env["XAI_API_KEY"]);
+    if (authHeader === undefined) {
+      res.status(401).json({ error: "No xAI API key provided" });
+      return;
+    }
+
+    const body: unknown = req.body;
+    const url = typeof body === "object" && body !== null && "url" in body
+      ? singleString({ ...body }.url)
+      : undefined;
+    if (url === undefined) {
+      res.status(400).json({ error: "No video url provided" });
+      return;
+    }
+    if (!isAllowedVideoUrl(url)) {
+      console.warn("  [PROXY] Refused video fetch for a host outside the allowlist");
+      res.status(400).json({
+        error: "Refusing to fetch a video from a host outside the allowlist",
+      });
+      return;
+    }
+
+    try {
+      const upstream = await fetchImpl(url, {
+        method: "GET",
+        headers: { Authorization: authHeader },
+        timeout: 300_000,
+      });
+      if (upstream.status !== 200) {
+        res.status(upstream.status).json({
+          error: `Failed to fetch video: ${upstream.status.toString()}`,
+        });
+        return;
+      }
+      // The body is base64 rather than binary, because FetchLike describes a
+      // text response. The client turns it back into a Blob. A video of this
+      // size passes through memory either way.
+      const text = await upstream.text();
+      res.status(200).type("application/json").send(JSON.stringify({ data: text }));
+    } catch (err) {
+      console.error("  [ERROR] xAI video fetch failed:", errorMessage(err));
       res.status(502).json({ error: `Proxy error: ${errorMessage(err)}` });
     }
   }),

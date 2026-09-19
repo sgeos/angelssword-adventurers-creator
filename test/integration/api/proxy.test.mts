@@ -13,7 +13,7 @@ import {
     resetMockFetch,
     wasFetchCalled,
 } from '../../helpers/mock-fetch.mts';
-import { createApp } from '../../../server.mts';
+import { createApp, isAllowedVideoUrl } from '../../../server.mts';
 
 // The mock is a constructor argument, not a global. Nothing is patched and
 // the production module has no seam to patch.
@@ -382,5 +382,105 @@ describe('AS Adventurer API characterization', () => {
             if (previous === undefined) delete process.env['XAI_API_KEY'];
             else process.env['XAI_API_KEY'] = previous;
         }
+    });
+
+    // --- xAI / Grok video ---
+
+    it('POST /api/xai/videos/generations forwards the body to xAI', async () => {
+        mockFetchResponse(200, { request_id: 'req-1' });
+        const res = await request(app)
+            .post('/api/xai/videos/generations')
+            .set('Authorization', 'Bearer xai-test')
+            .send({ model: 'grok-imagine-video-1.5', duration: 6 });
+
+        assert.equal(res.status, 200);
+        assert.equal(callAt().url, 'https://api.x.ai/v1/videos/generations');
+        assert.deepEqual(JSON.parse(callBodyText()), { model: 'grok-imagine-video-1.5', duration: 6 });
+    });
+
+    it('GET /api/xai/videos/:id polls the generation by id', async () => {
+        mockFetchResponse(202, {});
+        const res = await request(app)
+            .get('/api/xai/videos/req-1')
+            .set('Authorization', 'Bearer xai-test');
+
+        assert.equal(res.status, 202);
+        assert.equal(callAt().url, 'https://api.x.ai/v1/videos/req-1');
+        assert.equal(callAt().method, 'GET');
+    });
+
+    it('GET /api/xai/videos/:id escapes an id rather than splicing it into the path', async () => {
+        mockFetchResponse(200, {});
+        await request(app)
+            .get('/api/xai/videos/' + encodeURIComponent('a/../../secret'))
+            .set('Authorization', 'Bearer xai-test');
+
+        assert.ok(!callAt().url.includes('/../'), `path traversal reached upstream: ${callAt().url}`);
+    });
+});
+
+describe('xAI video fetch allowlist', () => {
+    it('allows xAI hosts over https', () => {
+        assert.equal(isAllowedVideoUrl('https://api.x.ai/v1/videos/a.mp4'), true);
+        assert.equal(isAllowedVideoUrl('https://assets.x.ai/a.mp4'), true);
+        assert.equal(isAllowedVideoUrl('https://cdn.assets.x.ai/a.mp4'), true);
+    });
+
+    it('refuses a host that merely ends with the allowed name', () => {
+        // The credential must not follow a suffix-confusion address.
+        assert.equal(isAllowedVideoUrl('https://x.ai.attacker.example/c'), false);
+        assert.equal(isAllowedVideoUrl('https://notx.ai/a.mp4'), false);
+        assert.equal(isAllowedVideoUrl('https://evilx.ai/a.mp4'), false);
+    });
+
+    it('refuses plaintext, so a credential is never sent unencrypted', () => {
+        assert.equal(isAllowedVideoUrl('http://api.x.ai/a.mp4'), false);
+    });
+
+    it('refuses link-local and loopback addresses', () => {
+        assert.equal(isAllowedVideoUrl('http://169.254.169.254/latest/meta-data/'), false);
+        assert.equal(isAllowedVideoUrl('https://127.0.0.1/a.mp4'), false);
+        assert.equal(isAllowedVideoUrl('https://localhost/a.mp4'), false);
+    });
+
+    it('refuses non-http schemes and malformed input', () => {
+        for (const bad of ['file:///etc/passwd', 'ftp://api.x.ai/a', 'not a url', '', 'javascript:alert(1)']) {
+            assert.equal(isAllowedVideoUrl(bad), false, `expected ${JSON.stringify(bad)} refused`);
+        }
+    });
+});
+
+describe('xAI video fetch route', () => {
+    beforeEach(() => { resetMockFetch(); });
+
+    it('refuses an address outside the allowlist without calling it', async () => {
+        const res = await request(app)
+            .post('/api/xai/video-fetch')
+            .set('Authorization', 'Bearer xai-test')
+            .send({ url: 'https://attacker.example/collect' });
+
+        assert.equal(res.status, 400);
+        assert.equal(wasFetchCalled(), false, 'the credential must not leave for an unlisted host');
+    });
+
+    it('fetches an allowed address and attaches the credential', async () => {
+        mockFetchResponse(200, 'AAAA');
+        const res = await request(app)
+            .post('/api/xai/video-fetch')
+            .set('Authorization', 'Bearer xai-test')
+            .send({ url: 'https://assets.x.ai/v/a.mp4' });
+
+        assert.equal(res.status, 200);
+        assert.equal(callAt().url, 'https://assets.x.ai/v/a.mp4');
+        assert.equal(callAt().headers['Authorization'], 'Bearer xai-test');
+    });
+
+    it('rejects a request with no url', async () => {
+        const res = await request(app)
+            .post('/api/xai/video-fetch')
+            .set('Authorization', 'Bearer xai-test')
+            .send({});
+        assert.equal(res.status, 400);
+        assert.equal(wasFetchCalled(), false);
     });
 });
