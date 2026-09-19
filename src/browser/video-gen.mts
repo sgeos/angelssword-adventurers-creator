@@ -16,8 +16,25 @@ import {
 import { base64ToBlob } from "./app-utils.mts";
 
 import { reasonText, responseErrorMessage } from "./api.mts";
-import { closestFrom, findEl, requireEl } from "./dom.mts";
+import { closestFrom, findEl, queryAll, requireEl } from "./dom.mts";
 import * as VideoGenCore from "./video-gen-core.mts";
+import {
+    VIDEO_PROVIDERS,
+    asVideoProviderId,
+    videoProviderFrom,
+} from "./providers.mts";
+import {
+    MAX_POLL_ATTEMPTS,
+    POLL_INTERVAL_MS,
+    buildGrokVideoRequest,
+    classifyPoll,
+    describeError,
+    extractRequestId,
+    throttleBackoffMs,
+} from "./grok-video-core.mts";
+
+/** Where the chosen video provider is remembered between sessions. */
+const VIDEO_PROVIDER_PREFERENCE_KEY = 'video_provider';
 
 // ============================================
 // STATE
@@ -112,9 +129,10 @@ function loadReferenceFiles(files: FileList): void {
 async function generateVideo(): Promise<void> {
     if (generating) return;
 
-    const apiKey = localStorage.getItem('google_api_key');
+    const provider = videoProviderFrom(localStorage.getItem(VIDEO_PROVIDER_PREFERENCE_KEY));
+    const apiKey = localStorage.getItem(provider.storageKey);
     if (apiKey === null || apiKey === '') {
-        showToast('No Google API key. Go to Settings to add one.', 'error');
+        showToast(`No ${provider.label} API key. Go to Settings to add one.`, 'error');
         return;
     }
 
@@ -128,7 +146,7 @@ async function generateVideo(): Promise<void> {
     const activeMode = modeSelector.querySelector('.mode-btn.active');
     const mode = (activeMode instanceof HTMLElement ? activeMode.dataset['mode'] : undefined) ?? 'reference';
 
-    if (mode === 'keyframe' && referenceImages.length < 2) {
+    if (mode === 'keyframe' && provider.id === 'google' && referenceImages.length < 2) {
         showToast('Keyframe mode requires both a Start Frame and End Frame', 'warning');
         return;
     }
@@ -160,7 +178,9 @@ async function generateVideo(): Promise<void> {
         const promises = [];
         for (let i = 0; i < genCount; i++) {
             if (isCancelled()) break;
-            promises.push(generateOneVideo(apiKey, prompt, duration, mode));
+            promises.push(provider.id === 'xai'
+                ? generateOneGrokVideo(apiKey, prompt, duration, mode)
+                : generateOneVideo(apiKey, prompt, duration, mode));
         }
 
         const results = await Promise.allSettled(promises);
@@ -192,6 +212,108 @@ async function generateVideo(): Promise<void> {
         requireEl('vgProgress', HTMLElement).classList.remove('active');
         requireEl('vgGenerateBtn', HTMLButtonElement).disabled = false;
     }
+}
+
+/** Sleep, so the poll loop yields between attempts. */
+const wait = async (ms: number): Promise<void> =>
+    new Promise((resolve) => { setTimeout(resolve, ms); });
+
+/**
+ * Generate one clip through Grok.
+ *
+ * Three steps, because the service works that way. Start and receive an
+ * identifier, poll until it resolves, then fetch the asset through the proxy
+ * since it needs the credential attached and a media element cannot supply
+ * one. classifyPoll in grok-video-core decides what each poll response means.
+ */
+async function generateOneGrokVideo(
+    apiKey: string,
+    prompt: string,
+    duration: number,
+    mode: string,
+): Promise<GeneratedVideo | null> {
+    const reference = referenceImages[0];
+    if (reference === undefined) throw new Error('Grok video needs a reference image');
+
+    const body = buildGrokVideoRequest({
+        prompt: prompt === ''
+            ? 'Gentle breathing idle animation with slight body sway. Perfect seamless loop. Static locked-off camera. Keep the character and solid background exactly as in the source image.'
+            : prompt,
+        imageDataUri: reference.dataUrl,
+        durationSeconds: duration,
+        mode,
+    });
+
+    const auth = `Bearer ${apiKey}`;
+    const started = await fetch(VIDEO_PROVIDERS.xai.generateRoute, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: auth },
+        body: JSON.stringify(body),
+    });
+    const startBody: unknown = await started.json().catch(() => ({}));
+    if (!started.ok) throw new Error(describeError(startBody, started.status));
+
+    const requestId = extractRequestId(startBody);
+    if (requestId === undefined) throw new Error('Grok did not return a generation id');
+
+    const progressFill = findEl('vgProgressFill', HTMLElement);
+    const progressText = findEl('vgProgressText', HTMLElement);
+    let consecutiveThrottles = 0;
+
+    for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
+        if (isCancelled()) return null;
+        await wait(POLL_INTERVAL_MS);
+        if (isCancelled()) return null;
+
+        if (progressFill !== undefined) {
+            const pct = Math.min(95, ((attempt + 1) / MAX_POLL_ATTEMPTS) * 100);
+            progressFill.style.width = `${pct.toString()}%`;
+        }
+        if (progressText !== undefined) {
+            const seconds = Math.floor(((attempt + 1) * POLL_INTERVAL_MS) / 1000);
+            progressText.textContent = `Grok video generating… (${seconds.toString()}s)`;
+        }
+
+        const polled = await fetch(`/api/xai/videos/${encodeURIComponent(requestId)}`, {
+            method: 'GET',
+            headers: { Authorization: auth },
+        });
+        const polledBody: unknown = await polled.json().catch(() => ({}));
+        const outcome = classifyPoll(polled.status, polledBody);
+
+        if (outcome.kind === 'ready') return fetchGrokVideo(auth, outcome.url);
+        if (outcome.kind === 'fatal' || outcome.kind === 'failed') throw new Error(outcome.reason);
+        if (outcome.kind === 'throttled') {
+            consecutiveThrottles++;
+            if (consecutiveThrottles >= 5) throw new Error('Grok throttled the request repeatedly');
+            await wait(throttleBackoffMs(consecutiveThrottles));
+            continue;
+        }
+        consecutiveThrottles = 0;
+    }
+
+    throw new Error('Grok video generation timed out');
+}
+
+/** Retrieve the finished asset through the proxy, which holds the credential. */
+async function fetchGrokVideo(auth: string, url: string): Promise<GeneratedVideo> {
+    const response = await fetch('/api/xai/video-fetch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: auth },
+        body: JSON.stringify({ url }),
+    });
+    const payload: unknown = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(describeError(payload, response.status));
+
+    const encoded = typeof payload === 'object' && payload !== null && 'data' in payload
+        ? { ...payload }.data
+        : undefined;
+    if (typeof encoded !== 'string' || encoded === '') {
+        throw new Error('Grok video download returned no data');
+    }
+
+    const blob = base64ToBlob(encoded, 'video/mp4');
+    return { blob, url: URL.createObjectURL(blob) };
 }
 
 /**
@@ -366,6 +488,21 @@ function handoffToVideoPrep(): void {
 
 function initVideoGen(): void {
     // Mode selector (Reference / Keyframe)
+    // Provider selector. Anything unrecognised is ignored rather than stored.
+    initModeSelector('vgProvider', (mode) => {
+        const chosen = asVideoProviderId(mode);
+        if (chosen === undefined) return;
+        localStorage.setItem(VIDEO_PROVIDER_PREFERENCE_KEY, chosen);
+        showToast(`Generating with ${VIDEO_PROVIDERS[chosen].label}`, 'info');
+    });
+
+    // Reflect the stored preference, so the active button matches what a
+    // generation would actually use.
+    const storedVideoProvider = videoProviderFrom(localStorage.getItem(VIDEO_PROVIDER_PREFERENCE_KEY));
+    for (const btn of queryAll(requireEl('vgProvider', HTMLElement), '.seg-btn', HTMLElement)) {
+        btn.classList.toggle('active', btn.dataset['mode'] === storedVideoProvider.id);
+    }
+
     initModeSelector('vgModeSelector', (mode) => {
         requireEl('vgReferenceMode', HTMLElement).classList.toggle('hidden', mode !== 'reference');
         requireEl('vgKeyframeMode', HTMLElement).classList.toggle('hidden', mode !== 'keyframe');

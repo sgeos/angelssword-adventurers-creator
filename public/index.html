@@ -395,6 +395,14 @@
                     <div class="glass-panel">
                         <div class="panel-title"><span class="title-icon">🎬</span> Video Generation</div>
 
+                        <div class="form-row">
+                            <label>Provider</label>
+                            <div class="seg-toggle" id="vgProvider">
+                                <button class="seg-btn active" data-mode="google" title="Generate with Google Gemini. Uses your Google API key.">Gemini</button>
+                                <button class="seg-btn" data-mode="xai" title="Generate with Grok. Uses your xAI API key from Settings.">Grok</button>
+                            </div>
+                        </div>
+
                         <div class="mode-selector" id="vgModeSelector">
                             <button class="mode-btn active" data-mode="reference" title="Provide reference images and describe the animation">🖼️ Reference Mode</button>
                             <button class="mode-btn" data-mode="keyframe" title="Upload start and end frames — AI interpolates between them">🔑 Keyframe Mode</button>

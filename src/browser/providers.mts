@@ -107,3 +107,61 @@ export const buildImageRequest = (
 /** Whether a credential looks usable, without asserting it is valid. */
 export const hasCredential = (value: string | null): boolean =>
   value !== null && value.trim().length > 0;
+
+/* ────────────────────────────────────────────────────────────────────────
+ * Video providers.
+ *
+ * A different set from the image providers, so a separate table rather than
+ * a shared one with unusable combinations. Google generates in a single
+ * request. Grok returns an identifier and is polled, then the finished asset
+ * is fetched through the proxy because it needs the credential attached.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+export type VideoProviderId = "google" | "xai";
+
+export interface VideoProvider {
+  readonly id: VideoProviderId;
+  readonly label: string;
+  /** Proxy route that starts a generation. */
+  readonly generateRoute: string;
+  /** localStorage key holding the credential. */
+  readonly storageKey: string;
+  /**
+   * Whether the provider answers immediately or must be polled. Google
+   * returns the clip in its response; Grok returns an identifier.
+   */
+  readonly pollingRequired: boolean;
+  /** Whether a reference image is mandatory rather than optional. */
+  readonly requiresReferenceImage: boolean;
+}
+
+export const VIDEO_PROVIDERS: Readonly<Record<VideoProviderId, VideoProvider>> = {
+  google: {
+    id: "google",
+    label: "Gemini",
+    generateRoute: "/api/video/generate",
+    storageKey: "google_api_key",
+    pollingRequired: false,
+    requiresReferenceImage: true,
+  },
+  xai: {
+    id: "xai",
+    label: "Grok",
+    generateRoute: "/api/xai/videos/generations",
+    storageKey: "xai_api_key",
+    pollingRequired: true,
+    requiresReferenceImage: true,
+  },
+};
+
+export const VIDEO_PROVIDER_ORDER: readonly VideoProviderId[] = ["google", "xai"];
+
+/** Narrow an untrusted string to a video provider identifier. */
+export const asVideoProviderId = (value: string): VideoProviderId | undefined =>
+  value === "google" || value === "xai" ? value : undefined;
+
+/** The video provider a stored preference names, falling back to Gemini. */
+export const videoProviderFrom = (stored: string | null): VideoProvider => {
+  const id = stored === null ? undefined : asVideoProviderId(stored);
+  return VIDEO_PROVIDERS[id ?? "google"];
+};

@@ -167,8 +167,14 @@ The exported WebM files also work with any OBS browser source, PNGtuber app, or 
 ### Generation providers
 
 Sprite generation runs through OpenAI or through Grok, selected in the AI
-Generate panel. Each uses its own key, entered in Settings and held in browser
-storage.
+Generate panel. Video generation runs through Google Gemini or through Grok,
+selected in the Video Generation panel. Each provider uses its own key,
+entered in Settings and held in browser storage.
+
+Grok video is generated asynchronously. The request returns an identifier,
+the application polls until the clip is ready, and the finished asset is
+retrieved through the local proxy, which holds the credential the asset
+requires. Only addresses on xAI's own hosts are fetched.
 
 A key may instead be supplied to the server through the `OPENAI_API_KEY`,
 `GOOGLE_API_KEY`, or `XAI_API_KEY` environment variables, which lets one
