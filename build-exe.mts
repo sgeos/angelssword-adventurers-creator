@@ -10,53 +10,53 @@
  *   ├── public/          (UI, including js/ compiled from src/browser)
  *   └── Start AS Adventurer.[bat|command|sh]
  *
- * ── Why there is a bundling step ────────────────────────────────────────
+ * ── How the binary is produced ──────────────────────────────────────────
  *
- * The server is ESM TypeScript. pkg 5.8.1 is the final release, is archived
- * upstream, and its Babel pass rejects `import.meta`, so it can consume
- * neither server.mts nor tsc's ESM output.
+ * Node's single executable applications feature. The server is bundled to one
+ * CommonJS file with esbuild, that bundle is turned into a preparation blob by
+ * Node itself, and the blob is injected into a copy of the running Node binary
+ * with postject.
  *
- * esbuild resolves that: it bundles the server and its dependencies into one
- * CommonJS file, substituting __dirname and __filename for the two
- * `import.meta` reads, which is what --define below does. pkg then has an
- * ordinary CommonJS entry point and is happy. The source stays idiomatic ESM;
- * only the binary target sees the CommonJS form.
+ * The bundling step exists because the source is ESM TypeScript and the
+ * feature wants a CommonJS entry point. Two `import.meta` reads in the server
+ * are substituted for their CommonJS equivalents by the --define flags below.
  *
- * pkg remains archived. Node's own single executable applications feature is
- * the eventual replacement, and it wants exactly the same CommonJS bundle
- * this step already produces, so that migration starts from here.
+ * This replaced a pkg-based build. pkg 5.8.1 is the final release and is
+ * archived upstream, its Babel pass rejects `import.meta`, and its newest base
+ * binary is Node 18, so a binary built with it ran an older runtime than the
+ * one the project is developed and tested against. The feature used here is
+ * maintained by the Node project and embeds whichever Node produced it.
  *
- * pkg ships prebuilt base binaries for Windows, macOS, and Linux only. It
- * recognises a freebsd target name, but publishes no binary for it and will
- * not cross-build one, so on the BSDs this script refuses rather than
- * producing something broken. `npm start` works there regardless.
+ * Neither approach cross-compiles. The binary is for the host platform, and
+ * the BSDs are unsupported because Node publishes no build for them. `npm
+ * start` works everywhere regardless.
  */
 import { execFileSync, execSync } from "node:child_process";
+import os from "node:os";
 import fs from "node:fs";
 import path from "node:path";
 
-/** pkg target triple, output name, and launcher flavour for one host. */
+/** Output name and launcher flavour for one host platform. */
 interface HostTarget {
-  readonly target: string;
   readonly binary: string;
   readonly launcher: "bat" | "command" | "sh";
 }
 
-/** pkg publishes base binaries for these two architectures only. */
+/** Node publishes builds for these architectures on the desktop platforms. */
 const ARCHES: Readonly<Record<string, string>> = { x64: "x64", arm64: "arm64" };
 const ARCH: string | undefined = ARCHES[process.arch];
 
-const HOSTS: Readonly<Record<string, HostTarget>> = ARCH === undefined ? {} : {
-  win32: { target: `node18-win-${ARCH}`, binary: "ASAdventurer.exe", launcher: "bat" },
-  darwin: { target: `node18-macos-${ARCH}`, binary: "ASAdventurer", launcher: "command" },
-  linux: { target: `node18-linux-${ARCH}`, binary: "ASAdventurer", launcher: "sh" },
+const HOSTS: Readonly<Record<string, HostTarget>> = {
+  win32: { binary: "ASAdventurer.exe", launcher: "bat" },
+  darwin: { binary: "ASAdventurer", launcher: "command" },
+  linux: { binary: "ASAdventurer", launcher: "sh" },
 };
 
-const HOST: HostTarget | undefined = HOSTS[process.platform];
+const HOST: HostTarget | undefined = ARCH === undefined ? undefined : HOSTS[process.platform];
 
 if (HOST === undefined) {
   console.error();
-  console.error(`  pkg has no prebuilt target for ${process.platform}/${process.arch}.`);
+  console.error(`  No single executable build is supported for ${process.platform}/${process.arch}.`);
   console.error("  Run the application directly instead:");
   console.error();
   console.error("      npm start");
@@ -127,43 +127,77 @@ execFileSync(
   { stdio: "inherit", cwd: ROOT },
 );
 
-// 4. Compile the binary with pkg
-log(`Compiling → ${HOST.binary} (${HOST.target}) ...`);
+// 4. Turn the bundle into a single executable preparation blob.
+log("Preparing the single executable blob...");
+const SEA_CONFIG = path.join(ROOT, "dist", "sea-config.json");
+const SEA_BLOB = path.join(ROOT, "dist", "sea-prep.blob");
+fs.writeFileSync(SEA_CONFIG, JSON.stringify({
+  main: BUNDLE,
+  output: SEA_BLOB,
+  disableExperimentalSEAWarning: true,
+}, null, 2));
+execFileSync(process.execPath, ["--experimental-sea-config", SEA_CONFIG], {
+  stdio: "inherit",
+  cwd: ROOT,
+});
+
+// 5. Copy the running Node binary and inject the blob into it.
 const ICON = path.join(ROOT, "icon.ico");
 const BIN = path.join(DIST, HOST.binary);
-const pkgArgs = [
-  "--yes", "pkg", BUNDLE,
-  "--targets", HOST.target,
-  "--output", BIN,
-  "--compress", "GZip",
+log(`Building ${HOST.binary} from ${path.basename(process.execPath)} (${os.platform()}/${os.arch()}) ...`);
+fs.copyFileSync(process.execPath, BIN);
+fs.chmodSync(BIN, 0o755);
+
+// An existing signature must come off before the binary is modified, and a
+// fresh one goes back on afterwards. Only macOS enforces this.
+if (process.platform === "darwin") {
+  try {
+    execFileSync("codesign", ["--remove-signature", BIN], { stdio: "pipe" });
+  } catch {
+    log("Note: no existing signature to remove.");
+  }
+}
+
+// The fuse string is the sentinel Node itself looks for. It is fixed by the
+// Node project rather than chosen here.
+const postjectArgs = [
+  "--yes", "postject", BIN, "NODE_SEA_BLOB", SEA_BLOB,
+  "--sentinel-fuse", "NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2",
 ];
-// --icon writes Windows PE resources and is rejected on other targets.
-if (process.platform === "win32" && fs.existsSync(ICON)) pkgArgs.push("--icon", ICON);
+if (process.platform === "darwin") postjectArgs.push("--macho-segment-name", "NODE_SEA");
 
 try {
-  execFileSync(process.platform === "win32" ? "npx.cmd" : "npx", pkgArgs, {
+  execFileSync(process.platform === "win32" ? "npx.cmd" : "npx", postjectArgs, {
     stdio: "inherit",
     cwd: ROOT,
   });
 } catch {
-  console.error("\n  ❌ pkg compilation failed. Make sure you have run: npm install");
+  console.error("\n  ❌ Injection failed. Make sure you have run: npm install");
   process.exit(1);
 }
 
-// 5. Executable bit, and a signature on macOS
-if (process.platform !== "win32") fs.chmodSync(BIN, 0o755);
-
-// Apple Silicon refuses to execute an unsigned binary outright. An ad-hoc
+// Apple Silicon refuses to execute an unsigned binary outright, and the
+// injection above invalidated whatever signature the copy carried. An ad-hoc
 // signature costs nothing and makes the build runnable on this machine.
-// This is NOT notarization: another Mac will still quarantine the download
+// This is NOT notarization. Another Mac will still quarantine the download
 // unless the user clears the attribute, or the binary is signed with a
 // Developer ID and notarized through Apple.
 if (process.platform === "darwin") {
   try {
-    execFileSync("codesign", ["--force", "--sign", "-", BIN], { stdio: "pipe" });
+    execFileSync("codesign", ["--sign", "-", BIN], { stdio: "pipe" });
     log("Applied an ad-hoc signature (runs here; not notarized for others).");
   } catch {
     log("⚠️  codesign failed — the binary may be blocked on Apple Silicon.");
+  }
+}
+
+// Windows resource editing, so the executable carries the project icon.
+if (process.platform === "win32" && fs.existsSync(ICON)) {
+  try {
+    execFileSync("npx.cmd", ["--yes", "rcedit", BIN, "--set-icon", ICON], { stdio: "pipe" });
+    log("Applied the application icon.");
+  } catch {
+    log("⚠️  rcedit failed — the executable will carry the default Node icon.");
   }
 }
 
@@ -213,8 +247,10 @@ if (fs.existsSync(README)) {
   log("Included README.md");
 }
 
-// 10. Remove the intermediate bundle; it is not part of the distribution.
+// Remove the intermediates; none of them belong in the distribution.
 fs.rmSync(BUNDLE, { force: true });
+fs.rmSync(SEA_BLOB, { force: true });
+fs.rmSync(SEA_CONFIG, { force: true });
 
 // 11. Distributable archive
 const ZIP_PATH = path.join(ROOT, "dist", "ASAdventurer.zip");

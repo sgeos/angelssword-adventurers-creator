@@ -278,9 +278,8 @@ export class ModelExporter {
             if (data !== null) {
                 // Video Prep sends videoSrc, an object URL, never a blob.
                 // A `data.blob` branch used to sit ahead of this; no producer
-                // has ever set that field, nor the `keyColor` the block below
-                // it read, so both were unreachable and are gone. See the
-                // videoPrepData shape in video-prep-core.mts.
+                // has ever set that field, so it was unreachable and is gone.
+                // See the videoPrepData shape in video-prep-core.mts.
                 const videoSource = data.videoSrc;
                 if (videoSource !== undefined && videoSource !== '') {
                     try {
@@ -310,6 +309,11 @@ export class ModelExporter {
                     if (data.fps !== undefined && data.fps > 0) {
                         this.detectedFps = data.fps;
                     }
+
+                    // Adopt the key colour chosen in Sprite Prep. It lives on
+                    // the handoff root rather than inside videoPrepData, which
+                    // is why the original read of `data.keyColor` never fired.
+                    this.applyKeyColor(handoff.keyColor);
 
                     // Consume handoff data
                     handoff.videoPrepData = null;
@@ -342,6 +346,22 @@ export class ModelExporter {
 
         // Also check on init in case data was set before this module loaded
         setTimeout(() => { void checkHandoff(); }, 500);
+    }
+
+    /**
+     * Adopt a key colour that arrived over the handoff.
+     *
+     * Sprite Prep writes the colour it keyed against to `handoff.keyColor`,
+     * and the exporter keys the video with the same colour so that the two
+     * stages agree. A malformed value is ignored rather than applied, since
+     * the handoff is shared mutable state and nothing guarantees its contents.
+     */
+    applyKeyColor(hex: string): void {
+        if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return;
+        const rgb = hexToRgb(hex);
+        this.chromaKey.setKeyColor(rgb.r, rgb.g, rgb.b);
+        this._selectSwatch(hex);
+        this.updatePreview();
     }
 
     private _selectSwatch(hex: string): void {

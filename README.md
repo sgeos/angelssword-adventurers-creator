@@ -172,19 +172,28 @@ node build-exe.mts
 ```
 
 Produces a self-contained binary for the platform it is run on, into
-`dist/ASAdventurer/`, alongside the UI files and a launcher. Windows, macOS,
-and Linux are supported. The BSDs are not, because `pkg` publishes no base
-binary for them; run the application with `npm start` there instead.
+`dist/ASAdventurer/`, alongside the user interface files and a launcher.
+Windows, macOS, and Linux are supported. The Berkeley Software Distribution
+systems are not, because Node publishes no build for them. Run the application
+with `npm start` there instead.
 
-The build bundles the server to CommonJS with esbuild before handing it to
-`pkg`. That step exists because the server is ESM TypeScript and `pkg` — which
-is archived, and whose final release predates `import.meta` — cannot consume
-it directly. The source stays ESM; only the binary target sees CommonJS.
+The build uses Node's single executable applications feature. The server is
+bundled to one CommonJS file with esbuild, Node turns that bundle into a
+preparation blob, and postject injects the blob into a copy of the running
+Node binary. The bundling step exists because the source is ECMAScript module
+TypeScript and the feature wants a CommonJS entry point.
 
-On macOS the build applies an ad-hoc code signature so the result runs on the
-machine that produced it. That is not notarization. Distributing the binary to
-another Mac requires an Apple Developer ID and a notarization step, or the
-recipient clearing the quarantine attribute by hand.
+An earlier version of this build used `pkg`. That tool is archived, its final
+release rejects `import.meta`, and its newest base binary is Node 18, so the
+binary ran an older runtime than the one the project is tested against. The
+feature used now is maintained by the Node project and embeds whichever
+version of Node produced it.
+
+On macOS the build applies an ad-hoc code signature, because injection
+invalidates the signature the copied binary carried and Apple Silicon refuses
+to run an unsigned executable. That is not notarization. Distributing to
+another Mac requires an Apple Developer identifier and a notarization step, or
+the recipient clearing the quarantine attribute by hand.
 
 ---
 
