@@ -11,13 +11,15 @@ bound.
 
 ## Active
 
-**Extracting the arithmetic still tangled with the Document Object Model.**
-The stage modules are the last untested code. Specified in
-[HANDOFF.md](./HANDOFF.md). Not architectural, and needs no new interface.
+**A decision for the operator: whether to keep extracting.** Recorded in
+[../decisions/OPEN.md](../decisions/OPEN.md) and argued in
+[HANDOFF.md](./HANDOFF.md).
 
-Success is `model-exporter`, `sprite-prep`, `video-prep`, `shell`, and
-`video-gen` reduced to presentation, with what they compute moved to the core
-and tested there.
+The arithmetic tangled with the Document Object Model has largely come out of
+the five largest modules, and what remains in them is increasingly element
+wiring and canvas drawing. Continuing means progressively thinner slices.
+Stopping means accepting that those five hold presentation and that the core
+holds what is worth testing.
 
 ## Completed: the three-layer rearchitecture
 
@@ -38,6 +40,10 @@ dropped.
 
 | Task | Status | Verification |
 |---|---|---|
+| Frame selection collapsed from four copies to one | Complete | 20 new tests; count and list asserted to agree |
+| Seek arithmetic unified, one number split into two names | Complete | 16 new tests; no `0.001` left in either stage |
+| Key scoring, crop and size estimate extracted | Complete | 43 new tests; six constants named and pinned |
+| Colour detection and placement extracted | Complete | 45 new tests; five placement copies became one |
 | Loop arithmetic extracted; capability list closed | Complete | 14 new tests; two formulas asserted to agree |
 | Network and time capabilities inverted | Complete | 35 new tests; server shares the port; ban exercised |
 | Storage capability inverted | Complete | 27 sites converted to 0; 37 new tests; ban exercised |

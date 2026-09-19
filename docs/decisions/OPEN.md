@@ -4,29 +4,31 @@
 
 Matters not settled. Each states what would resolve it.
 
-## Five modules have no unit tests
+## The five largest modules have no unit tests of their own
 
-Measured after the capability work on 2026-09-19: `model-exporter` at 1,660
-lines, `sprite-prep` at 1,119, `video-prep` at 914, `shell` at 784, and
+Measured 2026-09-19 after the extraction work: `model-exporter` at 1,599
+lines, `sprite-prep` at 1,047, `video-prep` at 912, `shell` at 784, and
 `video-gen` at 671. Treat these as of their date. All five are coupled to
 `document` and to a live canvas, which the test environment does not provide.
 
-Two routes exist. Continue extracting pure logic into the core, which is
-slower but adds nothing. Or supply a canvas implementation, which reaches more
-code at the cost of asserting against a surface whose fidelity is unknown.
+**What that heading now means has changed, and the change is the point.** The
+modules are untested; what they compute is not. Extraction has moved the
+arithmetic out from under the Document Object Model and into the core, where
+520 unit tests reach it. What remains inside the five is element wiring,
+canvas drawing and event binding.
 
-The rearchitecture in [../architecture/LAYERING.md](../architecture/LAYERING.md)
-takes the first route and has carried it as far as the capabilities go. What
-has come out so far, with the tests it brought: the Graphics Interchange
-Format compositor, the ComfyUI exchange, the Grok exchange, the storage round
-trips, and the video stage's loop arithmetic.
+Out so far, each with the tests it brought: the Graphics Interchange Format
+compositor, the ComfyUI exchange, the Grok exchange, the storage round trips,
+the video stage's loop arithmetic and seek timing, the exporter's placement,
+crop, size estimate and frame selection, the key colour auto-detection, and
+the advanced key scoring.
 
-**The remaining work needs no new interface.** Every capability the core needs
-is inverted, so what is left is separating the arithmetic still tangled with
-the Document Object Model in each stage. That is ordinary work rather than
-architectural work, and the two routes above are no longer a choice between
-approaches; the second, supplying a canvas, would now only reach what the
-first has deliberately left as presentation.
+**Every capability the core needs is inverted**, so nothing left here needs a
+new interface. The remaining question is whether to keep extracting, which has
+diminishing returns as what is left becomes genuinely presentational, or to
+stop and accept that the five hold presentation and nothing else. Supplying a
+canvas implementation, the other route once considered, would now reach only
+what has been deliberately left as presentation.
 
 ## The disposal handling in `gif-composite` does not match the format
 

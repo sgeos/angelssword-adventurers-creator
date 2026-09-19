@@ -12,10 +12,98 @@ file is arranged this way rather than being rewritten wholesale.
 
 ## Last Updated
 
+2026-09-19. Four extraction increments on top of the five architectural ones.
+Unit tests 276 to 520.
+
+## Verification
+
+`npm run check` passes across all five projects. 520 unit tests, 44
+application programming interface tests, 24 browser specifications, all
+passing. The container was not rebuilt and is marked unverified at the anchor
+in [HANDOFF.md](./HANDOFF.md).
+
+## Summary
+
+The architecture made the extraction possible; the extraction is what it was
+for. Nine increments in total, and the last four moved arithmetic out from
+under the Document Object Model into the core.
+
+What came out, and what each was hiding.
+
+The exporter's placement existed in **five identical copies**, each preceded
+by the same sanitising. The frame selection existed in **four**, and the
+fourth produced the estimate shown to a user before an export they then wait
+for. The named colour table existed **twice**, and the second copy had grown
+an injection parameter so the core could be handed the first. `0.001`
+appeared **seven times** serving two different purposes, an end-of-clip
+margin and a seek tolerance, which are not the same quantity.
+
+The auto-detection and the advanced key scoring were each a real algorithm
+inside a click handler, the second at ninety lines with six unexplained
+constants. Both are now named, documented and tested.
+
+Two booleans that could both be true, meaning nothing, became one field.
+
+## Questions for Human Pilot
+
+**Whether to keep extracting.** What remains in the five largest modules is
+increasingly element wiring, canvas drawing and event binding, which is what
+a stage module is for. Continuing means progressively thinner slices.
+Stopping means saying that those five hold presentation and the core holds
+what is worth testing. I have no strong view; the returns are visibly
+diminishing.
+
+Two matters from earlier remain open and are recorded in
+[../decisions/OPEN.md](../decisions/OPEN.md). The Graphics Interchange Format
+decode path has no production consumer, and its two divergences from the
+format are worth correcting only if it is kept.
+
+## Technical Concerns
+
+**Several of the extracted behaviours are preserved rather than correct**, and
+each says so where it is defined. A histogram bucket is identified by its
+floor, biasing every reconstructed colour dark by up to three levels. The
+placement rounds its four values independently, so the centring remainder
+falls on one side. `clampSeekTime` applies its lower clamp before its upper,
+so a sub-millisecond clip yields a negative time. `hexToRgb` does not
+validate and yields NaN. None is reachable in practice except the first,
+which moves every score if changed.
+
+**The size estimate's two constants are heuristics with no provenance.** They
+came from a comment saying roughly. They are named now so a measurement has
+somewhere to go, but nothing here establishes them.
+
+Two of my own tests failed on first run and both were the tests rather than
+the code, one asserting a clamp the function does not perform and one
+asserting a boundary that floating point makes unassertable at that
+magnitude. Both are recorded in [AGENT_PITFALLS.md](./AGENT_PITFALLS.md).
+
+Carried forward: neither extracted exchange has run against a live service.
+
+## Intended Next Step
+
+Await the decision above. If the answer is to continue, `shell` at 784 lines
+is the least examined of the five.
+
+## Session Context
+
+`main` at `2a78864` before this refresh. Upstream carries two open pull
+requests and one open issue, all from this fork.
+
+---
+
+## Superseded history
+
+Nothing below this line describes the present.
+
+### Superseded 2026-09-19 — rearchitecture complete, extraction begun
+
+#### Last Updated
+
 2026-09-19. Three-layer rearchitecture, five increments. Structurally
 complete, and every capability the core needs inverted.
 
-## Verification
+#### Verification
 
 `npm run check` passes across all five projects. 396 unit tests, 44
 application programming interface tests, 24 browser specifications, all
@@ -24,7 +112,7 @@ the core project, the two determinism bans, the two import-direction zones,
 the storage ban, and the network ban. The container was not rebuilt and is
 marked unverified at the anchor in [HANDOFF.md](./HANDOFF.md).
 
-## Summary
+#### Summary
 
 The pattern is from `~/projects/re/1830/`, whose architecture document states
 the part that matters: the rule is enforceable by inspection, and a core that
@@ -46,7 +134,7 @@ testable that had never been reachable from a node test: the Graphics
 Interchange Format compositor, the ComfyUI exchange, the Grok exchange, and
 the storage round trips. 120 tests were added across the five increments.
 
-## Questions for Human Pilot
+#### Questions for Human Pilot
 
 Two decisions are recorded in [../decisions/OPEN.md](../decisions/OPEN.md) and
 neither is mine to take.
@@ -57,7 +145,7 @@ path returns, which is what upstream had, or roughly 200 lines go. That
 decides whether the two format divergences pinned beside them are worth
 correcting.
 
-## Technical Concerns
+#### Technical Concerns
 
 **The capability list was wrong when first written, and the correction matters
 more than the entries.** It began as a count of what the browser layers reach
@@ -77,7 +165,7 @@ unit tests against a scripted client and by a browser specification against
 mocked routes, which establishes that the sequence is right and not that the
 service agrees with it.
 
-## Intended Next Step
+#### Intended Next Step
 
 Separating the arithmetic still tangled with the Document Object Model in the
 five largest modules. Not architectural, and needing no new interface.
@@ -85,16 +173,10 @@ five largest modules. Not architectural, and needing no new interface.
 mean something without a document, move those. `model-exporter` at 1,660 lines
 is the largest and the least examined.
 
-## Session Context
+#### Session Context
 
 `main` at `169cd1b` before this refresh. Upstream carries two open pull
 requests and one open issue, all from this fork.
-
----
-
-## Superseded history
-
-Nothing below this line describes the present.
 
 ### Superseded 2026-09-19 — rearchitecture, first three increments
 

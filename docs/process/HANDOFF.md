@@ -2,7 +2,7 @@
 
 > **Navigation**: [Process](./README.md) | [Documentation Root](../README.md)
 
-**Refreshed 2026-09-19. The anchor is `169cd1b`, the last commit before this
+**Refreshed 2026-09-19. The anchor is `2a78864`, the last commit before this
 refresh.** Read this block, run the validity check, then read the task below.
 
 ---
@@ -16,11 +16,11 @@ itself.
 
 ### Ancestry
 
-`main` should **contain** `169cd1b`, the last commit before this refresh. Test
+`main` should **contain** `2a78864`, the last commit before this refresh. Test
 containment rather than equality.
 
 ```sh
-git merge-base --is-ancestor 169cd1b HEAD
+git merge-base --is-ancestor 2a78864 HEAD
 ```
 
 If that fails, this file predates a history rewrite and is stale. If it
@@ -40,14 +40,15 @@ of the list rather than taking the next unused number, and renumber when
 inserting, because a list whose numbers skip reads as though checks are
 missing.
 
-1. `git ls-files` reports **81** TypeScript files and exactly **one**
+1. `git ls-files` reports **89** TypeScript files and exactly **one**
    JavaScript file, `eslint.config.mjs`, which is deliberate.
 2. **Five** `tsconfig.*.json` projects exist at the repository root, and
    `src/` holds exactly four directories, `core`, `platform-browser`,
    `platform-worker`, and `entry-browser`.
 3. `src/core/ports/` holds **three** capability interfaces, namely
-   `storage.mts`, `http.mts`, and `clock.mts`.
-4. `npm test` reports **396** unit tests and **44** application programming
+   `storage.mts`, `http.mts`, and `clock.mts`, and `src/core/` holds
+   **nineteen** modules.
+4. `npm test` reports **520** unit tests and **44** application programming
    interface tests, all passing.
 5. `npx playwright test` reports **24** passing browser specifications.
 6. `tsc -p tsconfig.core.json` succeeds, and adding `localStorage` to any file
@@ -83,54 +84,54 @@ Sprites generate through OpenAI, Grok, or a local ComfyUI. Video generates
 through Gemini, Grok, or ComfyUI with Wan image-to-video. A local server
 proxies every outbound call.
 
-**The three-layer rearchitecture is structurally complete, and every
-capability the core needs is inverted.** Five increments landed.
+**The three-layer rearchitecture is complete, and the extraction it enables
+is well advanced.** Nine increments landed.
 
-- `e579ee5` established `src/core/` and `tsconfig.core.json`, which withholds
-  the Document Object Model library and the node types together.
-- `5da3c11` separated the platform and entry layers, and added the
-  import-direction rule that no tsconfig can express.
-- `9cf2a11` inverted storage, twenty-seven call sites becoming none.
-- `8f75eb5` inverted the network and time, unified the browser's client with
-  the server's, and moved the ComfyUI and Grok exchanges into the core.
-- `169cd1b` extracted the video stage's loop arithmetic, and struck logging
-  and binary payloads off the capability list as not being capabilities.
+Architecture, five increments: `e579ee5` established the enforced core;
+`5da3c11` separated the platform and entry layers with the import-direction
+rule no tsconfig can express; `9cf2a11` inverted storage; `8f75eb5` inverted
+the network and time and moved the ComfyUI and Grok exchanges into the core;
+`169cd1b` struck logging and binary payloads off the capability list as not
+being capabilities.
+
+Extraction, four increments: `ad0a64c` took the exporter's key colour
+detection, placement and saturation match, and consolidated the colour table
+that existed twice; `c7d070b` took the advanced key scoring, the crop, and the
+size estimate; `f260334` gave the seek arithmetic one home and two names;
+`2a78864` collapsed a frame selection that existed four times.
+
+Unit tests went from 276 before this work to **520**.
 
 ## The next task
 
-**Not architectural.** Nothing further needs an interface. What remains is the
-ordinary work of separating the arithmetic still tangled with the Document
-Object Model inside the four stage modules, which is the same work as making
-them testable.
+**A decision first, and it belongs to the operator.** The extraction has
+reached diminishing returns and the question in
+[../decisions/OPEN.md](../decisions/OPEN.md) is whether to continue.
 
-`169cd1b` is the worked example to follow. It found a count computed two ways,
-two label vocabularies for one concept, and an epsilon whose reason was
-unrecorded, all inside forty lines of a stage. The method was to read a
-function, ask which lines would still mean something without a document, and
-move those.
+What is left in the five largest modules is increasingly element wiring,
+canvas drawing and event binding, which is what a stage module is for. The
+arithmetic that was tangled with it has largely come out. Continuing means
+extracting progressively thinner slices; stopping means accepting that those
+five hold presentation and that the core holds what is worth testing.
 
-Sizes at the anchor, largest first. `model-exporter` 1,660, `sprite-prep`
-1,119, `video-prep` 914, `shell` 784, `video-gen` 671.
+Sizes at the anchor, largest first. `model-exporter` 1,599, `sprite-prep`
+1,047, `video-prep` 912, `shell` 784, `video-gen` 671.
 
-`model-exporter` is the largest and the least examined. `sprite-prep` is the
-next. Neither has been read function by function in the way `video-prep` just
-was.
+`shell` is the one least examined, its 784 lines being the settings panel and
+the page chrome. `video-gen` was found to be already well factored, its pure
+parts having been extracted during the earlier provider work.
+
+Two other matters in `OPEN.md` are decisions rather than work, and neither has
+been taken: whether the Graphics Interchange Format decode path should keep
+existing when nothing imports it, and whether its two divergences from the
+format are worth correcting if it does.
 
 ### What is already true
 
-Measured at the anchor over code with comments and string literals stripped.
 The core has **zero** references to a platform facility of any kind, which
-`tsconfig.core.json` also refuses to compile.
-
-| Facility | Entry | Platform | Worker | Status |
-|---|---|---|---|---|
-| Document Object Model | 320 | 100 | 0 | The remaining work |
-| Binary payloads | 33 | 7 | 0 | Not a capability, see LAYERING.md |
-| Time and scheduling | 22 | 7 | 2 | Inverted; what is left is animation |
-| Logging | 10 | 2 | 0 | Not a capability, see LAYERING.md |
-| Storage | 0 | 3 | 0 | Inverted, confined by lint |
-| The network | 0 | 3 | 0 | Inverted, confined by lint |
-| Randomness | 0 | 2 | 0 | Resolved without an interface |
+`tsconfig.core.json` refuses to compile. Storage and the network are each
+confined by lint to named adapter files. Nineteen core modules carry what the
+application computes; 520 unit tests reach all of it.
 
 ### Traps specific to this task
 
@@ -158,7 +159,20 @@ a deliberately failing file before being believed.
 
 **Check that two formulas agree before unifying them.** The loop count was
 computed two ways and they turned out to agree, which was established rather
-than assumed, and the agreement is now a test.
+than assumed, and the agreement is now a test. The export frame count was the
+same story, and that one is shown to the user as an estimate before a wait.
+
+**One number can have two meanings.** `0.001` appeared seven times across two
+stages, four times as an end-of-clip margin and three as a seek tolerance. A
+single constant would have tied them together by accident.
+
+**`assert.equal` narrows.** Its `asserts actual is T` signature means a
+defensive `?.` after it is dead, which the lint reports. Assert once, then use
+the value plainly.
+
+**A boundary cannot always be asserted at a realistic magnitude.**
+`3 + 0.001` is not representable, so a tolerance test at three seconds
+measures floating point rather than the function under test.
 
 ## Open matters
 

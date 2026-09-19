@@ -88,6 +88,31 @@ before the refresh is committed, which is commit N minus one once it lands, and
 test it by containment with `git merge-base --is-ancestor` rather than by
 equality.
 
+## Tests
+
+**`assert.equal` narrows.** Its `asserts actual is T` signature means a
+defensive `?.` or `?? []` written after it is dead code, which the lint
+reports as an unnecessary condition. Assert once that a value is present,
+then use it plainly. This was hit four separate times in one session.
+
+**A boundary cannot always be asserted at a realistic magnitude.** A
+tolerance of `0.001` tested at three seconds measures floating point rather
+than the function: `3 + 0.001` is not representable, so the difference comes
+out as 0.0009999999999998899 and falls inside the tolerance. Assert the
+boundary where the arithmetic is exact and record the practical consequence
+separately.
+
+**A test that fails may be the test.** Two did in one session. One asserted a
+clamp the function does not perform, the other the boundary above. Read the
+function before assuming the code is wrong, and if the behaviour is merely
+surprising rather than wrong, pin it as characterisation and say so.
+
+**Check two formulas agree before unifying them.** Twice a quantity was
+computed two different ways in two places. Both times they agreed, and both
+times that was established by testing across the whole permitted range rather
+than by reading. One of the pairs produced an estimate shown to a user before
+a long wait.
+
 ## Working discipline
 
 **Commit each unit as soon as it is clean.** Recovery from a botched scripted
@@ -95,3 +120,7 @@ edit is cheap when the file is committed and expensive when it is not.
 
 **State what was not verified.** Claims of completeness that outrun the
 evidence are worse than a narrower claim, because they are believed.
+
+**Measure a figure before putting it in a commit message.** A line count was
+written from memory into a message and was wrong by eighteen. Commit messages
+are read later as evidence, so a number in one is a claim like any other.

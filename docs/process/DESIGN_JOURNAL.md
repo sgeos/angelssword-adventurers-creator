@@ -221,3 +221,61 @@ against a deliberately failing file before being believed, and two of them
 would otherwise have been reported as working while matching nothing. That
 practice cost about a minute each and is the only reason the claims in
 `LAYERING.md` are worth anything.
+
+## 2026-09-19 — What the extraction actually found
+
+Four increments of moving arithmetic out from under the Document Object Model.
+The tests were the goal, and the duplication was the surprise.
+
+**Five copies. Four copies. Twice. Seven times.** The exporter's placement
+arithmetic existed in five identical copies, each preceded by the same two
+lines of sanitising. The frame selection existed in four, one of them counting
+rather than collecting. The named-colour table existed in two, and the second
+had grown an injection parameter so that the core could be handed the first.
+The constant `0.001` appeared seven times across two stages, serving two
+different purposes.
+
+None of that was visible while the code sat inside event handlers. It becomes
+visible the moment one asks what a function computes, because the answer is
+the same sentence four times over.
+
+**Agreement is not a reason not to unify.** Twice a quantity was computed two
+different ways in two different places, and both times the two agreed. The
+frame count agreed; the loop count agreed. Nothing kept either pair agreeing,
+and one of them produced the estimate a user reads before waiting for an
+export. The unification reads like tidying and is worth the same as a bug fix.
+
+**One number, two meanings, is worse than two numbers.** `0.001` kept a seek
+clear of the end of a clip and separately decided that a player was already
+close enough to skip a seek. A single named constant would have been an
+improvement in appearance and a trap in fact, tying two unrelated quantities
+together so that tuning one silently moved the other.
+
+**Invalid states were representable and nobody had noticed.** Ping-pong and
+reverse were two booleans. Both true meant nothing, and every reader had to
+know which won. One field with three values removed the question.
+
+## 2026-09-19 — On preserving behaviour that is wrong
+
+Five behaviours were preserved rather than corrected in this work, and it is
+worth stating the test that was applied, because the temptation each time was
+to fix it while passing.
+
+A histogram bucket is identified by its floor, so every reconstructed colour
+is biased dark by up to three levels. The placement rounds four values
+independently, so a centring remainder falls on one side. `clampSeekTime`
+applies its lower clamp before its upper, so a sub-millisecond clip yields a
+negative time. `hexToRgb` does not validate and yields NaN. The Graphics
+Interchange Format compositor applies disposal from the wrong frame.
+
+The test applied was whether the commit was moving code or changing it. A
+commit that does both cannot be reviewed, because a reader cannot tell which
+difference in behaviour was intended. So each is preserved, pinned by a test
+that says at its own site that it characterises rather than specifies, and
+where a decision is needed it is recorded in `decisions/OPEN.md` rather than
+taken quietly.
+
+Two of them are genuinely unreachable, the negative seek time and the
+malformed hex, and the temptation there was strongest: nothing could break.
+But an unreachable case fixed silently still teaches the next reader that this
+codebase changes behaviour in refactoring commits.
