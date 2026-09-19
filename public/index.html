@@ -296,6 +296,14 @@
                             </div>
 
                             <div class="form-row">
+                                <label>Provider</label>
+                                <div class="seg-toggle" id="sgProvider">
+                                    <button class="seg-btn active" data-mode="openai" title="Generate with OpenAI. Uses your OpenAI API key.">OpenAI</button>
+                                    <button class="seg-btn" data-mode="xai" title="Generate with Grok. Uses your xAI API key from Settings.">Grok</button>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
                                 <label>Simultaneous Generations</label>
                                 <div class="gen-count" id="sgGenCount">
                                     <button class="gen-count-btn active" data-count="1" title="Generate 1 image">1</button>
@@ -971,6 +979,21 @@
                         <button class="btn btn-sm btn-accent" id="settingsOpenAITest" title="Test the API connection">Test</button>
                     </div>
                     <div id="settingsOpenAIStatus"></div>
+                </div>
+
+                <!-- xAI (Grok) API Key -->
+                <div class="glass-panel">
+                    <div class="panel-title"><span class="title-icon">⚡</span> xAI (Grok) API Key</div>
+                    <div class="panel-subtitle">Optional. Lets Sprite Prep generate through Grok instead of OpenAI. Your key is stored locally and never sent to any third party.</div>
+
+                    <div class="api-key-row">
+                        <div class="input-password">
+                            <input type="password" id="settingsXaiKey" placeholder="xai-..." title="Your xAI API key">
+                            <button class="toggle-vis" id="settingsXaiToggle" title="Show/hide key">👁️</button>
+                        </div>
+                        <button class="btn btn-sm btn-secondary" id="settingsXaiSave" title="Save key to browser storage">Save</button>
+                    </div>
+                    <div id="settingsXaiStatus"></div>
                 </div>
 
                 <!-- Google API Key -->

@@ -17,6 +17,17 @@ import {
 import { base64ToBlob, blobToBase64, colorName, debounce } from "./app-utils.mts";
 import { closestFrom, fieldValue, queryAll, require2d, requireEl } from "./dom.mts";
 import * as Core from "./sprite-prep-core.mts";
+import {
+    PROVIDERS,
+    asProviderId,
+    buildImageRequest,
+    hasCredential,
+    providerFrom,
+    type Provider,
+} from "./providers.mts";
+
+/** Where the chosen provider is remembered between sessions. */
+const PROVIDER_PREFERENCE_KEY = 'sprite_provider';
 import { channel } from "./pixels.mts";
 import { responseErrorMessage } from "./api.mts";
 
@@ -365,9 +376,10 @@ async function generate(): Promise<void> {
         return;
     }
 
-    const apiKey = localStorage.getItem('openai_api_key');
-    if (apiKey === null || apiKey === '') {
-        showToast('No OpenAI API key. Go to Settings to add one.', 'error');
+    const provider = providerFrom(localStorage.getItem(PROVIDER_PREFERENCE_KEY));
+    const apiKey = localStorage.getItem(provider.storageKey);
+    if (!hasCredential(apiKey) || apiKey === null) {
+        showToast(`No ${provider.label} API key. Go to Settings to add one.`, 'error');
         return;
     }
 
@@ -400,7 +412,7 @@ async function generate(): Promise<void> {
         const promises = [];
         for (let i = 0; i < genCount; i++) {
             if (isGenCancelled()) break;
-            promises.push(generateOne(apiKey, promptText, images));
+            promises.push(generateOne(apiKey, promptText, images, provider));
         }
 
         const results = await Promise.allSettled(promises);
@@ -428,8 +440,21 @@ async function generate(): Promise<void> {
     }
 }
 
-async function generateOne(apiKey: string, prompt: string, images: readonly unknown[]): Promise<string | null> {
-    const { endpoint, body } = Core.buildGenerateRequest({ prompt, images });
+async function generateOne(
+    apiKey: string,
+    prompt: string,
+    images: readonly unknown[],
+    provider: Provider = PROVIDERS.openai,
+): Promise<string | null> {
+    // OpenAI keeps its own request shape, which carries a reference image
+    // through /api/edits. Grok has no equivalent, so a reference image is
+    // ignored there and the prompt carries the description alone.
+    const { endpoint, body } = provider.id === 'openai'
+        ? Core.buildGenerateRequest({ prompt, images })
+        : {
+            endpoint: provider.imageRoute,
+            body: buildImageRequest(provider, { prompt, count: 1 }),
+        };
 
     const response = await fetch(endpoint, {
         method: 'POST',
@@ -716,6 +741,22 @@ function initSpritePrep(): void {
     });
 
     // Race mode selector
+    // Provider selector. initModeSelector reports the data-mode of the button
+    // clicked; anything unrecognised is ignored rather than stored.
+    initModeSelector('sgProvider', (mode) => {
+        const chosen = asProviderId(mode);
+        if (chosen === undefined) return;
+        localStorage.setItem(PROVIDER_PREFERENCE_KEY, chosen);
+        showToast(`Generating with ${PROVIDERS[chosen].label}`, 'info');
+    });
+
+    // Reflect the stored preference, so the active button matches what a
+    // generation would actually use.
+    const storedProvider = providerFrom(localStorage.getItem(PROVIDER_PREFERENCE_KEY));
+    for (const btn of queryAll(requireEl('sgProvider', HTMLElement), '.seg-btn', HTMLElement)) {
+        btn.classList.toggle('active', btn.dataset['mode'] === storedProvider.id);
+    }
+
     initModeSelector('sgRaceMode', (mode) => {
         raceMode = mode;
     });

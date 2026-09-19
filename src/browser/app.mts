@@ -6,6 +6,7 @@
  */
 import type { HandoffPayload } from "./video-prep-core.mts";
 import { closestFrom, findEl, queryAll, requireEl } from "./dom.mts";
+import { PROVIDERS } from "./providers.mts";
 
 /**
  * The `error.message` an API returned, if it sent one.
@@ -355,6 +356,35 @@ function initSettings(): void {
             googleStatus.innerHTML = `<div class="status-msg error">❌ ${err instanceof Error ? err.message : 'unknown error'}</div>`;
         }
     }
+
+    // --- xAI (Grok) API Key ---
+    // No Test button. The other two providers have one because they expose a
+    // cheap endpoint to probe; xAI's image endpoint bills on use, so a test
+    // here would cost the user money to learn nothing they will not learn on
+    // their first generation.
+    const xaiInput = requireEl('settingsXaiKey', HTMLInputElement);
+    const xaiToggle = requireEl('settingsXaiToggle', HTMLElement);
+    const xaiSave = requireEl('settingsXaiSave', HTMLElement);
+
+    const savedXai = localStorage.getItem(PROVIDERS.xai.storageKey);
+    if (savedXai !== null && savedXai !== '') xaiInput.value = savedXai;
+
+    xaiToggle.addEventListener('click', () => {
+        const isPassword = xaiInput.type === 'password';
+        xaiInput.type = isPassword ? 'text' : 'password';
+        xaiToggle.textContent = isPassword ? '🙈' : '👁️';
+    });
+
+    xaiSave.addEventListener('click', () => {
+        const key = xaiInput.value.trim();
+        if (key !== '') {
+            localStorage.setItem(PROVIDERS.xai.storageKey, key);
+            showToast('xAI API key saved', 'success');
+        } else {
+            localStorage.removeItem(PROVIDERS.xai.storageKey);
+            showToast('xAI API key removed', 'warning');
+        }
+    });
 
     // --- Notification Sounds ---
     const soundToggle = requireEl('settingsSoundEnabled', HTMLInputElement);

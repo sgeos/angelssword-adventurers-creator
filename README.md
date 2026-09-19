@@ -163,6 +163,18 @@ The exported WebM files also work with any OBS browser source, PNGtuber app, or 
   needs 23.6 for the same reason.
 - **Browser:** Chrome, Edge, or Firefox (opens automatically)
 - **Internet:** Required only for AI generation steps (Steps 1-2). Steps 3-4 work fully offline.
+
+### Generation providers
+
+Sprite generation runs through OpenAI or through Grok, selected in the AI
+Generate panel. Each uses its own key, entered in Settings and held in browser
+storage.
+
+A key may instead be supplied to the server through the `OPENAI_API_KEY`,
+`GOOGLE_API_KEY`, or `XAI_API_KEY` environment variables, which lets one
+person run the tool for others without each of them holding a key. A key sent
+from the browser takes precedence, so an environment key is a fallback rather
+than an override.
 - **Disk Space:** ~40 MB for the application
 
 ### Building a standalone binary

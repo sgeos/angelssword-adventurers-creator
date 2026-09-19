@@ -33,6 +33,31 @@ const errorMessage = (err: unknown): string =>
 const singleString = (value: unknown): string | undefined =>
   typeof value === "string" && value.length > 0 ? value : undefined;
 
+/**
+ * Resolve the credential for an upstream call.
+ *
+ * A request header wins, so that a key held only in the browser never has to
+ * reach the server's environment. An environment variable is the fallback,
+ * which is what lets an operator run the tool for others without each of them
+ * holding a key. Reimplemented from upstream pull request 1, which introduced
+ * the environment path for container deployments.
+ *
+ * The header is checked with singleString, so a repeated header yields
+ * undefined and a 401 rather than an array reaching string operations.
+ */
+const resolveAuth = (
+  header: unknown,
+  envVar: string | undefined,
+): string | undefined => {
+  const fromHeader = singleString(header);
+  if (fromHeader !== undefined) return fromHeader;
+  const fromEnv = singleString(envVar);
+  return fromEnv === undefined ? undefined : `Bearer ${fromEnv}`;
+};
+
+/** xAI's public API base. Requests reach it only through this proxy. */
+const XAI_API_BASE = "https://api.x.ai/v1";
+
 /** Clamp an environment port to something `listen` will accept. */
 const parsePort = (raw: string | undefined): number => {
   if (raw === undefined) return 3001;
@@ -271,6 +296,49 @@ app.post(
       await relay(res, upstream);
     } catch (err) {
       console.error("  [ERROR] Chat proxy failed:", errorMessage(err));
+      res.status(502).json({ error: `Proxy error: ${errorMessage(err)}` });
+    }
+  }),
+);
+
+// ── xAI ──────────────────────────────────────────────────────────────
+
+/**
+ * Grok image generation.
+ *
+ * Reimplemented from upstream pull request 1 by @Manya3084. The body is
+ * forwarded unchanged, because the caller builds it through
+ * `buildImageRequest` in src/browser/providers.mts, which knows that xAI
+ * rejects a request carrying a `size`.
+ *
+ * Authentication is a bearer key, from the request header or from XAI_API_KEY.
+ * Pull request 1 also offered an OAuth device-code flow that presented as
+ * xAI's own command line client, using its client identifier, its
+ * `grok-cli:access` scope, and `x-grok-client-surface: cli` headers. That path
+ * is deliberately not reimplemented here. It obtains subscription access
+ * through a client identity belonging to someone else, and the account it puts
+ * at risk is the user's.
+ */
+app.post(
+  "/api/xai/images/generations",
+  route(async (req, res) => {
+    const authHeader = resolveAuth(req.headers.authorization, process.env["XAI_API_KEY"]);
+    if (authHeader === undefined) {
+      res.status(401).json({ error: "No xAI API key provided" });
+      return;
+    }
+    try {
+      console.log("  [PROXY] POST /api/xai/images/generations → xAI /v1/images/generations");
+      const upstream = await fetchImpl(`${XAI_API_BASE}/images/generations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: authHeader },
+        body: JSON.stringify(req.body),
+        timeout: 300_000,
+      });
+      console.log(`  [PROXY] xAI /v1/images/generations → ${upstream.status.toString()}`);
+      await relay(res, upstream);
+    } catch (err) {
+      console.error("  [ERROR] xAI image proxy failed:", errorMessage(err));
       res.status(502).json({ error: `Proxy error: ${errorMessage(err)}` });
     }
   }),

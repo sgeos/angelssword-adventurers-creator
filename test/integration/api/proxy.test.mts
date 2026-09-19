@@ -283,4 +283,104 @@ describe('AS Adventurer API characterization', () => {
         assert.ok(typeof res.text === 'string' && res.text.length > 0);
         assert.match(res.text, /<!DOCTYPE html>|<html/i);
     });
+
+    // --- xAI / Grok image generation ---
+
+    it('POST /api/xai/images/generations forwards to xAI with the bearer key', async () => {
+        mockFetchResponse(200, { data: [{ url: 'https://x.ai/img.png' }] });
+
+        const res = await request(app)
+            .post('/api/xai/images/generations')
+            .set('Authorization', 'Bearer xai-test')
+            .send({ prompt: 'a knight', n: 1, model: 'grok-2-image' });
+
+        assert.equal(res.status, 200);
+        assert.equal(callAt().url, 'https://api.x.ai/v1/images/generations');
+        assert.equal(callAt().method, 'POST');
+        assert.equal(callAt().headers['Authorization'], 'Bearer xai-test');
+        assert.deepEqual(JSON.parse(callBodyText()), { prompt: 'a knight', n: 1, model: 'grok-2-image' });
+    });
+
+    it('POST /api/xai/images/generations rejects with 401 when no key is available', async () => {
+        const res = await request(app)
+            .post('/api/xai/images/generations')
+            .send({ prompt: 'x', n: 1 });
+
+        assert.equal(res.status, 401);
+        assert.equal(wasFetchCalled(), false, 'no upstream call without a key');
+    });
+
+    it('POST /api/xai/images/generations passes an upstream non-2xx through unchanged', async () => {
+        mockFetchResponse(422, { error: 'size is not supported' });
+
+        const res = await request(app)
+            .post('/api/xai/images/generations')
+            .set('Authorization', 'Bearer xai-test')
+            .send({ prompt: 'x', n: 1, size: '1024x1024' });
+
+        assert.equal(res.status, 422);
+        assert.match(res.text, /size is not supported/);
+    });
+
+    it('POST /api/xai/images/generations answers 502 when the upstream call rejects', async () => {
+        mockFetchReject('network down');
+
+        const res = await request(app)
+            .post('/api/xai/images/generations')
+            .set('Authorization', 'Bearer xai-test')
+            .send({ prompt: 'x', n: 1 });
+
+        assert.equal(res.status, 502);
+        assert.match(errorText(res.body), /^Proxy error:/);
+    });
+
+    it('POST /api/xai/images/generations rejects a repeated Authorization header', async () => {
+        // A repeated header arrives as an array. Reaching a string operation
+        // with one is the defect that crashes the Gemini routes upstream.
+        const res = await request(app)
+            .post('/api/xai/images/generations')
+            .set('Authorization', 'Bearer a')
+            .set('Authorization', 'Bearer b')
+            .send({ prompt: 'x', n: 1 });
+
+        assert.ok(res.status === 401 || res.status === 200, `unexpected ${res.status.toString()}`);
+        assert.notEqual(res.status, 502, 'must not crash into a 502');
+    });
+
+    it('POST /api/xai/images/generations falls back to XAI_API_KEY when no header is sent', async () => {
+        // The environment path is what lets an operator run the tool for
+        // others without each of them holding a key. Upstream pull request 1
+        // introduced it for container deployments.
+        const previous = process.env['XAI_API_KEY'];
+        process.env['XAI_API_KEY'] = 'env-key';
+        try {
+            mockFetchResponse(200, { data: [] });
+            const res = await request(app)
+                .post('/api/xai/images/generations')
+                .send({ prompt: 'x', n: 1 });
+
+            assert.equal(res.status, 200);
+            assert.equal(callAt().headers['Authorization'], 'Bearer env-key');
+        } finally {
+            if (previous === undefined) delete process.env['XAI_API_KEY'];
+            else process.env['XAI_API_KEY'] = previous;
+        }
+    });
+
+    it('prefers a request header over XAI_API_KEY, so a browser key never needs the environment', async () => {
+        const previous = process.env['XAI_API_KEY'];
+        process.env['XAI_API_KEY'] = 'env-key';
+        try {
+            mockFetchResponse(200, { data: [] });
+            await request(app)
+                .post('/api/xai/images/generations')
+                .set('Authorization', 'Bearer header-key')
+                .send({ prompt: 'x', n: 1 });
+
+            assert.equal(callAt().headers['Authorization'], 'Bearer header-key');
+        } finally {
+            if (previous === undefined) delete process.env['XAI_API_KEY'];
+            else process.env['XAI_API_KEY'] = previous;
+        }
+    });
 });
