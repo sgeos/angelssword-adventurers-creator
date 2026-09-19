@@ -5,7 +5,7 @@ import {
     PROVIDER_ORDER,
     asProviderId,
     buildImageRequest,
-    hasCredential,
+    credentialFrom,
     providerFrom,
 } from '../../src/core/providers.mts';
 
@@ -29,7 +29,7 @@ describe('providerFrom', () => {
     });
 
     it('falls back to OpenAI for absent or unusable values', () => {
-        assert.equal(providerFrom(null).id, 'openai');
+        assert.equal(providerFrom(undefined).id, 'openai');
         assert.equal(providerFrom('').id, 'openai');
         assert.equal(providerFrom('nonsense').id, 'openai');
     });
@@ -93,15 +93,19 @@ describe('buildImageRequest', () => {
     });
 });
 
-describe('hasCredential', () => {
-    it('accepts a non-blank value', () => {
-        assert.equal(hasCredential('sk-test'), true);
+describe('credentialFrom', () => {
+    it('returns a non-blank value unchanged, rather than reporting a boolean', () => {
+        assert.equal(credentialFrom('sk-test'), 'sk-test');
+    });
+
+    it('returns the value as stored, without trimming what is sent upstream', () => {
+        assert.equal(credentialFrom(' sk-test '), ' sk-test ');
     });
 
     it('rejects absent, empty and whitespace-only values', () => {
-        assert.equal(hasCredential(null), false);
-        assert.equal(hasCredential(''), false);
-        assert.equal(hasCredential('   '), false);
-        assert.equal(hasCredential('\t\n'), false);
+        assert.equal(credentialFrom(undefined), undefined);
+        assert.equal(credentialFrom(''), undefined);
+        assert.equal(credentialFrom('   '), undefined);
+        assert.equal(credentialFrom('\t\n'), undefined);
     });
 });

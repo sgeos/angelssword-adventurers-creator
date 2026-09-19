@@ -1,3 +1,4 @@
+import type { KeyValueStore } from "./ports/storage.mts";
 import { channel, type RgbaBuffer } from "./pixels.mts";
 
 /**
@@ -157,7 +158,7 @@ export type ExportFormat = 'gif' | 'webm';
 export const positiveOr = (value: number, fallback: number): number =>
     Number.isFinite(value) && value > 0 ? value : fallback;
 
-/** localStorage key holding the slider positions between sessions. */
+/** Storage key holding the slider positions between sessions. */
 export const SLIDER_STORAGE_KEY = 'ex_slider_values';
 
 /**
@@ -200,7 +201,7 @@ export const storedBoolean = (raw: unknown): boolean | undefined =>
 
 /**
  * Parse the stored slider positions, or undefined when the entry is absent,
- * malformed, or not an object. localStorage is writable by anything running on
+ * malformed, or not an object. The store is writable by anything running on
  * the origin, so nothing read back is trusted; every field is checked.
  */
 export const parsePersistedSliders = (raw: string): PersistedSliders | undefined => {
@@ -224,6 +225,25 @@ export const parsePersistedSliders = (raw: string): PersistedSliders | undefined
         antiAlias: storedBoolean(source['antiAlias']),
         smokeCleanup: storedBoolean(source['smokeCleanup']),
     };
+};
+
+/**
+ * Slider positions as stored, or undefined when nothing usable is there.
+ *
+ * Absence, an empty entry, malformed text, and a value that is not an object
+ * all reach the same answer, because a caller can do nothing different with
+ * any of them. The four cases were spelled out at the call site before the
+ * storage capability existed.
+ */
+export const loadPersistedSliders = (store: KeyValueStore): PersistedSliders | undefined => {
+    const raw = store.read(SLIDER_STORAGE_KEY);
+    if (raw === undefined || raw === '') return undefined;
+    return parsePersistedSliders(raw);
+};
+
+/** Store slider positions. */
+export const savePersistedSliders = (store: KeyValueStore, sliders: PersistedSliders): void => {
+    store.write(SLIDER_STORAGE_KEY, JSON.stringify(sliders));
 };
 
 /* ────────────────────────────────────────────────────────────────────────

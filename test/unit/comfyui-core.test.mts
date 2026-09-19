@@ -251,7 +251,7 @@ describe('asWorkflowKind', () => {
 describe('parseComfySettings', () => {
     it('returns the defaults for absent or unusable storage', () => {
         // localStorage is writable by anything on the origin.
-        for (const bad of [null, '', '{', 'null', '[]', '"text"', '42']) {
+        for (const bad of [undefined, '', '{', 'null', '[]', '"text"', '42']) {
             assert.deepEqual(parseComfySettings(bad), COMFY_DEFAULTS, JSON.stringify(bad));
         }
     });
@@ -409,7 +409,7 @@ describe('buildWanI2VWorkflow', () => {
 
 describe('parseWanSettings', () => {
     it('returns the defaults for absent or unusable storage', () => {
-        for (const bad of [null, '', '{', '[]', '"x"']) {
+        for (const bad of [undefined, '', '{', '[]', '"x"']) {
             assert.deepEqual(parseWanSettings(bad), WAN_DEFAULTS, JSON.stringify(bad));
         }
     });

@@ -67,10 +67,17 @@ returns the narrowed value or `undefined`.
 **Pure logic belongs in the core.** If it needs no platform, it goes in
 `src/core/`, which compiles without the Document Object Model and without the
 node types, and where a test can reach it. A capability the core genuinely
-needs becomes an interface the platform implements, never an import. The
-compiler enforces the first half of that and `eslint.config.mjs` bans the
-three ECMAScript facilities it cannot, namely `Math.random`, `Date.now`, and
-`new Date`.
+needs becomes an interface in `src/core/ports/` that the platform implements,
+never an import. The compiler enforces the first half of that and
+`eslint.config.mjs` bans the three ECMAScript facilities it cannot, namely
+`Math.random`, `Date.now`, and `new Date`.
+
+**A capability gets one adapter, and lint names it.** `localStorage` is
+reachable only from `src/platform-browser/local-storage.mts`. A second reach
+for a capability that already has an adapter has to be argued for.
+
+**Nothing imports an entry point.** `src/entry-browser/` is the top of the
+graph. Shared code belongs in the platform layer or the core.
 
 **Verification is by exit code**, and a claim states what was not covered. See
 [`docs/process/VERIFICATION.md`](./docs/process/VERIFICATION.md).

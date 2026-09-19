@@ -18,22 +18,23 @@ import { base64ToBlob } from "../platform-browser/app-utils.mts";
 import { reasonText, responseErrorMessage } from "../core/api.mts";
 import { closestFrom, findEl, queryAll, require2d, requireEl } from "../platform-browser/dom.mts";
 import {
-    COMFY_SETTINGS_KEY,
-    WAN_SETTINGS_KEY,
     buildWanI2VWorkflow,
     computeLetterbox,
     extractHistoryImages,
     extractPromptId,
-    parseComfySettings,
-    parseWanSettings,
+    loadComfySettings,
+    loadWanSettings,
     viewQuery,
 } from "../core/comfyui-core.mts";
 import * as VideoGenCore from "../core/video-gen-core.mts";
 import {
     VIDEO_PROVIDERS,
     asVideoProviderId,
-    videoProviderFrom,
+    loadCredential,
+    loadVideoProvider,
+    saveVideoProvider,
 } from "../core/providers.mts";
+import { browserStore } from "../platform-browser/local-storage.mts";
 import {
     MAX_POLL_ATTEMPTS,
     POLL_INTERVAL_MS,
@@ -43,9 +44,6 @@ import {
     extractRequestId,
     throttleBackoffMs,
 } from "../core/grok-video-core.mts";
-
-/** Where the chosen video provider is remembered between sessions. */
-const VIDEO_PROVIDER_PREFERENCE_KEY = 'video_provider';
 
 /** Wan renders slowly, so this polls less often and waits far longer. */
 const WAN_POLL_INTERVAL_MS = 3_000;
@@ -144,19 +142,19 @@ function loadReferenceFiles(files: FileList): void {
 async function generateVideo(): Promise<void> {
     if (generating) return;
 
-    const provider = videoProviderFrom(localStorage.getItem(VIDEO_PROVIDER_PREFERENCE_KEY));
+    const provider = loadVideoProvider(browserStore);
 
     // ComfyUI runs on the user's own machine and holds no credential, so what
     // can be missing is its address rather than a key.
     let apiKey = '';
     if (provider.id === 'comfyui') {
-        if (parseComfySettings(localStorage.getItem(COMFY_SETTINGS_KEY)).url === '') {
+        if (loadComfySettings(browserStore).url === '') {
             showToast('No ComfyUI address. Go to Settings to add one.', 'error');
             return;
         }
     } else {
-        const stored = localStorage.getItem(provider.storageKey);
-        if (stored === null || stored === '') {
+        const stored = loadCredential(browserStore, provider);
+        if (stored === undefined) {
             showToast(`No ${provider.label} API key. Go to Settings to add one.`, 'error');
             return;
         }
@@ -282,7 +280,7 @@ async function letterboxForWan(dataUrl: string, width: number, height: number): 
 
 /** One call through the local ComfyUI proxy. */
 async function comfyCall(path: string, method: string, body?: unknown): Promise<Response> {
-    const baseUrl = parseComfySettings(localStorage.getItem(COMFY_SETTINGS_KEY)).url;
+    const baseUrl = loadComfySettings(browserStore).url;
     return fetch(VIDEO_PROVIDERS.comfyui.generateRoute, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -300,7 +298,7 @@ async function generateOneWanVideo(prompt: string): Promise<GeneratedVideo | nul
     const reference = referenceImages[0];
     if (reference === undefined) throw new Error('ComfyUI video needs a reference image');
 
-    const wan = parseWanSettings(localStorage.getItem(WAN_SETTINGS_KEY));
+    const wan = loadWanSettings(browserStore);
     const framed = await letterboxForWan(reference.dataUrl, wan.width, wan.height);
 
     const uploaded = await comfyCall('/upload/image', 'POST', {
@@ -633,13 +631,13 @@ function initVideoGen(): void {
     initModeSelector('vgProvider', (mode) => {
         const chosen = asVideoProviderId(mode);
         if (chosen === undefined) return;
-        localStorage.setItem(VIDEO_PROVIDER_PREFERENCE_KEY, chosen);
+        saveVideoProvider(browserStore, chosen);
         showToast(`Generating with ${VIDEO_PROVIDERS[chosen].label}`, 'info');
     });
 
     // Reflect the stored preference, so the active button matches what a
     // generation would actually use.
-    const storedVideoProvider = videoProviderFrom(localStorage.getItem(VIDEO_PROVIDER_PREFERENCE_KEY));
+    const storedVideoProvider = loadVideoProvider(browserStore);
     for (const btn of queryAll(requireEl('vgProvider', HTMLElement), '.seg-btn', HTMLElement)) {
         btn.classList.toggle('active', btn.dataset['mode'] === storedVideoProvider.id);
     }

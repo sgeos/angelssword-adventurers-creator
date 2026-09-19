@@ -15,6 +15,7 @@
  * posts the result through the local proxy.
  */
 
+import type { KeyValueStore } from "./ports/storage.mts";
 import { formUrlEncode } from "./urlencode.mts";
 
 /** One node in a ComfyUI prompt graph. */
@@ -445,11 +446,11 @@ const asNumber = (value: unknown, fallback: number, min: number, max: number): n
 
 /**
  * Read settings from a stored string, filling anything absent or unusable
- * from the defaults. localStorage is writable by anything on the origin, so
+ * from the defaults. The store is writable by anything on the origin, so
  * nothing read back is trusted.
  */
-export const parseComfySettings = (raw: string | null): ComfySettings => {
-  if (raw === null || raw === "") return COMFY_DEFAULTS;
+export const parseComfySettings = (raw: string | undefined): ComfySettings => {
+  if (raw === undefined || raw === "") return COMFY_DEFAULTS;
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -571,8 +572,8 @@ export const WAN_NEGATIVE_PROMPT: string =
   + "camera move, zoom, pan, cropped head, cropped feet, head cut off, "
   + "feet cut off, close-up, upper body only, out of frame";
 
-export const parseWanSettings = (raw: string | null): WanSettings => {
-  if (raw === null || raw === "") return WAN_DEFAULTS;
+export const parseWanSettings = (raw: string | undefined): WanSettings => {
+  if (raw === undefined || raw === "") return WAN_DEFAULTS;
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -753,4 +754,30 @@ export const computeLetterbox = (
     offsetX: Math.floor((tw - drawWidth) / 2),
     offsetY: Math.floor((th - drawHeight) / 2),
   };
+};
+
+/* ────────────────────────────────────────────────────────────────────────
+ * Settings through the storage capability.
+ *
+ * The parsers above take a string because that is what they parse. These
+ * take a store because that is what a caller has, and they were the shape
+ * every call site wrote out by hand before the capability existed.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/** ComfyUI settings as stored, or the defaults. */
+export const loadComfySettings = (store: KeyValueStore): ComfySettings =>
+  parseComfySettings(store.read(COMFY_SETTINGS_KEY));
+
+/** Store ComfyUI settings. */
+export const saveComfySettings = (store: KeyValueStore, settings: ComfySettings): void => {
+  store.write(COMFY_SETTINGS_KEY, JSON.stringify(settings));
+};
+
+/** Wan settings as stored, or the defaults. */
+export const loadWanSettings = (store: KeyValueStore): WanSettings =>
+  parseWanSettings(store.read(WAN_SETTINGS_KEY));
+
+/** Store Wan settings. */
+export const saveWanSettings = (store: KeyValueStore, settings: WanSettings): void => {
+  store.write(WAN_SETTINGS_KEY, JSON.stringify(settings));
 };

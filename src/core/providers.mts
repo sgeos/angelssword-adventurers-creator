@@ -13,6 +13,8 @@
  */
 
 /** Providers the sprite stage can generate through. */
+import type { KeyValueStore } from "./ports/storage.mts";
+
 export type ProviderId = "openai" | "xai" | "comfyui";
 
 /** How a provider authenticates, which decides what the settings pane asks for. */
@@ -31,7 +33,7 @@ export interface Provider {
   readonly label: string;
   /** Proxy route on the local server, never the upstream address. */
   readonly imageRoute: string;
-  /** localStorage key holding the user's credential. */
+  /** Storage key holding the user's credential. */
   readonly storageKey: string;
   readonly authKind: AuthKind;
   /** Default model, overridable per request. */
@@ -82,15 +84,33 @@ export const PROVIDER_ORDER: readonly ProviderId[] = ["openai", "xai", "comfyui"
  *
  * Returns the narrowed value rather than a boolean, because the lint
  * configuration bans type predicates. The value arrives from a data attribute
- * or from localStorage, so neither source constrains it.
+ * or from the store, so neither source constrains it.
  */
 export const asProviderId = (value: string): ProviderId | undefined =>
   value === "openai" || value === "xai" || value === "comfyui" ? value : undefined;
 
 /** The provider a stored preference names, falling back to OpenAI. */
-export const providerFrom = (stored: string | null): Provider => {
-  const id = stored === null ? undefined : asProviderId(stored);
+export const providerFrom = (stored: string | undefined): Provider => {
+  const id = stored === undefined ? undefined : asProviderId(stored);
   return PROVIDERS[id ?? "openai"];
+};
+
+/**
+ * Storage key holding the sprite provider preference.
+ *
+ * It lived in the sprite stage until the storage capability existed. A key
+ * under which the core writes is the core's own business; which store it is
+ * written to is not.
+ */
+export const PROVIDER_PREFERENCE_KEY = "sprite_provider";
+
+/** The sprite provider the user last chose, or the default. */
+export const loadProvider = (store: KeyValueStore): Provider =>
+  providerFrom(store.read(PROVIDER_PREFERENCE_KEY));
+
+/** Remember the sprite provider the user chose. */
+export const saveProvider = (store: KeyValueStore, id: ProviderId): void => {
+  store.write(PROVIDER_PREFERENCE_KEY, id);
 };
 
 /** Request body for an image generation, in the shape each provider expects. */
@@ -122,8 +142,46 @@ export const buildImageRequest = (
 };
 
 /** Whether a credential looks usable, without asserting it is valid. */
-export const hasCredential = (value: string | null): boolean =>
-  value !== null && value.trim().length > 0;
+/**
+ * The credential a stored value holds, or undefined when it holds none.
+ *
+ * This replaced a `hasCredential` predicate returning a boolean. The
+ * predicate did not narrow, so its one caller had to re-check for absence
+ * immediately afterwards, which is the shape the repository's narrowing
+ * convention exists to prevent.
+ *
+ * The value is returned as stored rather than trimmed. Trimming here would
+ * change what is sent upstream, and no caller trimmed before.
+ *
+ * One behaviour changed when this replaced two different checks. The sprite
+ * stage rejected a blank credential and the video stage rejected only an
+ * empty one, so a credential of spaces alone was refused in one place and
+ * sent in the other. Both now refuse it.
+ */
+export const credentialFrom = (value: string | undefined): string | undefined =>
+  value !== undefined && value.trim().length > 0 ? value : undefined;
+
+/** The credential stored for a provider, or undefined when there is none. */
+export const loadCredential = (
+  store: KeyValueStore,
+  provider: Pick<Provider, "storageKey">,
+): string | undefined => credentialFrom(store.read(provider.storageKey));
+
+/**
+ * Store a credential, or remove it when the value is blank.
+ *
+ * Writing a blank string would leave a key present and useless, which reads
+ * back as a configured provider with an unusable credential. Removing is what
+ * the settings panel already did by hand at three sites.
+ */
+export const saveCredential = (
+  store: KeyValueStore,
+  provider: Pick<Provider, "storageKey">,
+  value: string,
+): void => {
+  if (credentialFrom(value) === undefined) store.remove(provider.storageKey);
+  else store.write(provider.storageKey, value);
+};
 
 /* ────────────────────────────────────────────────────────────────────────
  * Video providers.
@@ -141,7 +199,7 @@ export interface VideoProvider {
   readonly label: string;
   /** Proxy route that starts a generation. */
   readonly generateRoute: string;
-  /** localStorage key holding the credential. */
+  /** Storage key holding the credential. */
   readonly storageKey: string;
   /**
    * Whether the provider answers immediately or must be polled. Google
@@ -187,7 +245,19 @@ export const asVideoProviderId = (value: string): VideoProviderId | undefined =>
   value === "google" || value === "xai" || value === "comfyui" ? value : undefined;
 
 /** The video provider a stored preference names, falling back to Gemini. */
-export const videoProviderFrom = (stored: string | null): VideoProvider => {
-  const id = stored === null ? undefined : asVideoProviderId(stored);
+export const videoProviderFrom = (stored: string | undefined): VideoProvider => {
+  const id = stored === undefined ? undefined : asVideoProviderId(stored);
   return VIDEO_PROVIDERS[id ?? "google"];
+};
+
+/** Storage key holding the video provider preference. */
+export const VIDEO_PROVIDER_PREFERENCE_KEY = "video_provider";
+
+/** The video provider the user last chose, or the default. */
+export const loadVideoProvider = (store: KeyValueStore): VideoProvider =>
+  videoProviderFrom(store.read(VIDEO_PROVIDER_PREFERENCE_KEY));
+
+/** Remember the video provider the user chose. */
+export const saveVideoProvider = (store: KeyValueStore, id: VideoProviderId): void => {
+  store.write(VIDEO_PROVIDER_PREFERENCE_KEY, id);
 };

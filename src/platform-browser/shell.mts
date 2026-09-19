@@ -6,14 +6,22 @@
  */
 import type { HandoffPayload } from "../core/video-prep-core.mts";
 import { closestFrom, findEl, queryAll, requireEl } from "./dom.mts";
-import { PROVIDERS } from "../core/providers.mts";
+import { browserStore } from "./local-storage.mts";
+import { PROVIDERS, VIDEO_PROVIDERS, loadCredential, saveCredential } from "../core/providers.mts";
+import {
+    loadCharacterName,
+    loadSoundEnabled,
+    saveSoundEnabled,
+} from "../core/preferences.mts";
 import {
     COMFY_DEFAULTS,
-    COMFY_SETTINGS_KEY,
-    WAN_SETTINGS_KEY,
     asWorkflowKind,
     parseComfySettings,
     parseWanSettings,
+    loadComfySettings,
+    loadWanSettings,
+    saveComfySettings,
+    saveWanSettings,
     type ComfySettings,
     type WanSettings,
     type WorkflowKind,
@@ -85,7 +93,7 @@ export const ASAdventurer: AppState = {
 class NotificationSound {
     private audioContext: AudioContext | null = null;
     private readonly buffers: Record<string, AudioBuffer> = {};
-    enabled: boolean = localStorage.getItem('as_sound_enabled') !== 'false';
+    enabled: boolean = loadSoundEnabled(browserStore);
     private readonly clips: readonly string[] = ['quest_complete_2.mp3', 'quest_complete_10.mp3'];
 
     constructor() {
@@ -159,7 +167,7 @@ class NotificationSound {
 
     setEnabled(val: boolean): void {
         this.enabled = val;
-        localStorage.setItem('as_sound_enabled', String(val));
+        saveSoundEnabled(browserStore, val);
     }
 }
 
@@ -250,8 +258,8 @@ export function initSettings(): void {
     const openaiStatus = requireEl('settingsOpenAIStatus', HTMLElement);
 
     // Load saved key
-    const savedOpenAI = localStorage.getItem('openai_api_key');
-    if (savedOpenAI !== null && savedOpenAI !== '') openaiInput.value = savedOpenAI;
+    const savedOpenAI = loadCredential(browserStore, PROVIDERS.openai);
+    if (savedOpenAI !== undefined) openaiInput.value = savedOpenAI;
 
     // Show/hide toggle
     openaiToggle.addEventListener('click', () => {
@@ -263,13 +271,9 @@ export function initSettings(): void {
     // Save
     openaiSave.addEventListener('click', () => {
         const key = openaiInput.value.trim();
-        if (key !== '') {
-            localStorage.setItem('openai_api_key', key);
-            showToast('OpenAI API key saved', 'success');
-        } else {
-            localStorage.removeItem('openai_api_key');
-            showToast('OpenAI API key removed', 'warning');
-        }
+        saveCredential(browserStore, PROVIDERS.openai, key);
+        if (key !== '') showToast('OpenAI API key saved', 'success');
+        else showToast('OpenAI API key removed', 'warning');
     });
 
     // Test connection
@@ -300,7 +304,7 @@ export function initSettings(): void {
             if (resp.ok) {
                 openaiStatus.innerHTML = '<div class="status-msg success">✅ Connection successful!</div>';
                 // Auto-save on successful test
-                localStorage.setItem('openai_api_key', key);
+                saveCredential(browserStore, PROVIDERS.openai, key);
             } else {
                 const data: unknown = await resp.json().catch(() => ({}));
                 const msg = apiErrorMessage(data) ?? `HTTP ${resp.status.toString()}`;
@@ -319,8 +323,8 @@ export function initSettings(): void {
     const googleStatus = requireEl('settingsGoogleStatus', HTMLElement);
 
     // Load saved key
-    const savedGoogle = localStorage.getItem('google_api_key');
-    if (savedGoogle !== null && savedGoogle !== '') googleInput.value = savedGoogle;
+    const savedGoogle = loadCredential(browserStore, VIDEO_PROVIDERS.google);
+    if (savedGoogle !== undefined) googleInput.value = savedGoogle;
 
     // Show/hide toggle
     googleToggle.addEventListener('click', () => {
@@ -332,13 +336,9 @@ export function initSettings(): void {
     // Save
     googleSave.addEventListener('click', () => {
         const key = googleInput.value.trim();
-        if (key !== '') {
-            localStorage.setItem('google_api_key', key);
-            showToast('Google API key saved', 'success');
-        } else {
-            localStorage.removeItem('google_api_key');
-            showToast('Google API key removed', 'warning');
-        }
+        saveCredential(browserStore, VIDEO_PROVIDERS.google, key);
+        if (key !== '') showToast('Google API key saved', 'success');
+        else showToast('Google API key removed', 'warning');
     });
 
     // Test connection
@@ -357,7 +357,7 @@ export function initSettings(): void {
             const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
             if (resp.ok) {
                 googleStatus.innerHTML = '<div class="status-msg success">✅ Connection successful!</div>';
-                localStorage.setItem('google_api_key', key);
+                saveCredential(browserStore, VIDEO_PROVIDERS.google, key);
             } else {
                 const data: unknown = await resp.json().catch(() => ({}));
                 const msg = apiErrorMessage(data) ?? `HTTP ${resp.status.toString()}`;
@@ -377,8 +377,8 @@ export function initSettings(): void {
     const xaiToggle = requireEl('settingsXaiToggle', HTMLElement);
     const xaiSave = requireEl('settingsXaiSave', HTMLElement);
 
-    const savedXai = localStorage.getItem(PROVIDERS.xai.storageKey);
-    if (savedXai !== null && savedXai !== '') xaiInput.value = savedXai;
+    const savedXai = loadCredential(browserStore, PROVIDERS.xai);
+    if (savedXai !== undefined) xaiInput.value = savedXai;
 
     xaiToggle.addEventListener('click', () => {
         const isPassword = xaiInput.type === 'password';
@@ -388,13 +388,9 @@ export function initSettings(): void {
 
     xaiSave.addEventListener('click', () => {
         const key = xaiInput.value.trim();
-        if (key !== '') {
-            localStorage.setItem(PROVIDERS.xai.storageKey, key);
-            showToast('xAI API key saved', 'success');
-        } else {
-            localStorage.removeItem(PROVIDERS.xai.storageKey);
-            showToast('xAI API key removed', 'warning');
-        }
+        saveCredential(browserStore, PROVIDERS.xai, key);
+        if (key !== '') showToast('xAI API key saved', 'success');
+        else showToast('xAI API key removed', 'warning');
     });
 
     // --- ComfyUI (local) ---
@@ -423,7 +419,7 @@ export function initSettings(): void {
         }
     };
 
-    const loaded = parseComfySettings(localStorage.getItem(COMFY_SETTINGS_KEY));
+    const loaded = loadComfySettings(browserStore);
     comfyUrl.value = loaded.url;
     comfyModel.value = loaded.model;
     comfyClip.value = loaded.clipName;
@@ -468,7 +464,7 @@ export function initSettings(): void {
     const wanFramesVal = requireEl('settingsWanFramesVal', HTMLElement);
     const wanGguf = requireEl('settingsWanGguf', HTMLInputElement);
 
-    const loadedWan = parseWanSettings(localStorage.getItem(WAN_SETTINGS_KEY));
+    const loadedWan = loadWanSettings(browserStore);
     wanUnet.value = loadedWan.unet;
     wanVae.value = loadedWan.vae;
     wanEncoder.value = loadedWan.textEncoder;
@@ -493,8 +489,8 @@ export function initSettings(): void {
     }));
 
     requireEl('settingsComfySave', HTMLElement).addEventListener('click', () => {
-        localStorage.setItem(COMFY_SETTINGS_KEY, JSON.stringify(readComfySettings()));
-        localStorage.setItem(WAN_SETTINGS_KEY, JSON.stringify(readWanSettings()));
+        saveComfySettings(browserStore, readComfySettings());
+        saveWanSettings(browserStore, readWanSettings());
         showToast('ComfyUI settings saved', 'success');
     });
 
@@ -779,8 +775,8 @@ export function initCharNameSync(): void {
     }
 
     // Load saved name
-    const saved = localStorage.getItem('as_char_name');
-    if (saved !== null && saved !== '') {
+    const saved = loadCharacterName(browserStore);
+    if (saved !== '') {
         ASAdventurer.characterName = saved;
         for (const id of inputs) {
             const el = findEl(id, HTMLInputElement);

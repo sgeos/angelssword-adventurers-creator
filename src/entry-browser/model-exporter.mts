@@ -26,10 +26,10 @@ import {
     formatBytes,
     getOutputFrameCount,
     sanitizeFilename,
-    SLIDER_STORAGE_KEY,
     asPreviewMode,
-    parsePersistedSliders,
+    loadPersistedSliders,
     positiveOr,
+    savePersistedSliders,
     storedNumber,
     type CropRatio,
     type ExportFormat,
@@ -38,6 +38,7 @@ import {
     type PreviewMode,
 } from "../core/exporter-math.mts";
 import { ColorQuantizer } from "../core/gif-codec.mts";
+import { browserStore } from "../platform-browser/local-storage.mts";
 import type { EncodeRequest, EncodeResponse, WorkerFrame } from "../core/gif-worker-core.mts";
 import type { TimerCommand } from "../platform-worker/timer-worker.mts";
 
@@ -684,14 +685,12 @@ export class ModelExporter {
             antiAlias: requireEl('exAntiAlias', HTMLInputElement).checked,
             smokeCleanup: requireEl('exSmokeCleanup', HTMLInputElement).checked,
         };
-        localStorage.setItem(SLIDER_STORAGE_KEY, JSON.stringify(data));
+        savePersistedSliders(browserStore, data);
     }
 
     loadPersistedSliders(): void {
         try {
-            const raw = localStorage.getItem(SLIDER_STORAGE_KEY);
-            if (raw === null || raw === '') return;
-            const data = parsePersistedSliders(raw);
+            const data = loadPersistedSliders(browserStore);
             if (data === undefined) return;
 
             const setSlider = (

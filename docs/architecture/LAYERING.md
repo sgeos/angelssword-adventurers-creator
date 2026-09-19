@@ -2,12 +2,14 @@
 
 > **Navigation**: [Architecture](./README.md) | [Documentation Root](../README.md)
 
-Status. **Structurally complete, and thinly populated.** All three layers
-exist and each boundary is enforced by a check rather than by convention. What
-remains is the long part: the four stage modules are entry points that still
-hold their logic, so the core has the pure parts and the platform layer has
-everything that touches a canvas. The capability interfaces are declared as
-their consumers arrive rather than in advance.
+Status. **Structurally complete. One capability inverted, five to go.** All
+three layers exist and each boundary is enforced by a check rather than by
+convention. Storage is inverted end to end, from a declared interface through
+a browser adapter to twenty-seven converted call sites. What remains is the
+long part: the four stage modules are entry points that still hold their
+logic, and time, the network, randomness, logging, and binary payloads are
+still reached directly. Capability interfaces are declared as their consumers
+arrive rather than in advance.
 
 ## The rule
 
@@ -118,21 +120,58 @@ Interfaces are declared when a consumer for them exists, not in advance. A
 declared interface that nothing implements and nothing calls records an
 intention rather than a contract, and it ages badly.
 
-| Capability | Status | Where it is reached directly today |
+Counts below were measured on 2026-09-19 over code with comments and string
+literals stripped, because a naive search reports a module that merely
+discusses a facility.
+
+| Capability | Status | Reached directly today, by layer |
 |---|---|---|
 | A raster to read and write | **Declared**, as `RgbaImage` in `src/core/pixels.mts` | Satisfied structurally by `ImageData`. No adapter exists or is wanted |
+| Storage | **Declared and implemented**, `KeyValueStore` and `local-storage.mts` | Platform 3, all inside the adapter. Entry 0, down from 27 |
 | A scratch surface to composite onto | **Not needed after all**, see below | Nothing. `gif-composite` used a canvas and did not need one |
-| Storage | Not declared | `localStorage` at twenty-seven sites across four stage modules |
-| Time and scheduling | Not declared | `setTimeout` and `requestAnimationFrame` in polling and playback loops |
-| The network | Not declared in the browser | Already inverted on the server as `FetchLike` in `server.mts` |
-| Randomness | Not declared | `Math.random` at three sites, all generating seeds |
-| Logging | Not declared | `console` at twelve sites |
+| Time and scheduling | Not declared | Entry 24, platform 5, worker 2 |
+| The network | Not declared in the browser | Entry 9, platform 4. Already inverted on the server as `FetchLike` |
+| Randomness | Not declared | Entry 2, platform 1, all generating seeds |
+| Logging | Not declared | Entry 10, platform 2 |
+| Binary payloads | Not declared | Entry 32, platform 6. `Blob`, `File`, and object URLs |
 
-`RgbaImage` is the model for the rest. The keyer and the exporters need
-somewhere to read and write pixels. They do not need a canvas, a rendering
-context, or a document, so the core declares the shape it uses and a browser
-`ImageData` satisfies it without an adapter. A test satisfies it with an object
-literal, which is the property that makes the keyer testable at all.
+The core column is absent from that table because every count in it is zero.
+That is checked rather than asserted, `tsconfig.core.json` refusing to compile
+a core module that names any of these.
+
+`RgbaImage` is the model for a capability with no behaviour. The keyer and the
+exporters need somewhere to read and write pixels. They do not need a canvas, a
+rendering context, or a document, so the core declares the shape it uses and a
+browser `ImageData` satisfies it without an adapter. A test satisfies it with
+an object literal, which is the property that makes the keyer testable at all.
+
+`KeyValueStore` is the model for one with behaviour, and it is worth reading
+as a worked example.
+
+The core decides what is worth remembering, how it is encoded, and whether what
+comes back can be trusted. It does not decide where the bytes live. So the
+interface has three methods and the browser adapter is the only file in the
+project that knows the answer is Web Storage, which a lint rule enforces by
+naming that one file as the exemption.
+
+Three things came out of writing it that were not the point of writing it.
+
+**The platform's idea of absence had reached into the core.** Four core parsers
+took `string | null`, which is the Web Storage return type and not this
+project's convention. They take `string | undefined` now, and the adapter
+translates, which is one line and is the adapter's job.
+
+**A predicate that did not narrow became a narrowing that does.**
+`hasCredential` returned a boolean, so its caller re-checked for absence
+immediately afterwards, in the shape the repository's own convention exists to
+prevent. `credentialFrom` returns the credential or `undefined`.
+
+**Twenty-seven call sites had no handling for a store that throws.** A browser
+configured to block site data raises on the first property access to
+`localStorage`, before any method runs, which would have taken the page down.
+The adapter probes once and catches on every operation, degrading to a store
+that forgets. That trade is stated where it is made, because a dropped write
+means a preference can appear saved and not be.
 
 ## Why this is worth doing here
 
@@ -172,11 +211,9 @@ preserved rather than corrected, and both recorded in
 - The four stage modules are entry points that still hold their logic. Moving
   that logic into the core is the long part of this work, and it is the same
   work as the untested-module problem.
-- Declare the storage, clock, network, randomness, and logging interfaces as
-  the logic that needs them moves into the core.
-- The four core parsers that accept `string | null` take that shape from the
-  Web Storage interface rather than from the core's own conventions. They
-  become `string | undefined` when the storage capability is declared.
+- Declare the clock, network, randomness, logging, and binary payload
+  interfaces as the logic that needs them moves into the core. The network is
+  the most valuable, being the one the server has already inverted.
 - `Handoff` cannot move to the core as it stands, carrying an
   `HTMLCanvasElement` and two `Blob` fields. It moves when the drawing surface
   and the binary payload are inverted, not before.

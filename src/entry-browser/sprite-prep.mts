@@ -18,11 +18,10 @@ import { base64ToBlob, blobToBase64, colorName, debounce } from "../platform-bro
 import { closestFrom, fieldValue, queryAll, require2d, requireEl } from "../platform-browser/dom.mts";
 import * as Core from "../core/sprite-prep-core.mts";
 import {
-    COMFY_SETTINGS_KEY,
     buildWorkflowFor,
     extractHistoryImages,
     extractPromptId,
-    parseComfySettings,
+    loadComfySettings,
     viewQuery,
     type ComfySettings,
 } from "../core/comfyui-core.mts";
@@ -30,13 +29,19 @@ import {
     PROVIDERS,
     asProviderId,
     buildImageRequest,
-    hasCredential,
-    providerFrom,
+    loadCredential,
+    loadProvider,
+    saveProvider,
     type Provider,
 } from "../core/providers.mts";
-
-/** Where the chosen provider is remembered between sessions. */
-const PROVIDER_PREFERENCE_KEY = 'sprite_provider';
+import {
+    loadSpriteOffset,
+    loadSpriteZoom,
+    saveCharacterName,
+    saveSpriteOffset,
+    saveSpriteZoom,
+} from "../core/preferences.mts";
+import { browserStore } from "../platform-browser/local-storage.mts";
 
 /** ComfyUI offers no completion callback, so the history is polled. */
 const COMFY_POLL_INTERVAL_MS = 2_000;
@@ -53,18 +58,11 @@ const KEY_COLORS = Core.KEY_COLORS;
 // ============================================
 // STATE
 // ============================================
-/** Read a stored integer, falling back when absent or unparsable. */
-const storedInt = (key: string, fallback: number): number => {
-    const raw = localStorage.getItem(key);
-    const parsed = raw === null ? NaN : parseInt(raw, 10);
-    return Number.isFinite(parsed) ? parsed : fallback;
-};
-
 let spriteImage: HTMLImageElement | null = null;
 let spriteFileName = '';
 let selectedKeyColor = '#00FF00';
-let offset = storedInt('sp-offset', 0);
-let zoom = storedInt('sp-zoom', 100);
+let offset = loadSpriteOffset(browserStore);
+let zoom = loadSpriteZoom(browserStore);
 
 // Generative mode state
 let generating = false;
@@ -329,7 +327,7 @@ function handoffToVideoGen(): void {
             ASAdventurer.handoff.spriteBlob = blob;
             ASAdventurer.handoff.spriteCanvas = canvas;
             ASAdventurer.handoff.spriteBase64 = await blobToBase64(blob);
-            localStorage.setItem('as_char_name', ASAdventurer.characterName);
+            saveCharacterName(browserStore, ASAdventurer.characterName);
             showToast('Sprite sent to Generate Video', 'success');
             switchTab('tab-video-gen');
         })();
@@ -389,20 +387,20 @@ async function generate(): Promise<void> {
         return;
     }
 
-    const provider = providerFrom(localStorage.getItem(PROVIDER_PREFERENCE_KEY));
+    const provider = loadProvider(browserStore);
 
     // ComfyUI holds no credential. It runs on the user's own machine, so the
     // thing that can be missing is its address rather than a key.
     let apiKey = '';
     if (provider.authKind === 'none') {
-        const configured = parseComfySettings(localStorage.getItem(COMFY_SETTINGS_KEY));
+        const configured = loadComfySettings(browserStore);
         if (configured.url === '') {
             showToast(`No ${provider.label} address. Go to Settings to add one.`, 'error');
             return;
         }
     } else {
-        const stored = localStorage.getItem(provider.storageKey);
-        if (!hasCredential(stored) || stored === null) {
+        const stored = loadCredential(browserStore, provider);
+        if (stored === undefined) {
             showToast(`No ${provider.label} API key. Go to Settings to add one.`, 'error');
             return;
         }
@@ -491,7 +489,7 @@ async function generateOneComfy(
     prompt: string,
     images: readonly unknown[],
 ): Promise<string | null> {
-    const settings = parseComfySettings(localStorage.getItem(COMFY_SETTINGS_KEY));
+    const settings = loadComfySettings(browserStore);
 
     // A reference image must reach ComfyUI before the graph can name it.
     let referenceFilename: string | undefined;
@@ -671,7 +669,7 @@ function genHandoffToVideoGen(): void {
 
     ASAdventurer.handoff.spriteBlob = base64ToBlob(chosen.dataUrl);
     ASAdventurer.handoff.spriteBase64 = chosen.dataUrl;
-    localStorage.setItem('as_char_name', ASAdventurer.characterName);
+    saveCharacterName(browserStore, ASAdventurer.characterName);
     showToast('Sprite sent to Generate Video', 'success');
     switchTab('tab-video-gen');
 }
@@ -780,7 +778,7 @@ function initSpritePrep(): void {
     offsetSlider.addEventListener('input', () => {
         offset = parseInt(offsetSlider.value, 10);
         offsetVal.textContent = `${offset.toString()}px`;
-        localStorage.setItem('sp-offset', offset.toString());
+        saveSpriteOffset(browserStore, offset);
         debouncedRender();
     });
 
@@ -792,7 +790,7 @@ function initSpritePrep(): void {
     zoomSlider.addEventListener('input', () => {
         zoom = parseInt(zoomSlider.value, 10);
         zoomVal.textContent = `${zoom.toString()}%`;
-        localStorage.setItem('sp-zoom', zoom.toString());
+        saveSpriteZoom(browserStore, zoom);
         debouncedRender();
     });
 
@@ -856,13 +854,13 @@ function initSpritePrep(): void {
     initModeSelector('sgProvider', (mode) => {
         const chosen = asProviderId(mode);
         if (chosen === undefined) return;
-        localStorage.setItem(PROVIDER_PREFERENCE_KEY, chosen);
+        saveProvider(browserStore, chosen);
         showToast(`Generating with ${PROVIDERS[chosen].label}`, 'info');
     });
 
     // Reflect the stored preference, so the active button matches what a
     // generation would actually use.
-    const storedProvider = providerFrom(localStorage.getItem(PROVIDER_PREFERENCE_KEY));
+    const storedProvider = loadProvider(browserStore);
     for (const btn of queryAll(requireEl('sgProvider', HTMLElement), '.seg-btn', HTMLElement)) {
         btn.classList.toggle('active', btn.dataset['mode'] === storedProvider.id);
     }
