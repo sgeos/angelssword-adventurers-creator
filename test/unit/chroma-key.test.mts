@@ -25,12 +25,12 @@ describe('ChromaKey', () => {
 
         // Border pixels transparent
         for (let x = 0; x < 8; x++) {
-            assert.equal(at(img.data, (0 * 8 + x) * 4 + 3), 0, `top ${x}`);
-            assert.equal(at(img.data, (7 * 8 + x) * 4 + 3), 0, `bot ${x}`);
+            assert.equal(at(img.data, (0 * 8 + x) * 4 + 3), 0, `top ${x.toString()}`);
+            assert.equal(at(img.data, (7 * 8 + x) * 4 + 3), 0, `bot ${x.toString()}`);
         }
         for (let y = 0; y < 8; y++) {
-            assert.equal(at(img.data, (y * 8 + 0) * 4 + 3), 0, `left ${y}`);
-            assert.equal(at(img.data, (y * 8 + 7) * 4 + 3), 0, `right ${y}`);
+            assert.equal(at(img.data, (y * 8 + 0) * 4 + 3), 0, `left ${y.toString()}`);
+            assert.equal(at(img.data, (y * 8 + 7) * 4 + 3), 0, `right ${y.toString()}`);
         }
         // Center red stays opaque
         assert.equal(at(img.data, (3 * 8 + 3) * 4 + 3), 255);
@@ -63,7 +63,7 @@ describe('ChromaKey', () => {
         const img = makeImageData(4, 4, () => [0, 255, 0, 255]);
         ck.process(img);
         for (let i = 0; i < 16; i++) {
-            assert.equal(at(img.data, i * 4 + 3), 0, `pixel ${i}`);
+            assert.equal(at(img.data, i * 4 + 3), 0, `pixel ${i.toString()}`);
         }
     });
 
@@ -90,7 +90,7 @@ describe('ChromaKey', () => {
         // against (10,5) with minDist 5.
         const c = at(img.data, (1 * 20 + 1) * 4 + 3);
         const mid = at(img.data, (5 * 20 + 10) * 4 + 3);
-        assert.ok(c < mid, `corner alpha ${c} should be < mid-edge ${mid}`);
+        assert.ok(c < mid, `corner alpha ${c.toString()} should be < mid-edge ${mid.toString()}`);
         assert.equal(cornerA, 0);
         assert.ok(midTop === 0 || midTop < 255); // on top edge
     });
@@ -107,7 +107,7 @@ describe('ChromaKey', () => {
         for (let i = 0; i < 64; i++) {
             const after = at(img.data, i * 4 + 3);
             const wasBefore = at(before, i);
-            assert.ok(after <= wasBefore, `alpha increased at ${i}: ${wasBefore} → ${after}`);
+            assert.ok(after <= wasBefore, `alpha increased at ${i.toString()}: ${wasBefore.toString()} → ${after.toString()}`);
         }
     });
 });

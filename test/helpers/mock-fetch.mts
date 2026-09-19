@@ -49,23 +49,23 @@ export function createResponse(spec: ResponseSpec = {}): MockResponse {
             get: (name: string): string | null =>
                 headers[name.toLowerCase()] ?? headers[name] ?? null,
         },
-        text: (): Promise<string> => Promise.resolve(textBody),
-        json: (): Promise<unknown> => Promise.resolve(JSON.parse(textBody)),
+        text: async (): Promise<string> => textBody,
+        json: async (): Promise<unknown> => JSON.parse(textBody),
     };
 }
 
-export const mockFetch: FetchLike = (url: string, init?: UpstreamInit) => {
+export const mockFetch: FetchLike = async (url: string, init?: UpstreamInit) => {
     calls.push({ url, options: init, method: init?.method ?? 'GET' });
 
     if (nextError !== null) {
         const err = nextError;
         nextError = null;
-        return Promise.reject(err);
+        throw err;
     }
 
     const response = nextResponse ?? createResponse();
     nextResponse = null;
-    return Promise.resolve(response);
+    return response;
 };
 
 export function resetMockFetch(): void {
@@ -100,8 +100,11 @@ export function wasFetchCalled(): boolean {
  * Read a request body back as a string, so a test can assert on multipart
  * content. UpstreamInit says a body is a string or a form-data FormData, and
  * instanceof on the real class narrows it without an assertion.
+ *
+ * Synchronous: form-data buffers the whole body, so there is nothing to wait
+ * for. It was async when it also handled a raw stream, which nothing sends.
  */
-export async function getFormBodyString(body: string | FormData | undefined): Promise<string> {
+export function getFormBodyString(body: string | FormData | undefined): string {
     if (body === undefined) return '';
     if (typeof body === 'string') return body;
     if (body instanceof FormData) return body.getBuffer().toString('binary');

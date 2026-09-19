@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+import { expect, test } from '@playwright/test';
 
 test.describe('F — Model exporter smoke', () => {
   test('exporter tab and export mode UI are present', async ({ page }) => {
@@ -23,7 +23,7 @@ test.describe('F — Model exporter smoke', () => {
       if (typeof window.ChromaKey === 'function') {
         try {
           const ck = new window.ChromaKey();
-          return { available: true, constructed: !!ck };
+          return { available: true, constructed: ck !== null && ck !== undefined };
         } catch (e) {
           return { available: true, constructed: false, error: String(e) };
         }

@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+import { expect, test } from '@playwright/test';
 
 test.describe('B — Settings localStorage', () => {
   test('openai_api_key and google_api_key round-trip via Settings UI', async ({ page }) => {

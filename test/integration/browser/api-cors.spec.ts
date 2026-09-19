@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+import { expect, test } from '@playwright/test';
 
 test.describe('C — Static / API proxy smoke', () => {
   test('static assets and CORS headers are available', async ({ request }) => {

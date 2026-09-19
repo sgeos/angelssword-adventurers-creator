@@ -95,7 +95,7 @@ describe('video-gen-core buildVideoRequestBody', () => {
             duration: 8, // even if a caller passes it, it must not appear
         });
         assert.ok(!('duration' in body), 'duration must not reach the request body');
-        assert.ok(!('video_length' in (body.generation_config?.video_config || {})));
+        assert.ok(!('video_length' in (body.generation_config?.video_config ?? {})));
     });
 });
 
@@ -122,9 +122,12 @@ describe('video-gen-core extractVideoPayload', () => {
                 content: [{ type: 'video', data: 'NODATA' }],
             }],
         });
-        assert.notEqual(payload, null, 'a video payload must be found');
-        assert.equal(payload?.mimeType, 'video/mp4');
-        assert.equal(payload?.base64, 'NODATA');
+        // A guard rather than notEqual: the matcher asserts at runtime but
+        // does not narrow, and optional chaining after it reads as if the
+        // absence were tolerable, which the next two lines say it is not.
+        if (payload === null) throw new Error('a video payload must be found');
+        assert.equal(payload.mimeType, 'video/mp4');
+        assert.equal(payload.base64, 'NODATA');
     });
 
     it('extracts from candidates inlineData (generateContent fallback)', () => {

@@ -138,8 +138,9 @@
     // which the server must not have, so they have their own projects
     // rather than being half-checked under this one.
     "public",
-    "playwright.config.js",
-    "test/integration/browser",
+    // Playwright's config and specs belong to tsconfig.test.json, which has
+    // the DOM lib their page callbacks need.
+    "playwright.config.ts",
     // Tests belong to tsconfig.test.json, which adds the DOM lib so they
     // can exercise browser modules directly.
     "test",

@@ -68,7 +68,7 @@ jobs:
       # which a bare runner does not have.
       - run: npx playwright install --with-deps chromium
 
-      # playwright.config.js starts the server itself, and its command builds
+      # playwright.config.ts starts the server itself, and its command builds
       # src/browser first, so the specs cannot pass against a stale bundle.
       - run: npx playwright test
 

@@ -162,8 +162,9 @@ describe('video-prep-core buildVideoPrepHandoffPayload', () => {
             crossfade: false,
             crossfadeDuration: 0,
         });
-        assert.notEqual(payload.concat, null, 'concat payload must be present when enabled');
-        assert.equal(payload.concat?.crossfade, false);
-        assert.equal(payload.concat?.crossfadeDuration, 0);
+        const concat = payload.concat;
+        if (concat === null) throw new Error('concat payload must be present when enabled');
+        assert.equal(concat.crossfade, false);
+        assert.equal(concat.crossfadeDuration, 0);
     });
 });

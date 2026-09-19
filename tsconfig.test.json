@@ -22,9 +22,9 @@
     "allowJs": true,
     "checkJs": false
   },
-  "include": ["test/**/*.mts", "test/**/*.mjs", "src/browser/**/*.mts"],
+  "include": ["test/**/*.mts", "test/**/*.ts", "src/browser/**/*.mts", "playwright.config.ts"],
   // gif-worker.mts needs the WebWorker lib, which cannot be loaded beside DOM.
   // Only its message plumbing lives there; gif-worker-core.mts holds the
   // encoding and stays in this project so tests can reach it.
-  "exclude": ["test/integration/browser", "src/browser/gif-worker.mts", "src/browser/timer-worker.mts"]
+  "exclude": ["src/browser/gif-worker.mts", "src/browser/timer-worker.mts"]
 }

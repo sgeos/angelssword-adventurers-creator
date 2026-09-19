@@ -1,5 +1,5 @@
-const { test, expect } = require('@playwright/test');
-const { TAB_IDS } = require('./helpers');
+import { expect, test } from '@playwright/test';
+import { TAB_IDS } from './helpers.ts';
 
 test.describe('A — App loads', () => {
   test('homepage shows brand and five pipeline tabs', async ({ page }) => {

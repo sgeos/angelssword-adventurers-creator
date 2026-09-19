@@ -1,6 +1,6 @@
-const { test, expect } = require('@playwright/test');
-const { SPRITE_ON_GREEN, interactionsVideoResponse } = require('./helpers');
-const fs = require('fs');
+import { expect, test } from '@playwright/test';
+import { SPRITE_ON_GREEN, interactionsVideoResponse } from './helpers.ts';
+import fs from 'node:fs';
 
 test.describe('E — Mocked video generate → prep handoff', () => {
   test('mock /api/video/generate sets handoff.videoBlob for Video Prep', async ({ page }) => {
@@ -23,8 +23,11 @@ test.describe('E — Mocked video generate → prep handoff', () => {
     const dataUrl = `data:image/png;base64,${pngBuf.toString('base64')}`;
 
     await page.evaluate((b64) => {
-      window.ASAdventurer.handoff.spriteBase64 = b64;
-      window.ASAdventurer.handoff.keyColor = '#00FF00';
+      // The module publishes this on load; fail loudly if it did not.
+      const app = window.ASAdventurer;
+      if (app === undefined) throw new Error('ASAdventurer is not published on window');
+      app.handoff.spriteBase64 = b64;
+      app.handoff.keyColor = '#00FF00';
     }, dataUrl);
 
     await page.locator('.tab-btn[data-tab="tab-video-gen"]').click();
@@ -40,10 +43,12 @@ test.describe('E — Mocked video generate → prep handoff', () => {
     await expect(page.locator('#tab-video-prep')).toHaveClass(/active/, { timeout: 10_000 });
 
     const videoHandoff = await page.evaluate(() => {
-      const h = window.ASAdventurer.handoff;
+      const app = window.ASAdventurer;
+      if (app === undefined) throw new Error('ASAdventurer is not published on window');
+      const h = app.handoff;
       return {
-        hasVideoBlob: !!h.videoBlob,
-        videoBlobSize: h.videoBlob ? h.videoBlob.size : 0,
+        hasVideoBlob: h.videoBlob !== null,
+        videoBlobSize: h.videoBlob === null ? 0 : h.videoBlob.size,
         hasVideoUrl: typeof h.videoUrl === 'string' && h.videoUrl.startsWith('blob:'),
       };
     });
@@ -59,7 +64,9 @@ test.describe('E — Mocked video generate → prep handoff', () => {
     // Production shape from src/browser/video-prep.mts sendToExporter
       // (without needing a real decodeable video)
     const shape = await page.evaluate(() => {
-      window.ASAdventurer.handoff.videoPrepData = {
+      const app = window.ASAdventurer;
+      if (app === undefined) throw new Error('ASAdventurer is not published on window');
+      app.handoff.videoPrepData = {
         videoSrc: 'blob:http://localhost/mock',
         videoWidth: 1280,
         videoHeight: 720,
@@ -71,7 +78,7 @@ test.describe('E — Mocked video generate → prep handoff', () => {
         outputFrameCount: 30,
         concat: null,
       };
-      return Object.keys(window.ASAdventurer.handoff.videoPrepData).sort();
+      return Object.keys(app.handoff.videoPrepData).sort();
     });
 
     expect(shape).toEqual(
@@ -93,7 +100,7 @@ test.describe('E — Mocked video generate → prep handoff', () => {
     await expect(page.locator('#tab-exporter')).toHaveClass(/active/);
 
     // Exporter listens for videoPrepData — banner may appear if consumer wired
-    const hasData = await page.evaluate(() => !!window.ASAdventurer.handoff.videoPrepData);
+    const hasData = await page.evaluate(() => window.ASAdventurer?.handoff.videoPrepData !== null);
     // Handoff may be consumed by exporter observer; either still set or consumed is fine
     expect(typeof hasData).toBe('boolean');
   });

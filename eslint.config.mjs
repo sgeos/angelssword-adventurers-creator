@@ -370,26 +370,76 @@ export default defineConfig(
     },
   },
 
-  // Test code and its harness, all untyped CommonJS. Same treatment as the
-  // build scripts and for the same reason: the type-aware rules report on
-  // the absence of types rather than on anything an author did. The
-  // no-unsafe-* family alone accounts for 360 of the findings here, and
-  // no-floating-promises fires on every node:test `it()`, which nobody
-  // awaits by design.
-  //
-  // This is a directory glob rather than a list of filenames, unlike the
-  // build-script block below, and the difference is deliberate. A glob
-  // exemption normally lets new files escape the rules, which is the hole
-  // it exists to avoid. It is acceptable here because nothing under test/
-  // is imported by the server, so code hidden there cannot reach
-  // production — the escape would buy nothing.
+  // Tests and the Playwright config live in a fourth project, which supplies
+  // both the node types and the DOM lib — specs need DOM for the callbacks
+  // they hand to page.evaluate. Without this they resolve against the root
+  // config, which excludes test/, and the type-aware rules cannot run at all.
   {
-    files: ["test/**", "playwright.config.js"],
-    extends: [tseslint.configs.disableTypeChecked],
+    files: ["test/**/*.mts", "test/**/*.ts", "playwright.config.ts"],
+    languageOptions: {
+      parserOptions: {
+        projectService: false,
+        project: "./tsconfig.test.json",
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
+
+  // Tests are TypeScript now and belong to tsconfig.test.json, so they are
+  // linted with full type information like everything else. A
+  // disableTypeChecked block stood here while they were untyped CommonJS; it
+  // went with the last of them, along with the note explaining why a glob
+  // exemption was tolerable. No exemption, no need for the excuse.
+  //
+  // What remains is narrow. A test body is an expression run for its
+  // assertions, and Playwright hands callbacks to page.evaluate whose return
+  // types are inferred and then checked against the assertions made on them.
+  // Annotating every one adds noise without adding a guarantee.
+  // A mock that satisfies a Promise-returning interface has nothing to await:
+  // promise-function-async demands the `async` keyword, and require-await then
+  // objects to its absent `await`. The two rules cannot both be satisfied
+  // here, so the weaker one yields — and only in this file, where faking async
+  // is the entire point. Everywhere else an async function with no await is
+  // still a missing await.
+  {
+    files: ["test/helpers/mock-fetch.mts"],
     rules: {
-      "@typescript-eslint/no-require-imports": "off",
+      "@typescript-eslint/require-await": "off",
+    },
+  },
+
+  {
+    files: ["test/**"],
+    rules: {
       "@typescript-eslint/explicit-function-return-type": "off",
       "@typescript-eslint/explicit-module-boundary-types": "off",
+
+      // node:test's describe/it return promises the runner owns; awaiting
+      // them is not how the API is used. Exempting those calls by name keeps
+      // the rule live everywhere else in a test — a forgotten `await` on a
+      // page action or an assertion helper is still an error, which is the
+      // failure this rule actually exists to catch. Disabling it wholesale
+      // for test/ would hide exactly that.
+      "@typescript-eslint/no-floating-promises": [
+        "error",
+        {
+          allowForKnownSafeCalls: [
+            {
+              from: "package",
+              package: "node:test",
+              name: [
+                "describe",
+                "it",
+                "test",
+                "before",
+                "after",
+                "beforeEach",
+                "afterEach",
+              ],
+            },
+          ],
+        },
+      ],
     },
   },
 

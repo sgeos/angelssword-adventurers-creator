@@ -76,9 +76,9 @@ describe('GifEncoder / GifDecoder', () => {
         assert.equal(decoded.frames.length, 1);
         const frame = at(decoded.frames, 0);
         for (let i = 0; i < w * h; i++) {
-            assert.equal(at(frame.rgba, i * 4 + 3), 255, `alpha ${i}`);
+            assert.equal(at(frame.rgba, i * 4 + 3), 255, `alpha ${i.toString()}`);
             // Quantization may shift slightly; red should dominate
-            assert.ok(at(frame.rgba, i * 4) > 200, `R ${at(frame.rgba, i * 4)}`);
+            assert.ok(at(frame.rgba, i * 4) > 200, `R ${at(frame.rgba, i * 4).toString()}`);
             assert.ok(at(frame.rgba, i * 4 + 1) < 40, `G`);
             assert.ok(at(frame.rgba, i * 4 + 2) < 40, `B`);
         }
@@ -102,10 +102,10 @@ describe('GifEncoder / GifDecoder', () => {
         const frame = at(decoded.frames, 0);
         for (let y = 0; y < h; y++) {
             for (let x = 0; x < 2; x++) {
-                assert.equal(at(frame.rgba, (y * w + x) * 4 + 3), 0, `transparent ${x},${y}`);
+                assert.equal(at(frame.rgba, (y * w + x) * 4 + 3), 0, `transparent ${x.toString()},${y.toString()}`);
             }
             for (let x = 2; x < 4; x++) {
-                assert.equal(at(frame.rgba, (y * w + x) * 4 + 3), 255, `opaque ${x},${y}`);
+                assert.equal(at(frame.rgba, (y * w + x) * 4 + 3), 255, `opaque ${x.toString()},${y.toString()}`);
                 assert.ok(at(frame.rgba, (y * w + x) * 4 + 2) > 200, 'blue channel');
             }
         }

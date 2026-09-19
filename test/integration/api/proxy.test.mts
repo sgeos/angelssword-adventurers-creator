@@ -19,6 +19,22 @@ import { createApp } from '../../../server.mts';
 // the production module has no seam to patch.
 const app = createApp(mockFetch);
 
+/**
+ * The `error` string from a proxy error body. supertest types `res.body` as
+ * `any`, so this narrows once rather than letting `any` spread through every
+ * assertion that touches it.
+ */
+function errorText(body: unknown): string {
+    if (typeof body !== 'object' || body === null || !('error' in body)) {
+        throw new Error(`expected an error body, got ${JSON.stringify(body)}`);
+    }
+    const message: unknown = body.error;
+    if (typeof message !== 'string') {
+        throw new Error(`expected error to be a string, got ${typeof message}`);
+    }
+    return message;
+}
+
 describe('AS Adventurer API characterization', () => {
     beforeEach(() => {
         resetMockFetch();
@@ -165,7 +181,7 @@ describe('AS Adventurer API characterization', () => {
         assert.equal(callAt().method, 'POST');
         assert.equal(callAt().headers['Authorization'], 'Bearer sk-edit');
 
-        const formBody = await getFormBodyString(callAt().body);
+        const formBody = getFormBodyString(callAt().body);
         assert.match(formBody, /name="model"/);
         assert.match(formBody, /gpt-image-2/);
         assert.match(formBody, /filename="ref0\.png"/);
@@ -231,7 +247,7 @@ describe('AS Adventurer API characterization', () => {
             .send({ prompt: 'x' });
 
         assert.equal(res.status, 502);
-        assert.match(res.body.error, /^Proxy error:/);
+        assert.match(errorText(res.body), /^Proxy error:/);
     });
 
     it('POST /api/video/generate fetch reject → 502 with /^Proxy error:/', async () => {
@@ -243,7 +259,7 @@ describe('AS Adventurer API characterization', () => {
             .send({ model: 'x' });
 
         assert.equal(res.status, 502);
-        assert.match(res.body.error, /^Proxy error:/);
+        assert.match(errorText(res.body), /^Proxy error:/);
     });
 
     // --- 12: OPTIONS CORS ---

@@ -5,16 +5,16 @@
  * There is no OPEN_BROWSER=0 gate on current main — in CI/headless Linux
  * xdg-open typically fails harmlessly. Prefer PORT=3001 for webServer.
  */
-const { defineConfig, devices } = require('@playwright/test');
+import { defineConfig, devices } from '@playwright/test';
 
-const PORT = process.env.PORT || '3001';
+const PORT = process.env['PORT'] ?? '3001';
 const baseURL = `http://localhost:${PORT}`;
 
-module.exports = defineConfig({
+export default defineConfig({
   testDir: 'test/integration/browser',
   fullyParallel: false,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
+  forbidOnly: process.env['CI'] !== undefined,
+  retries: process.env['CI'] !== undefined ? 1 : 0,
   workers: 1,
   reporter: [['list']],
   timeout: 60_000,
@@ -35,11 +35,11 @@ module.exports = defineConfig({
     // compiled output, so a stale build would silently test old code.
     command: 'npm run build:browser && node server.mts',
     url: baseURL,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: process.env['CI'] === undefined,
     timeout: 30_000,
     env: {
       ...process.env,
-      PORT: String(PORT),
+      PORT: PORT,
     },
   },
 });

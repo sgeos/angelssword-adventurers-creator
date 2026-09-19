@@ -1,5 +1,5 @@
-const { test, expect } = require('@playwright/test');
-const { SPRITE_ON_GREEN } = require('./helpers');
+import { expect, test } from '@playwright/test';
+import { SPRITE_ON_GREEN } from './helpers.ts';
 
 test.describe('D — Sprite upload + handoff', () => {
   test('upload PNG enables handoff; consumer can read spriteBase64 + keyColor', async ({ page }) => {
@@ -8,7 +8,7 @@ test.describe('D — Sprite upload + handoff', () => {
     // Defaults contract before any upload
     const defaults = await page.evaluate(() => {
       const h = window.ASAdventurer?.handoff;
-      return h
+      return h !== undefined
         ? {
             keys: Object.keys(h).sort(),
             keyColor: h.keyColor,
@@ -16,7 +16,10 @@ test.describe('D — Sprite upload + handoff', () => {
           }
         : null;
     });
-    expect(defaults).not.toBeNull();
+    // A guard rather than expect(): Playwright's matchers assert at runtime
+    // but do not narrow the type, and the assertion signatures that would are
+    // banned by the lint configuration.
+    if (defaults === null) throw new Error('ASAdventurer.handoff was not present on load');
     expect(defaults.keys).toEqual(
       expect.arrayContaining([
         'spriteBlob',
@@ -43,11 +46,13 @@ test.describe('D — Sprite upload + handoff', () => {
     await expect(page.locator('#tab-video-gen')).toHaveClass(/active/, { timeout: 10_000 });
 
     const handoff = await page.evaluate(() => {
-      const h = window.ASAdventurer.handoff;
+      const app = window.ASAdventurer;
+      if (app === undefined) throw new Error('ASAdventurer is not published on window');
+      const h = app.handoff;
       return {
-        hasBlob: !!h.spriteBlob,
+        hasBlob: h.spriteBlob !== null,
         hasBase64: typeof h.spriteBase64 === 'string' && h.spriteBase64.length > 20,
-        base64Prefix: (h.spriteBase64 || '').slice(0, 30),
+        base64Prefix: (h.spriteBase64 ?? '').slice(0, 30),
         keyColor: h.keyColor,
       };
     });
@@ -74,7 +79,7 @@ test.describe('D — Sprite upload + handoff', () => {
     await page.locator('.tab-btn[data-tab="tab-exporter"]').click();
     await expect(page.locator('#tab-exporter')).toHaveClass(/active/);
 
-    const ok = await page.evaluate(() => !!window.ASAdventurer?.handoff);
+    const ok = await page.evaluate(() => window.ASAdventurer !== undefined);
     expect(ok).toBe(true);
   });
 });
