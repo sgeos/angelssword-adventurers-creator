@@ -2,17 +2,45 @@
 
 > **Navigation**: [Process](./README.md) | [Documentation Root](../README.md)
 
-**Refreshed 2026-09-19, describing `main` at `69addb8`.** Read this block, run
-the validity check, then read the task below. It is a rearchitecture and
-should not be begun without reading the two reference projects named.
+**Refreshed 2026-09-19. The anchor is `2c0aef0`, the last commit before this
+refresh.** Read this block, run the validity check, then read the task below.
+It is a rearchitecture and should not be begun without reading the two
+reference projects named.
 
 ---
 
 ## Validity
 
-Validate by content, never by a hash match. A check requiring the tip to equal
-a recorded commit claims that nothing else ever lands, and fails on the next
-commit. Each assertion below was true at the refresh.
+Validate by ancestry and by content, never by a hash match. A check requiring
+the tip to equal a recorded commit claims that nothing else ever lands, and it
+fails on the very next commit, including the commit that carries the refresh
+itself.
+
+### Ancestry
+
+`main` should **contain** `2c0aef0`, the last commit before this refresh. Test
+containment rather than equality.
+
+```sh
+git merge-base --is-ancestor 2c0aef0 HEAD
+```
+
+If that fails, this file predates a history rewrite and is stale. If it
+succeeds, the anchor is satisfied no matter how far the tip has since moved,
+because an anchor only has to be an ancestor.
+
+The anchor is the commit before the refresh, never the refresh commit, for the
+reason that a file cannot record the hash of the commit that introduces it.
+Naming it by what it is, the last commit before the refresh, also keeps the
+description from going stale later, which a phrase such as the current tip
+would not.
+
+### Content
+
+Cheap and independent, each verified at the refresh. Read the rendered order
+of the list rather than taking the next unused number, and renumber when
+inserting, because a list whose numbers skip reads as though checks are
+missing.
 
 1. `git ls-files` reports **58** TypeScript files and exactly **one**
    JavaScript file, `eslint.config.mjs`, which is deliberate.
@@ -21,6 +49,11 @@ commit. Each assertion below was true at the refresh.
    interface tests, all passing.
 4. `npx playwright test` reports **22** passing browser specifications.
 5. `docker compose up --build` produces a container that serves on port 3001.
+
+Assertions 1 through 4 were re-executed at the anchor. Assertion 5 was last
+exercised one refresh earlier, at `69addb8`, and was judged too costly to
+repeat for a status check. It is recorded as unverified at the anchor rather
+than restated as though it had been run.
 
 If an assertion fails, this file is stale. Trust the repository and say so.
 
@@ -153,3 +186,18 @@ Rewrite the block above when its assertions stop holding. Do not append and
 leave the old one, which is how the reference project's equivalent reached 118
 kilobytes. Superseded detail belongs in
 [DESIGN_JOURNAL.md](./DESIGN_JOURNAL.md).
+
+Record the anchor by reading the tip **before** committing the refresh.
+
+```sh
+git rev-parse --short HEAD   # run this first, write the result as the anchor
+```
+
+That commit becomes the parent of the refresh commit, so the anchor is always
+commit N minus one relative to the refresh. Writing the tip after committing
+is impossible, and writing it after any later commit would name a commit the
+refresh never described.
+
+A refresh may also take more than one commit, in which case any hash written
+mid-sequence is wrong by the time the sequence finishes. The ancestry test
+tolerates this, since it asks only that the anchor be reachable.

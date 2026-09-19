@@ -14,7 +14,10 @@ away from where it is sought, and `git show main:<path>` would return the older
 copy on `main` with no error at all.
 
 Open every mailbox by naming the branch it describes and the commit it was
-written against, so that a reader who reaches the wrong file can tell.
+written against, so that a reader who reaches the wrong file can tell. Name
+that commit the same way [HANDOFF.md](../HANDOFF.md) does, meaning the tip read
+before the mailbox is committed, which is commit N minus one once it lands, and
+test it by ancestry rather than by equality.
 
 Structure follows `REVERSE_PROMPT.md`, meaning last updated, verification,
 summary, questions, concerns, and next step. The primary session reconciles

@@ -78,6 +78,16 @@ never assigned because it is absent from one payload. It is assigned on the
 parent object, five times. Search for the producer before concluding there is
 none.
 
+## Process documents
+
+**An anchor written as the current tip is stale before it is read.** A handoff
+described `main` at a hash, and committing the handoff advanced `main` past it.
+The check below the header was by content and still sound, but the wording
+invited a resuming session to conclude the file was stale. Record the tip read
+before the refresh is committed, which is commit N minus one once it lands, and
+test it by containment with `git merge-base --is-ancestor` rather than by
+equality.
+
 ## Working discipline
 
 **Commit each unit as soon as it is clean.** Recovery from a botched scripted

@@ -61,3 +61,34 @@ pass in continuous integration and fail on my own machine, because a key was
 exported in my shell. A test that depends on ambient environment is worse than
 a failing test, since it fails only where nobody is looking.
 
+
+## 2026-09-19 — Ancestry validation adopted, reversing an earlier judgement
+
+The knowledge graph entry above records that only the content half of the
+reference project's validity check was carried across, on the reasoning that
+ancestry validation assumes a long-lived version branch which this project
+does not have. That reasoning was wrong, and the operator corrected it.
+
+Ancestry validation does not require a long-lived branch. It requires only a
+reachable commit, and `main` supplies one. What the reference actually
+demonstrates is a containment test, not a comparison against a release line,
+and containment holds on a single-branch repository exactly as well.
+
+The omission produced a visible cost within one session. The header named the
+anchor as `main` at `69addb8` while the tip was `2c0aef0`, because the refresh
+commit had itself advanced the tip. Nothing was broken, since the check below
+the header was by content. A resuming session nonetheless had to reason its
+way past an apparent mismatch that the wording invited, which is precisely the
+failure the reference warns against and had already suffered.
+
+Two rules now hold. The anchor is the tip read before the refresh is
+committed, which makes it commit N minus one once the refresh lands, since a
+file cannot record the hash of the commit that introduces it. The anchor is
+tested by containment rather than equality, so it stays valid however far the
+tip subsequently moves, and it also survives a refresh that takes more than
+one commit.
+
+The general lesson is about adaptation rather than about git. Declining part
+of a convention borrowed from a working system requires a reason that the
+system itself does not already refute. The reason given here was a property of
+the reference that was never the reason the convention existed.

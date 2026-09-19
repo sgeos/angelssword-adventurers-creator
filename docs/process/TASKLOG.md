@@ -25,6 +25,7 @@ brought under test as a consequence rather than as separate work.
 
 | Task | Status | Verification |
 |---|---|---|
+| Handoff validity anchored on commit N minus one | Complete | Ancestry check run against the anchor it records |
 | Container deployment, environment keys completed | Complete | Image built and run; 276/44/22 pass |
 | ComfyUI Wan image-to-video | Complete | Letterbox verified at 832x480 |
 | ComfyUI sprites, wired | Complete | Generates with no key set |
