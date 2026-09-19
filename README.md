@@ -10,15 +10,34 @@
 
 AS Adventurer Creator is a standalone desktop tool that lets you create animated VTuber / PNGtuber assets from scratch. It walks you through a simple 4-step pipeline — from a static sprite all the way to a transparent, looping animated model ready for streaming.
 
-No installation required. Just run `ASAdventurer.exe` and open your browser.
+No installation required for the prebuilt binary. Run it and open your browser. From source, Node.js 22.18 or newer is the only prerequisite.
 
 ---
 
 ## Quick Start
 
+**Windows**
+
 1. **Double-click** `ASAdventurer.exe` (or use `Start AS Adventurer.bat`)
 2. Your browser will open to `http://localhost:3001`
 3. Follow the 4-step pipeline below
+
+**macOS**
+
+1. **Double-click** `Start ASAdventurer.command`
+2. Your browser will open to `http://localhost:3001`
+
+**Linux and the BSDs**
+
+```sh
+./bin/start          # or simply: npm start
+```
+
+The launcher checks for Node.js and reports the install command for your
+platform if it is missing. It does not install anything itself.
+
+Set `AS_NO_OPEN=1` to stop the server opening a browser, which is useful
+headless and on systems without `xdg-open`.
 
 ---
 
@@ -136,29 +155,129 @@ The exported WebM files also work with any OBS browser source, PNGtuber app, or 
 
 ## System Requirements
 
-- **OS:** Windows 10/11 (64-bit)
+- **OS:** Windows 10/11, macOS, Linux, or FreeBSD/OpenBSD/NetBSD (64-bit)
+- **Node.js:** 22.18 or newer (24 recommended), required on every platform
+  except when running a prebuilt binary on Windows or macOS. The server is
+  TypeScript and runs through Node's native type stripping, with no build
+  step; 22.18 is the first release where that works without a flag. Node 23
+  needs 23.6 for the same reason.
 - **Browser:** Chrome, Edge, or Firefox (opens automatically)
 - **Internet:** Required only for AI generation steps (Steps 1-2). Steps 3-4 work fully offline.
 - **Disk Space:** ~40 MB for the application
+
+### Building a standalone binary
+
+```sh
+node build-exe.mts
+```
+
+Produces a self-contained binary for the platform it is run on, into
+`dist/ASAdventurer/`, alongside the UI files and a launcher. Windows, macOS,
+and Linux are supported. The BSDs are not, because `pkg` publishes no base
+binary for them; run the application with `npm start` there instead.
+
+The build bundles the server to CommonJS with esbuild before handing it to
+`pkg`. That step exists because the server is ESM TypeScript and `pkg` — which
+is archived, and whose final release predates `import.meta` — cannot consume
+it directly. The source stays ESM; only the binary target sees CommonJS.
+
+On macOS the build applies an ad-hoc code signature so the result runs on the
+machine that produced it. That is not notarization. Distributing the binary to
+another Mac requires an Apple Developer ID and a notarization step, or the
+recipient clearing the quarantine attribute by hand.
 
 ---
 
 ## File Structure
 
+The built distribution, where the binary and launcher names follow the
+platform they were built on:
+
 ```
 ASAdventurer/
-├── ASAdventurer.exe          ← Main application (double-click to run)
-├── Start AS Adventurer.bat   ← Launcher with console output
-├── README.md                 ← This file
-├── icon.ico                  ← Application icon
-└── public/                   ← UI files (do not modify)
+├── ASAdventurer[.exe]                ← Main application (double-click to run)
+├── Start AS Adventurer.[bat|command|sh]  ← Launcher with console output
+├── README.md                         ← This file
+├── icon.ico                          ← Application icon (Windows builds only)
+└── public/                           ← UI files (do not modify)
     ├── index.html
     ├── style.css
-    ├── sprite-prep.js
-    ├── video-prep.js
-    ├── model-exporter.js
+    ├── js/                           ← Compiled from src/browser
     └── assets/
 ```
+
+---
+
+## Working on the Source
+
+The application is TypeScript throughout. The two halves are built and run
+differently, because they have to be:
+
+- **Server** (`server.mts`) runs directly. Node strips the types as it loads
+  the file, so there is no build step and nothing to keep in sync.
+- **Browser** (`src/browser/*.mts`) is compiled to `public/js/*.mjs`, because
+  no browser strips types. `index.html` loads that output as ES modules.
+  `npm start` builds it first, so running the app never serves a stale bundle.
+
+```sh
+npm install
+npm start              # builds the browser half, then serves on :3001
+
+npm run check          # typecheck every project, then lint
+npm test               # unit and API tests
+npx playwright test    # browser tests (needs: npx playwright install chromium)
+npm run test:all       # all of the above
+```
+
+### Why four tsconfig projects
+
+They differ in which global types each half is allowed to see, and that
+separation is enforced rather than assumed:
+
+| Project | Covers | Sees |
+|---|---|---|
+| `tsconfig.json` | server and build scripts | Node, no DOM |
+| `tsconfig.browser.json` | `src/browser` | DOM, no Node |
+| `tsconfig.worker.json` | the two Web Workers | WebWorker, neither DOM nor Node |
+| `tsconfig.test.json` | tests and the Playwright config | both |
+
+The worker project exists because the `WebWorker` and `DOM` libs both declare
+`self` and cannot be loaded together. Splitting it also proves the GIF codec
+is free of DOM dependencies, which is how a stray `document` reference in it
+was found.
+
+### The strictness is deliberate
+
+`eslint.config.mjs` carries roughly two thirds of the enforcement; the
+compiler settings alone cannot ban `any`, type assertions, or non-null
+assertions. `isolatedDeclarations` requires every exported symbol to state a
+type the compiler need not infer. Type predicates are banned, so code that
+narrows an untrusted string returns the narrowed value or `undefined` rather
+than asserting a relationship the compiler must take on trust.
+
+If a rule is in the way, the honest move is to argue for changing it, not to
+route around it — `eslint-disable` comments are disabled config-wide and will
+not work.
+
+### The tests are checked too
+
+Every source file is TypeScript apart from `eslint.config.mjs` itself, tests
+included, and the tests are linted with full type information rather than
+exempted from the type-aware rules. That matters because a test harness
+exempted from the rules is the obvious place for unchecked code to accumulate,
+and the harness is what everything else is trusted on.
+
+Two narrow exemptions exist, each named in the config with its reason:
+
+- `node:test`'s `describe`/`it` are exempted from `no-floating-promises` by
+  name. The runner owns those promises. The rule stays on everywhere else in a
+  test, so a forgotten `await` on a page action is still an error.
+- `require-await` is off in `test/helpers/mock-fetch.mts` alone, where a mock
+  satisfying a `Promise`-returning interface has nothing to await and the two
+  async rules cannot both be satisfied.
+
+Playwright compiles specs to CommonJS, so spec-side code uses `__dirname`
+rather than `import.meta.url`.
 
 ---
 

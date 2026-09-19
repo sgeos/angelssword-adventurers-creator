@@ -1,10 +1,24 @@
 {
   "name": "as-adventurer",
   "version": "1.0.0",
-  "description": "⚔️ AS Adventurer — VTuber Creation Pipeline by Angel's Sword Studios",
-  "main": "server.js",
+  "description": "\u2694\ufe0f AS Adventurer \u2014 VTuber Creation Pipeline by Angel's Sword Studios",
+  "main": "server.mts",
+  "engines": {
+    "node": "^22.18.0 || >=23.6.0"
+  },
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.mts",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.browser.json --noEmit && tsc -p tsconfig.worker.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "lint": "eslint .",
+    "check": "npm run typecheck && npm run lint",
+    "test:unit": "node --test test/unit/*.test.mts",
+    "test:api": "node --test test/integration/api/*.test.mts",
+    "test:browser": "playwright test",
+    "test": "npm run test:unit && npm run test:api",
+    "test:all": "npm run check && npm run test && npm run test:browser",
+    "build:exe": "node build-exe.mts",
+    "build:browser": "tsc -p tsconfig.browser.json && tsc -p tsconfig.worker.json",
+    "prestart": "npm run build:browser"
   },
   "dependencies": {
     "express": "^4.21.0",
@@ -16,7 +30,18 @@
   "license": "MIT",
   "private": true,
   "devDependencies": {
+    "@playwright/test": "^1.51.0",
+    "@types/express": "^4.17.25",
+    "@types/multer": "^2.2.0",
+    "@types/node": "^24.13.5",
+    "@types/node-fetch": "^2.6.13",
+    "@types/supertest": "7.2.1",
+    "esbuild": "0.28.2",
+    "eslint": "^10.10.0",
     "rcedit": "^5.0.2",
-    "sharp": "^0.35.3"
+    "sharp": "^0.35.3",
+    "supertest": "^7.1.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.70.0"
   }
 }

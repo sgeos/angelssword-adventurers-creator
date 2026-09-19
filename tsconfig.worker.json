@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  // Web Worker code. Split from the browser project because the WebWorker and
+  // DOM libs both declare `self` and cannot be loaded together; a worker that
+  // shared the browser project would see `self` as a Window and would need a
+  // type assertion to talk to its own scope. Keeping it separate lets the
+  // worker stay assertion-free under the same strict rules as everything else.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "WebWorker"],
+    // No "node" and no DOM: a worker sees neither.
+    "types": [],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": false,
+    "outDir": "public/js",
+    "rootDir": "src/browser",
+    "sourceMap": true,
+    "declaration": true,
+    "allowJs": false,
+    "checkJs": false,
+    "rewriteRelativeImportExtensions": true
+  },
+  // gif-codec is shared with the browser project; it is DOM-free by
+  // construction, and this project is what proves that stays true.
+  "include": [
+    "src/browser/gif-worker.mts",
+    "src/browser/timer-worker.mts",
+    "src/browser/gif-worker-core.mts",
+    "src/browser/gif-codec.mts"
+  ],
+  "exclude": []
+}

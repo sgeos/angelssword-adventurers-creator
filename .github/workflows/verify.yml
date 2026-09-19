@@ -1,0 +1,82 @@
+# Runs exactly what `npm run check`, `npm test` and `npx playwright test` run
+# locally. Nothing here is CI-only: a green run means the same commands pass on
+# a clean checkout, and a red one is reproducible with a single local command.
+name: verify
+
+on:
+  push:
+  pull_request:
+
+# A second push to the same branch makes the first run's answer irrelevant.
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: typecheck and lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # The lowest version the project claims to support. Testing the
+          # floor rather than the newest release is the point: the server runs
+          # TypeScript through native type stripping, and that is exactly the
+          # capability the floor is chosen for.
+          node-version: '22.18.0'
+          cache: npm
+
+      - run: npm ci
+
+      # Typechecks every tsconfig project, then lints.
+      - run: npm run check
+
+  test:
+    name: unit and API tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.18.0'
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm test
+
+  browser:
+    name: browser tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.18.0'
+          cache: npm
+
+      - run: npm ci
+
+      # --with-deps pulls the system libraries the headless browser needs,
+      # which a bare runner does not have.
+      - run: npx playwright install --with-deps chromium
+
+      # playwright.config.ts starts the server itself, and its command builds
+      # src/browser first, so the specs cannot pass against a stale bundle.
+      - run: npx playwright test
+
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

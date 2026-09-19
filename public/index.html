@@ -1035,11 +1035,17 @@
 <div class="toast-container" id="toastContainer"></div>
 
 <!-- Scripts -->
-<script src="app.js"></script>
-<script src="sprite-prep.js"></script>
-<script src="video-gen.js"></script>
-<script src="video-prep.js"></script>
-<script src="model-exporter.js"></script>
+<!--
+  Compiled from src/browser/*.mts by `npm run build:browser` into js/.
+  Only the five stage entry points are listed: each pulls in the shared
+  modules it needs through the module graph, which loads them once. Module
+  scripts are deferred, so these run after the document is parsed.
+-->
+<script type="module" src="js/app.mjs"></script>
+<script type="module" src="js/sprite-prep.mjs"></script>
+<script type="module" src="js/video-gen.mjs"></script>
+<script type="module" src="js/video-prep.mjs"></script>
+<script type="module" src="js/model-exporter.mjs"></script>
 
 </body>
 </html>
