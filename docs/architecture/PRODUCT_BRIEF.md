@@ -1,4 +1,17 @@
-# AS Adventurer — VTuber Creation Pipeline Handoff
+# Product Brief
+
+> **Navigation**: [Architecture](./README.md) | [Documentation Root](../README.md)
+
+Inherited from the upstream project, where this file sat at the repository
+root under the name `HANDOFF.md`. It records the product intent and the design
+system, and it is preserved because that intent is not written down anywhere
+else. Statements about implementation are those of the pre-conversion
+JavaScript and have not been revised. Where this document and the code
+disagree, the code is current.
+
+Links to the upstream author's local machine have been reduced to plain text.
+They pointed at Windows paths that exist on no other computer, and several
+named files that this repository has never contained.
 
 ## Project Overview
 
@@ -7,7 +20,7 @@
 > [!IMPORTANT]
 > **Core Value Proposition**: Drop-dead simple. A total beginner should be able to create a VTuber model from scratch in minutes. Hover tooltips on everything. The tool's simplicity is its advantage over Live2D.
 
-**Workspace**: `H:\Git\devtools\AS Adventurer`
+**Workspace**: the upstream author's, recorded here as inherited.
 
 ---
 
@@ -23,7 +36,7 @@
 ## Branding & Design System
 
 ### Source of Truth
-The existing design system lives in [editor.css](file:///H:/Git/devtools/editor.css) (752 lines). All new UI must match this aesthetic.
+The existing design system lives in `editor.css` (752 lines). All new UI must match this aesthetic.
 
 ### Color Palette (CSS Custom Properties)
 ```css
@@ -65,7 +78,7 @@ font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
 | **Scrollbars** | Custom thin, subtle white-alpha |
 
 ### Existing ASArtTool Style (Alternative Reference)
-The ASArtTool at [asarttool.css](file:///H:/Git/devtools/asarttool/asarttool.css) uses a slightly different but compatible theme:
+The ASArtTool at `asarttool.css` uses a slightly different but compatible theme:
 - Fonts: `Cinzel Decorative` (display), `Cinzel` (headings), `Outfit` (body), `Share Tech Mono` (mono)
 - Glass panels: `backdrop-filter: blur(20px)`, semi-transparent backgrounds with gold borders
 - Tagline: "Design · Generate · Cut · Create"
@@ -122,7 +135,7 @@ The image must be exactly 1280×720 pixels.
 **API Route**: `POST /api/edits` (with images) or `POST /api/generate` (text-only), proxied through local server to OpenAI.
 
 **Reference Image Format** (user provided):
-![Sprite reference](file:///C:/Users/Leaflit/.gemini/antigravity/brain/ba710d63-17b4-4e08-8da0-cf1affaaf90e/media__1783469515473.png)
+!`Sprite reference`
 *Single character on solid magenta background, 1280×720, bottom-anchored*
 
 ---
@@ -294,7 +307,7 @@ Crafted with ✦ for adventurers everywhere
 
 **Why proxy?** OpenAI requires server-side requests (CORS blocked from browser). The proxy also keeps the API key out of client-side code.
 
-**Reference implementation**: [server.ps1](file:///H:/Git/devtools/asarttool/server.ps1) (PowerShell version — rewrite as Node.js)
+**Reference implementation**: `server.ps1` (PowerShell version — rewrite as Node.js)
 
 ### Start ASAdventurer.bat
 ```batch
@@ -313,7 +326,7 @@ pause
 ## Key Algorithms to Port
 
 ### 1. Optimal Color Auto-Detection
-**Source**: [sprite-generator.js](file:///H:/Git/devtools/asarttool/sprite-generator.js) `_analyzeReferenceForKeyColor()`
+**Source**: `sprite-generator.js` `_analyzeReferenceForKeyColor()`
 
 Algorithm:
 1. Draw reference image to canvas
@@ -324,7 +337,7 @@ Algorithm:
 6. If minDist < 80, show ⚠ Avoid badge
 
 ### 2. Chroma Key Engine
-**Source**: [fugi-maker.js](file:///H:/Git/devtools/fugi-maker/index.html) `ChromaKey` class (lines 2696-3399)
+**Source**: `fugi-maker.js` `ChromaKey` class (lines 2696-3399)
 
 5-pass pipeline:
 1. Edge flood fill (BFS from borders)
@@ -346,9 +359,9 @@ Algorithm:
 
 | Tool | Path | What to take |
 |:---|:---|:---|
-| **ASArtTool** | [H:\Git\devtools\asarttool](file:///H:/Git/devtools/asarttool) | Generative AI pipeline, prompt construction, key color system, server proxy, notification sounds, touch-up editor patterns |
-| **Fugi Maker EX** | [H:\Git\devtools\fugi-maker](file:///H:/Git/devtools/fugi-maker) | Loop Builder, Video→GIF pipeline, ChromaKey engine, GIF encoder/decoder, WebM export, sprite prep canvas system |
-| **Design System** | [H:\Git\devtools\editor.css](file:///H:/Git/devtools/editor.css) | CSS variables, component patterns, branding |
+| **ASArtTool** | `H:\Git\devtools\asarttool` | Generative AI pipeline, prompt construction, key color system, server proxy, notification sounds, touch-up editor patterns |
+| **Fugi Maker EX** | `H:\Git\devtools\fugi-maker` | Loop Builder, Video→GIF pipeline, ChromaKey engine, GIF encoder/decoder, WebM export, sprite prep canvas system |
+| **Design System** | `H:\Git\devtools\editor.css` | CSS variables, component patterns, branding |
 
 ---
 

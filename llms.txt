@@ -1,0 +1,38 @@
+# AS Adventurer Creator
+
+> A VTuber and PNGtuber asset creation pipeline. Four stages in a single page,
+> backed by a local server that proxies two external services. This repository
+> is a TypeScript fork of a JavaScript original.
+
+The application converts a static sprite into a transparent looping animated
+model. Stages communicate through a shared handoff object rather than a router
+or a store. The server runs TypeScript directly through native type stripping,
+while the browser half is compiled to ECMAScript modules.
+
+When generating code for this project, consult the agent onboarding file and
+the architecture documents first, then confirm details against the source.
+
+## Start Here
+
+- [AGENTS.md](https://github.com/sgeos/angelssword-adventurers-creator/blob/main/AGENTS.md): Assistant onboarding for any model.
+- [CLAUDE.md](https://github.com/sgeos/angelssword-adventurers-creator/blob/main/CLAUDE.md): Authoritative project context, conventions, per-session protocol.
+- [README](https://github.com/sgeos/angelssword-adventurers-creator/blob/main/README.md): Overview and quick start.
+
+## Core Reference
+
+- [Documentation Root](https://github.com/sgeos/angelssword-adventurers-creator/blob/main/docs/README.md): Knowledge graph index.
+- [Pipeline](https://github.com/sgeos/angelssword-adventurers-creator/blob/main/docs/architecture/PIPELINE.md): The four stages and the handoff object.
+- [Project Structure](https://github.com/sgeos/angelssword-adventurers-creator/blob/main/docs/architecture/PROJECT_STRUCTURE.md): Four TypeScript projects, strictness, and the binary build.
+- [Product Brief](https://github.com/sgeos/angelssword-adventurers-creator/blob/main/docs/architecture/PRODUCT_BRIEF.md): Product intent, inherited from upstream.
+
+## Process
+
+- [Handoff](https://github.com/sgeos/angelssword-adventurers-creator/blob/main/docs/process/HANDOFF.md): What a resuming session reads first.
+- [Communication](https://github.com/sgeos/angelssword-adventurers-creator/blob/main/docs/process/COMMUNICATION.md): Bidirectional human and assistant protocol.
+- [Agent Pitfalls](https://github.com/sgeos/angelssword-adventurers-creator/blob/main/docs/process/AGENT_PITFALLS.md): Mistakes actually made in this repository.
+- [Verification](https://github.com/sgeos/angelssword-adventurers-creator/blob/main/docs/process/VERIFICATION.md): What counts as verified.
+
+## Decisions
+
+- [Resolved](https://github.com/sgeos/angelssword-adventurers-creator/blob/main/docs/decisions/RESOLVED.md): Decisions taken and why.
+- [Open](https://github.com/sgeos/angelssword-adventurers-creator/blob/main/docs/decisions/OPEN.md): Unresolved matters.

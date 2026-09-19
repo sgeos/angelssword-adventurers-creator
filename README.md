@@ -217,6 +217,24 @@ ASAdventurer/
 
 ---
 
+## Documentation
+
+Fuller documentation lives in [`docs/`](./docs/README.md), structured as a
+knowledge graph. Each file holds one concept, and each directory carries an
+index.
+
+| If the question is | Start here |
+|---|---|
+| How the stages fit together | [Pipeline](./docs/architecture/PIPELINE.md) |
+| Why there are four TypeScript projects | [Project Structure](./docs/architecture/PROJECT_STRUCTURE.md) |
+| Why something is the way it is | [Resolved Decisions](./docs/decisions/RESOLVED.md) |
+| What is still unresolved | [Open Questions](./docs/decisions/OPEN.md) |
+
+Assistants working on this repository should begin with
+[`AGENTS.md`](./AGENTS.md) and [`CLAUDE.md`](./CLAUDE.md).
+
+---
+
 ## Working on the Source
 
 The application is TypeScript throughout. The two halves are built and run
