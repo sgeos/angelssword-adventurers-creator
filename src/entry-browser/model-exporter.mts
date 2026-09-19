@@ -14,6 +14,7 @@ import {
 } from "../platform-browser/shell.mts";
 import { debounce } from "../platform-browser/app-utils.mts";
 import { detectKeyColor, hexToRgb, rgbToHex } from "../core/color.mts";
+import { clampSeekTime, frameTime, isAtTime } from "../core/video-time.mts";
 import type { HandoffPayload } from "../core/video-prep-core.mts";
 import { ChromaKey } from "../core/chroma-key.mts";
 import { closestFrom, queryAll, require2d, requireEl } from "../platform-browser/dom.mts";
@@ -797,11 +798,10 @@ export class ModelExporter {
     }
 
     seekToFrame(frameNum: number): void {
-        const time = frameNum / this.fps;
-        const targetTime = Math.min(time, this.duration - 0.001);
+        const targetTime = frameTime(frameNum, this.fps, this.duration);
         this.updateFrameInfo();
 
-        if (Math.abs(this.video.currentTime - targetTime) < 0.001) {
+        if (isAtTime(this.video.currentTime, targetTime)) {
             this.previewCtx.drawImage(this.video, 0, 0, this.videoWidth, this.videoHeight);
             this._debouncedKeyPreview();
             return;
@@ -1572,9 +1572,9 @@ export class ModelExporter {
     // ─── SEEK HELPER ───
     async seekToAsync(time: number): Promise<void> {
         return new Promise((resolve) => {
-            const targetTime = Math.min(Math.max(0, time), this.duration - 0.001);
+            const targetTime = clampSeekTime(time, this.duration);
 
-            if (Math.abs(this.video.currentTime - targetTime) < 0.001) {
+            if (isAtTime(this.video.currentTime, targetTime)) {
                 resolve();
                 return;
             }

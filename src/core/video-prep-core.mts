@@ -84,32 +84,6 @@ export const loopSummary = (
   };
 };
 
-/**
- * The playback time of one frame, kept clear of the very end of the clip.
- *
- * The millisecond of slack matters. Seeking exactly to `duration` lands past
- * the last decodable frame in several browsers and yields either the previous
- * frame or nothing, so the final frame of a clip would not render. It is
- * preserved from the original rather than rounded off.
- */
-export const FRAME_SEEK_EPSILON_SECONDS = 0.001;
-
-/** Where in a clip a frame index sits. */
-export const frameTime = (frameIndex: number, fps: number, duration: number): number =>
-  Math.min(frameIndex / fps, duration - FRAME_SEEK_EPSILON_SECONDS);
-
-/**
- * Move a frame index by one step, stopping at the ends.
- *
- * Returns the index unchanged at a boundary rather than wrapping, which is
- * what the two navigation buttons did with a guard each.
- */
-export const stepFrame = (current: number, delta: number, totalFrames: number): number => {
-  const next = current + delta;
-  if (next < 0 || next > totalFrames - 1) return current;
-  return next;
-};
-
 /** Playback order of frame indices for a loop mode. */
 export const buildLoopSequence = (cachedLength: number, loopMode: string): number[] => {
   const sequence: number[] = [];

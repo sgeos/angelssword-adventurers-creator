@@ -15,6 +15,7 @@ import {
 import { findEl, require2d, requireEl } from "../platform-browser/dom.mts";
 import { fetchBlob } from "../platform-browser/binary.mts";
 import * as VideoPrepCore from "../core/video-prep-core.mts";
+import { clampSeekTime, frameTime, isAtTime, seekDuration, stepFrame } from "../core/video-time.mts";
 
 /**
  * Start playback, reporting the rejection the browser raises when an
@@ -128,11 +129,8 @@ const state: VideoPrepState = {
 /** Seek a video element and wait for 'seeked' event */
 async function seekVideoAsync(videoEl: HTMLVideoElement, time: number, maxDuration?: number): Promise<void> {
     return new Promise((resolve) => {
-        const dur = maxDuration !== undefined && maxDuration > 0
-            ? maxDuration
-            : (videoEl.duration > 0 ? videoEl.duration : 1);
-        const targetTime = Math.min(Math.max(0, time), dur - 0.001);
-        if (Math.abs(videoEl.currentTime - targetTime) < 0.001) {
+        const targetTime = clampSeekTime(time, seekDuration(maxDuration, videoEl.duration));
+        if (isAtTime(videoEl.currentTime, targetTime)) {
             resolve();
             return;
         }
@@ -360,7 +358,7 @@ async function autoCacheFrames(): Promise<void> {
     for (let i = 0; i < total; i++) {
         if (!stillCaching()) break; // Video changed, abort
 
-        const time = Math.min(i / state.fps, state.duration - 0.001);
+        const time = frameTime(i, state.fps, state.duration);
         video.currentTime = time;
         await new Promise(r => { video.addEventListener('seeked', r, { once: true }); });
 
@@ -388,7 +386,7 @@ async function autoCacheFrames(): Promise<void> {
 
 function seekToFrame(frameIdx: number): void {
     if (!state.videoLoaded) return;
-    const time = VideoPrepCore.frameTime(frameIdx, state.fps, state.duration);
+    const time = frameTime(frameIdx, state.fps, state.duration);
 
     // Update scrubber and info
     const info = requireEl('vpFrameInfo', HTMLElement);
@@ -414,10 +412,10 @@ function seekToFrame(frameIdx: number): void {
 }
 
 /** Move one frame, stopping at the ends rather than wrapping. */
-function stepFrame(delta: number): void {
+function stepFrameBy(delta: number): void {
     pauseVideo();
     stopPreview();
-    const next = VideoPrepCore.stepFrame(state.currentFrame, delta, state.totalFrames);
+    const next = stepFrame(state.currentFrame, delta, state.totalFrames);
     if (next === state.currentFrame) return;
     state.currentFrame = next;
     seekToFrame(state.currentFrame);
@@ -800,8 +798,8 @@ function init(): void {
     });
 
     // ── Frame Navigation ──
-    requireEl('vpPrevFrame', HTMLElement).addEventListener('click', () => { stepFrame(-1); });
-    requireEl('vpNextFrame', HTMLElement).addEventListener('click', () => { stepFrame(1); });
+    requireEl('vpPrevFrame', HTMLElement).addEventListener('click', () => { stepFrameBy(-1); });
+    requireEl('vpNextFrame', HTMLElement).addEventListener('click', () => { stepFrameBy(1); });
 
     // ── Play / Pause ──
     requireEl('vpPlayBtn', HTMLElement).addEventListener('click', () => {

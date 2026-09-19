@@ -1,13 +1,15 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    FRAME_SEEK_EPSILON_SECONDS,
     LOOP_MODE_LABELS,
-    frameTime,
     getOutputFrameCount,
     loopSummary,
-    stepFrame,
 } from '../../src/core/video-prep-core.mts';
+import {
+    FRAME_SEEK_EPSILON_SECONDS,
+    frameTime,
+    stepFrame,
+} from '../../src/core/video-time.mts';
 
 /**
  * Arithmetic that was tangled with the video stage's Document Object Model
