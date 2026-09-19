@@ -12,7 +12,8 @@ import {
     notificationSound,
     showToast,
 } from "../platform-browser/shell.mts";
-import { debounce, hexToRgb } from "../platform-browser/app-utils.mts";
+import { debounce } from "../platform-browser/app-utils.mts";
+import { detectKeyColor, hexToRgb, rgbToHex } from "../core/color.mts";
 import type { HandoffPayload } from "../core/video-prep-core.mts";
 import { ChromaKey } from "../core/chroma-key.mts";
 import { closestFrom, queryAll, require2d, requireEl } from "../platform-browser/dom.mts";
@@ -20,6 +21,8 @@ import { channel } from "../core/pixels.mts";
 import {
     MODE_LIMITS,
     asCropRatio,
+    matchedSaturationPercent,
+    placeScaled,
     averageSaturation,
     asExportMode,
     computeCropToCenter,
@@ -455,48 +458,18 @@ export class ModelExporter {
         btn.addEventListener('click', () => {
             if (!this.videoLoaded) return;
 
-            // Sample corners + edges of the frame to detect the most common color
+            // The detection is core. It reads one frame and returns the
+            // colour; sampling, quantising and counting live in color.mts,
+            // where they are tested. This used to call getImageData once per
+            // sample point, roughly two hundred times, and now reads the
+            // frame once.
             this.workCtx.drawImage(this.video, 0, 0, this.videoWidth, this.videoHeight);
-            const w = this.videoWidth, h = this.videoHeight;
-
-            const samplePoints = [];
-            // Top and bottom edges
-            for (let x = 0; x < w; x += Math.max(1, Math.floor(w / 50))) {
-                samplePoints.push([x, 0], [x, h - 1]);
-            }
-            // Left and right edges
-            for (let y = 0; y < h; y += Math.max(1, Math.floor(h / 50))) {
-                samplePoints.push([0, y], [w - 1, y]);
-            }
-
-            // Count colors
-            const colorCounts = new Map<string, number>();
-            for (const point of samplePoints) {
-                const x = channel(point, 0);
-                const y = channel(point, 1);
-                const pixel = this.workCtx.getImageData(x, y, 1, 1).data;
-                // Quantize to reduce noise
-                const qr = Math.min(255, Math.round(channel(pixel, 0) / 16) * 16);
-                const qg = Math.min(255, Math.round(channel(pixel, 1) / 16) * 16);
-                const qb = Math.min(255, Math.round(channel(pixel, 2) / 16) * 16);
-                const key = `${qr.toString()},${qg.toString()},${qb.toString()}`;
-                colorCounts.set(key, (colorCounts.get(key) ?? 0) + 1);
-            }
-
-            // Find most common
-            let bestKey: string | null = null;
-            let bestCount = 0;
-            for (const [key, count] of colorCounts) {
-                if (count > bestCount) { bestCount = count; bestKey = key; }
-            }
-
-            if (bestKey !== null) {
-                const parts = bestKey.split(',').map(Number);
-                const r = channel(parts, 0);
-                const g = channel(parts, 1);
-                const b = channel(parts, 2);
-                this.chromaKey.setKeyColor(r, g, b);
-                const hex = '#' + [r, g, b].map(c => Math.min(255, c).toString(16).padStart(2, '0')).join('');
+            const detected = detectKeyColor(
+                this.workCtx.getImageData(0, 0, this.videoWidth, this.videoHeight),
+            );
+            if (detected !== undefined) {
+                this.chromaKey.setKeyColor(detected.r, detected.g, detected.b);
+                const hex = rgbToHex(detected);
                 this._selectSwatch(hex);
                 this.updatePreview();
                 showToast(`Auto-detected key color: ${hex.toUpperCase()}`, 'success');
@@ -619,10 +592,7 @@ export class ModelExporter {
             // Get current processed output saturation
             const w = this.videoWidth, h = this.videoHeight;
             this.workCtx.clearRect(0, 0, w, h);
-            const scale = positiveOr(this.videoScale, 1);
-            const vOffset = Number.isFinite(this.videoOffset) ? this.videoOffset : 0;
-            const sw = Math.round(w * scale), sh = Math.round(h * scale);
-            const dx = Math.round((w - sw) / 2), dy = Math.round((h - sh) / 2) + vOffset;
+            const { dx, dy, sw, sh } = placeScaled(w, h, this.videoScale, this.videoOffset);
             this.workCtx.drawImage(this.video, 0, 0, this.video.videoWidth, this.video.videoHeight, dx, dy, sw, sh);
             const outData = this.workCtx.getImageData(0, 0, w, h);
             // Process without post-saturation to get base output
@@ -632,15 +602,14 @@ export class ModelExporter {
             this.chromaKey.postSaturation = savedSat;
             const outAvgSat = averageSaturation(outData.data, bgColor, true);
 
-            if (outAvgSat > 0.001) {
-                const ratio = refAvgSat / outAvgSat;
-                const newSatPercent = Math.round(Math.max(0, Math.min(200, ratio * 100)));
+            const newSatPercent = matchedSaturationPercent(refAvgSat, outAvgSat);
+            if (newSatPercent !== undefined) {
                 requireEl('exSaturation', HTMLInputElement).value = String(newSatPercent);
                 requireEl('exSaturationVal', HTMLElement).textContent = `${newSatPercent.toString()}%`;
                 this.chromaKey.postSaturation = newSatPercent / 100;
                 this.persistSliders();
                 this.updatePreview();
-                console.log(`[RefMatch] ref=${refAvgSat.toFixed(3)} out=${outAvgSat.toFixed(3)} ratio=${ratio.toFixed(2)} → sat=${newSatPercent.toString()}%`);
+                console.log(`[RefMatch] ref=${refAvgSat.toFixed(3)} out=${outAvgSat.toFixed(3)} → sat=${newSatPercent.toString()}%`);
             }
         });
 
@@ -864,25 +833,16 @@ export class ModelExporter {
 
         const w = this.videoWidth;
         const h = this.videoHeight;
-        const scale = positiveOr(this.videoScale, 1);
-        const vOffset = Number.isFinite(this.videoOffset) ? this.videoOffset : 0;
+        const { dx, dy, sw, sh } = placeScaled(w, h, this.videoScale, this.videoOffset);
 
         if (this.previewMode === 'original') {
             this.previewCtx.clearRect(0, 0, w, h);
-            const sw = Math.round(w * scale);
-            const sh = Math.round(h * scale);
-            const dx = Math.round((w - sw) / 2);
-            const dy = Math.round((h - sh) / 2) + vOffset;
             this.previewCtx.drawImage(this.video, 0, 0, this.video.videoWidth, this.video.videoHeight, dx, dy, sw, sh);
             return;
         }
 
         // Draw video scaled + centered to work canvas
         this.workCtx.clearRect(0, 0, w, h);
-        const sw = Math.round(w * scale);
-        const sh = Math.round(h * scale);
-        const dx = Math.round((w - sw) / 2);
-        const dy = Math.round((h - sh) / 2) + vOffset;
         this.workCtx.drawImage(this.video, 0, 0, this.video.videoWidth, this.video.videoHeight, dx, dy, sw, sh);
         const imageData = this.workCtx.getImageData(0, 0, w, h);
 
@@ -1204,10 +1164,7 @@ export class ModelExporter {
 
             const drawScaled = (): void => {
                 recCtx.clearRect(0, 0, width, height);
-                const sw = Math.round(width * videoScale);
-                const sh = Math.round(height * videoScale);
-                const dx = Math.round((width - sw) / 2);
-                const dy = Math.round((height - sh) / 2) + videoOffset;
+                const { dx, dy, sw, sh } = placeScaled(width, height, videoScale, videoOffset);
                 if (this.cropEnabled) {
                     recCtx.drawImage(this.video, this.cropX, this.cropY, this.cropW, this.cropH, dx, dy, sw, sh);
                 } else {
@@ -1406,10 +1363,7 @@ export class ModelExporter {
 
             const drawVideoScaled = (ctx: CanvasRenderingContext2D, w: number, h: number): void => {
                 ctx.clearRect(0, 0, w, h);
-                const sw = Math.round(w * videoScale);
-                const sh = Math.round(h * videoScale);
-                const dx = Math.round((w - sw) / 2);
-                const dy = Math.round((h - sh) / 2) + videoOffset;
+                const { dx, dy, sw, sh } = placeScaled(w, h, videoScale, videoOffset);
                 if (this.cropEnabled) {
                     ctx.drawImage(this.video, this.cropX, this.cropY, this.cropW, this.cropH, dx, dy, sw, sh);
                 } else {

@@ -1,6 +1,10 @@
 import { describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { debounce, base64ToBlob, hexToRgb, colorName } from '../../src/platform-browser/app-utils.mts';
+import { debounce, base64ToBlob } from '../../src/platform-browser/app-utils.mts';
+// hexToRgb and colorName moved to the core, neither touching the platform.
+// The assertions below stay here as well as in color.test.mts, so that the
+// move is proved not to have changed what they answer.
+import { hexToRgb, colorName } from '../../src/core/color.mts';
 
 describe('app-utils', () => {
     it('hexToRgb(#00FF00) → {r:0,g:255,b:0}', () => {

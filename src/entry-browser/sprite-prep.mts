@@ -14,7 +14,8 @@ import {
     showToast,
     switchTab,
 } from "../platform-browser/shell.mts";
-import { base64ToBlob, blobToBase64, bytesToDataUri, colorName, debounce } from "../platform-browser/app-utils.mts";
+import { base64ToBlob, blobToBase64, bytesToDataUri, debounce } from "../platform-browser/app-utils.mts";
+import { colorName } from "../core/color.mts";
 import { closestFrom, fieldValue, queryAll, require2d, requireEl } from "../platform-browser/dom.mts";
 import * as Core from "../core/sprite-prep-core.mts";
 import { buildWorkflowFor, loadComfySettings } from "../core/comfyui-core.mts";

@@ -72,26 +72,9 @@ export const blobToBase64 = async (blob: Blob): Promise<string> =>
     reader.readAsDataURL(blob);
   });
 
-export interface Rgb {
-  readonly r: number;
-  readonly g: number;
-  readonly b: number;
-}
-
-/** Parse `#rrggbb` into components. */
-export const hexToRgb = (hex: string): Rgb => ({
-  r: parseInt(hex.slice(1, 3), 16),
-  g: parseInt(hex.slice(3, 5), 16),
-  b: parseInt(hex.slice(5, 7), 16),
-});
-
-const COLOR_NAMES: Readonly<Record<string, string>> = {
-  "#00FF00": "Green",
-  "#FF00FF": "Magenta",
-  "#0000FF": "Blue",
-  "#FFFF00": "Yellow",
-  "#00FFFF": "Cyan",
-};
-
-/** Friendly name for a known key colour, or the hex itself. */
-export const colorName = (hex: string): string => COLOR_NAMES[hex.toUpperCase()] ?? hex;
+/*
+ * `Rgb`, `hexToRgb`, `colorName` and the named-colour table used to live
+ * here. None of the four touches the platform, and the core carried a second
+ * copy of the table because it could not reach this one. They are in
+ * `core/color.mts` now; this file keeps only what genuinely needs a browser.
+ */

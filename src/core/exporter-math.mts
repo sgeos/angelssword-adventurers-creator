@@ -247,6 +247,67 @@ export const savePersistedSliders = (store: KeyValueStore, sliders: PersistedSli
 };
 
 /* ────────────────────────────────────────────────────────────────────────
+ * Placing the video inside the output frame.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/** Where and how large the video is drawn inside the output frame. */
+export interface Placement {
+    /** Left edge of the destination rectangle. */
+    readonly dx: number;
+    /** Top edge of the destination rectangle. */
+    readonly dy: number;
+    /** Destination width. */
+    readonly sw: number;
+    /** Destination height. */
+    readonly sh: number;
+}
+
+/**
+ * Scale the video about the frame's centre, then shift it vertically.
+ *
+ * # This existed five times
+ *
+ * The preview, the original-mode preview, the reference-match measurement,
+ * the WebM recorder and the Graphics Interchange Format encoder each computed
+ * it, identically, and each sanitised its inputs the same way immediately
+ * beforehand. Five copies of four lines is how a change reaches four of five
+ * places.
+ *
+ * # What the sanitising is for
+ *
+ * The scale and the offset come from numeric inputs, so both can arrive as
+ * NaN, and the scale can arrive as zero or negative. A non-positive scale
+ * collapses the frame to nothing and a NaN offset makes every coordinate NaN,
+ * neither of which a user asked for by typing in a box. A scale falls back to
+ * 1 and an offset to 0.
+ *
+ * # Rounding
+ *
+ * Each of the four values is rounded independently, which is what the copies
+ * did. That means the drawn rectangle is not necessarily centred to the pixel
+ * when the scaled size is odd against an even frame, the remainder falling on
+ * one side. It is preserved rather than corrected, because the alternative
+ * shifts every existing export by up to half a pixel.
+ */
+export const placeScaled = (
+    width: number,
+    height: number,
+    rawScale: number,
+    rawOffset: number,
+): Placement => {
+    const scale = positiveOr(rawScale, 1);
+    const offset = Number.isFinite(rawOffset) ? rawOffset : 0;
+    const sw = Math.round(width * scale);
+    const sh = Math.round(height * scale);
+    return {
+        sw,
+        sh,
+        dx: Math.round((width - sw) / 2),
+        dy: Math.round((height - sh) / 2) + offset,
+    };
+};
+
+/* ────────────────────────────────────────────────────────────────────────
  * Reference-match saturation analysis.
  *
  * Moved here from model-exporter so it is reachable from tests. It took an
@@ -296,4 +357,41 @@ export const averageSaturation = (
       count++;
   }
   return count > 0 ? totalSat / count : 0;
+};
+
+/**
+ * Below this, the output is treated as having no colour to match against.
+ *
+ * Dividing by a near-zero average saturation produces an enormous ratio from
+ * rounding noise, so the exporter declines to act rather than slamming the
+ * slider to its limit.
+ */
+export const SATURATION_MATCH_FLOOR = 0.001;
+
+/** The slider cannot exceed this, so neither can a matched value. */
+export const SATURATION_MAX_PERCENT = 200;
+
+/**
+ * The saturation percentage that would make the output match a reference.
+ *
+ * Returns undefined when the output has essentially no saturation to scale,
+ * which is the case the exporter skips. Returning a value there would mean
+ * choosing one, and there is no right answer, since an output with no colour
+ * cannot be made to match a reference that has some.
+ *
+ * The result is clamped to the slider's own range and rounded to a whole
+ * percent, because that is what is written back into the control. Rounding
+ * here rather than at the call site keeps the returned number and the
+ * displayed number the same.
+ *
+ * The floor comparison is written so that a NaN output average declines
+ * rather than proceeding, NaN failing every ordered comparison.
+ */
+export const matchedSaturationPercent = (
+    referenceAverage: number,
+    outputAverage: number,
+): number | undefined => {
+    if (!(outputAverage > SATURATION_MATCH_FLOOR)) return undefined;
+    const ratio = referenceAverage / outputAverage;
+    return Math.round(Math.max(0, Math.min(SATURATION_MAX_PERCENT, ratio * 100)));
 };

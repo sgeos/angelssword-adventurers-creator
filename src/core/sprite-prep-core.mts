@@ -2,6 +2,7 @@
  * Sprite Prep core: pure logic, no DOM and no fetch.
  */
 import { channel, type RgbaBuffer } from "./pixels.mts";
+import { colorName } from "./color.mts";
 
 export interface KeyColor {
   readonly hex: string;
@@ -127,16 +128,15 @@ export const computeSpriteDrawRect = (opts: DrawRectOptions): DrawRect => {
   };
 };
 
-const DEFAULT_COLOR_NAMES: Readonly<Record<string, string>> = {
-  "#00FF00": "Green",
-  "#FF00FF": "Magenta",
-  "#0000FF": "Blue",
-  "#FFFF00": "Yellow",
-  "#00FFFF": "Cyan",
-};
-
-export const defaultColorName = (hex: string): string =>
-  DEFAULT_COLOR_NAMES[hex.toUpperCase()] ?? hex;
+/**
+ * Default naming for a key colour.
+ *
+ * This carried its own copy of the table until `color.mts` existed, because
+ * the only other copy was in the platform and the core could not reach it.
+ * The `colorNameFn` seam below remains, a caller overriding the naming being
+ * reasonable, but its default is now the one table rather than a second one.
+ */
+export const defaultColorName = (hex: string): string => colorName(hex);
 
 export type RaceMode = "normal" | "kanolith" | "zoalith";
 

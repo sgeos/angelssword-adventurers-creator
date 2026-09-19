@@ -224,7 +224,7 @@ export function showToast(message: string, type = 'info'): void {
 // ============================================
 // UTILITY FUNCTIONS
 // ============================================
-// Shared utils (debounce, base64ToBlob, blobToBase64, hexToRgb, colorName)
+// Shared utils (debounce, base64ToBlob, blobToBase64, bytesToDataUri)
 // live in public/lib/app-utils.js and are attached to window before this script.
 
 // ============================================
