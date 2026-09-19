@@ -12,40 +12,51 @@ file is arranged this way rather than being rewritten wholesale.
 
 ## Last Updated
 
-2026-09-19. Knowledge graph adaptation. Complete.
+2026-09-19. Reimplementation of upstream pull request 1. Complete.
 
 ## Verification
 
-`npm run check`, `npm test`, and `npx playwright test` all pass. 182 unit
-tests, 15 application programming interface tests, 10 browser specifications.
+`npm run check`, `npm test` and `npx playwright test` all pass. 276 unit
+tests, 44 application programming interface tests, 22 browser
+specifications. The container was verified by building and running it.
 
 ## Summary
 
-A Markdown knowledge graph was added under `docs/`, adapted from the reference
-project named by the operator. The communication and handoff protocols were
-carried across and rewritten for this project's scale. The upstream product
-brief, previously at the repository root, moved into the graph.
+Upstream pull request 1 is fully reimplemented across five increments: a
+provider abstraction with Grok sprites, Grok video, ComfyUI sprites, ComfyUI
+Wan video, and container deployment. Three parts were deliberately not
+reproduced, each for a stated reason recorded beside the code that would have
+held them.
 
 ## Questions for Human Pilot
 
-None outstanding.
+None outstanding. The next task is stated in
+[HANDOFF.md](./HANDOFF.md) and is a rearchitecture into three layers.
 
 ## Technical Concerns
 
-The graph is new and has not been used by a resuming session, so its handoff
-validity check has never actually been run in anger.
+Nothing added for Grok or ComfyUI has run against a live service. Every
+provider test uses mocked routes, so the request shapes are faithful to what
+upstream established empirically rather than independently verified.
 
-Five modules totalling roughly 4,700 lines remain without unit tests, being
-coupled to a live canvas.
+Completing the environment key support made six tests environment-dependent:
+they passed in continuous integration and failed on a workstation with a key
+exported. A `withoutEnv` helper fixed it, but the class of problem will recur
+wherever a fallback reads the environment.
+
+Five stage modules totalling roughly 4,700 lines still have no unit tests.
+The next task subsumes this, the cause being the same coupling in both cases.
 
 ## Intended Next Step
 
-None. Awaiting a prompt.
+The three-layer rearchitecture described in [HANDOFF.md](./HANDOFF.md). Read
+the two reference projects first. Measure before moving anything, because a
+portable core already exists in fourteen modules without being named.
 
 ## Session Context
 
-Fork `main` at the commit that introduced this file. Upstream carries two open
-pull requests and one open issue from this fork.
+`main` at `69addb8`. Upstream carries two open pull requests and one open
+issue, all from this fork.
 
 ---
 

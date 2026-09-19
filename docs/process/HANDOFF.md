@@ -2,86 +2,154 @@
 
 > **Navigation**: [Process](./README.md) | [Documentation Root](../README.md)
 
-**Refreshed 2026-09-19, describing `main` at `eafb924`.** Read this block, run
-the validity check, then stop and wait for a human prompt.
+**Refreshed 2026-09-19, describing `main` at `69addb8`.** Read this block, run
+the validity check, then read the task below. It is a rearchitecture and
+should not be begun without reading the two reference projects named.
 
 ---
 
 ## Validity
 
 Validate by content, never by a hash match. A check requiring the tip to equal
-a recorded commit claims that nothing else ever lands, and such a check fails
-the first time anybody commits. The assertions below are cheap, independent,
-and each was true when this file was refreshed.
+a recorded commit claims that nothing else ever lands, and fails on the next
+commit. Each assertion below was true at the refresh.
 
-1. `git ls-files` reports **51** TypeScript files and exactly **one**
-   JavaScript file, `eslint.config.mjs`. A second JavaScript file means either
-   a regression or a deliberate exception that this file predates.
-2. **Four** `tsconfig.*.json` projects exist at the repository root. Their
-   purposes are described in
-   [PROJECT_STRUCTURE.md](../architecture/PROJECT_STRUCTURE.md).
-3. `npm test` reports **182** unit tests and **15** application programming
-   interface tests, all passing. A lower count means tests were removed.
-4. `npx playwright test` reports **10** passing browser specifications.
-5. The tag `initial-typescript-conversion` exists and points at the merge that
-   brought TypeScript to `main`.
+1. `git ls-files` reports **58** TypeScript files and exactly **one**
+   JavaScript file, `eslint.config.mjs`, which is deliberate.
+2. **Four** `tsconfig.*.json` projects exist at the repository root.
+3. `npm test` reports **276** unit tests and **44** application programming
+   interface tests, all passing.
+4. `npx playwright test` reports **22** passing browser specifications.
+5. `docker compose up --build` produces a container that serves on port 3001.
 
-If an assertion fails, this file is stale. Trust the repository and say so in
-`REVERSE_PROMPT.md` rather than trusting this document.
+If an assertion fails, this file is stale. Trust the repository and say so.
 
 ## What a resuming session should do first
 
-1. Run the validity check above.
-2. Read [TASKLOG.md](./TASKLOG.md) and the current-state block of
-   [REVERSE_PROMPT.md](./REVERSE_PROMPT.md).
-3. Read [AGENT_PITFALLS.md](./AGENT_PITFALLS.md). It is short, and every entry
-   records a mistake actually made in this repository.
+1. Run the validity check.
+2. Read [AGENT_PITFALLS.md](./AGENT_PITFALLS.md). Short, and every entry is a
+   mistake made in this repository. Two of them were repeated after being
+   written down, so it is not merely decorative.
+3. Read the task below and the two reference projects.
 4. Stop and wait for a prompt.
 
 ## Current state
 
-The project is a hard fork of `AngelsSwordStudios/angelssword-adventurers-creator`,
-converted to TypeScript throughout. The fork's `main` branch is the working
-line. Upstream is dormant, with three commits in total.
+A hard fork of `AngelsSwordStudios/angelssword-adventurers-creator`, converted
+to TypeScript throughout. Upstream is dormant.
 
-The application is a four-stage pipeline in a single page. Sprite preparation,
-video generation, video preparation, and model export. Stages communicate
-through a shared handoff object described in
-[PIPELINE.md](../architecture/PIPELINE.md).
+A four-stage pipeline in one page. Sprite preparation, video generation, video
+preparation, model export, communicating through a shared handoff object.
+Sprites generate through OpenAI, Grok, or a local ComfyUI. Video generates
+through Gemini, Grok, or ComfyUI with Wan image-to-video. A local server
+proxies every outbound call.
 
-Verification passes in full. Typecheck and lint across four projects, 182 unit
-tests, 15 application programming interface tests, 10 browser specifications,
-and a continuous integration workflow observed to succeed.
+The whole of upstream pull request 1 has been reimplemented, deliberately
+excluding three things. Its OAuth flow presented as xAI's own command line
+client. Its ComfyUI restart route ran a shell command and needed the Docker
+socket mounted. Its video fetch attached the user's credential to any address
+a caller named. Each omission is recorded where the code would have gone.
+
+Verification passes in full, and the container is verified by building and
+running rather than by reading.
+
+## The next task
+
+Rearchitect the project into three layers, matching the operator's Rust
+projects.
+
+- A portable core, free of platform assumptions, inverting control through
+  interfaces so that capabilities normally taken from the platform are
+  supplied to it.
+- A platform layer implementing those interfaces for a particular target,
+  which may use the platform's own facilities or delegate to a proprietary
+  library.
+- An entry point, which may be a command line tool, an application, or a
+  library.
+
+Two reference projects almost certainly follow this pattern and should be read
+before starting.
+
+- `~/projects/rust/keleusma/`
+- `~/projects/re/1830/`
+
+Note that the first is also the source of this repository's knowledge graph
+and process protocol, so its conventions are already partly present here.
+
+### What is already true, and what is not
+
+The shape exists in part and is worth measuring before moving anything.
+Classified by whether a browser interface appears in code rather than in a
+comment, which matters because several modules discuss `localStorage` in prose
+without touching it:
+
+**Portable today, fourteen modules.** `api`, `chroma-key`, `comfyui-core`,
+`exporter-math`, `gif-codec`, `gif-worker`, `gif-worker-core`,
+`grok-video-core`, `pixels`, `providers`, `sprite-prep-core`, `timer-worker`,
+`video-gen-core`, `video-prep-core`.
+
+**Coupled to the browser, eight modules.** `app`, `app-utils`, `dom`,
+`gif-composite`, `model-exporter`, `sprite-prep`, `video-gen`, `video-prep`.
+
+So a portable core largely exists and is unnamed. What does not exist is the
+inversion. The portable modules do not receive their capabilities through
+interfaces; they simply avoid needing any. Where a capability is genuinely
+required, the coupling sits in the stage module instead, which is why those
+eight are large and thinly tested.
+
+The clearest candidates for inverted capabilities, each currently reached
+directly rather than supplied:
+
+- **Storage.** `localStorage` is read and written in at least four modules.
+- **A drawing surface.** Canvas work forced the decision not to supply one in
+  tests, which is why five stage modules have no unit tests at all.
+- **The network.** Already inverted on the server through `createApp(fetchImpl)`,
+  and not inverted at all in the browser.
+- **Time and scheduling.** `setTimeout` appears in several polling loops.
+- **Randomness.** Seeds are drawn with `Math.random` inside generation paths.
+
+### Why this is worth doing here
+
+Not merely for symmetry with the Rust projects. Five modules totalling roughly
+4,700 lines have no unit tests, and the reason is uniformly that they reach
+for a canvas or the document. Inverting those capabilities is the same work as
+making them testable, so the architectural change and the coverage gap have
+one answer.
+
+### Traps specific to this task
+
+`tsconfig.browser.json` withholds the node types and `tsconfig.json` withholds
+the document library, which already enforces part of this separation. A
+portable core needs a project that has neither, as `tsconfig.worker.json`
+already demonstrates for the workers. Expect the project layout to change, and
+expect `eslint.config.mjs` to need matching scopes, since it names projects
+explicitly.
+
+Do not move files before the interfaces exist. A rename that merely relocates
+the coupling costs the same review effort and buys nothing.
 
 ## Open matters
 
-These are recorded in [decisions/OPEN.md](../decisions/OPEN.md) and summarised
-here because a resuming session will meet them.
+Recorded in [decisions/OPEN.md](../decisions/OPEN.md).
 
-- Five modules totalling roughly 4,700 lines have no unit tests. They are
-  coupled to a live canvas, which the test environment deliberately does not
-  provide.
-- The Windows and Linux binary builds have never been run. Only macOS on arm64
-  has been exercised.
-- No stage has been tested against live application programming interface
-  keys.
-- No release has been cut, so the only way to obtain a binary is to build one.
+- Five stage modules have no unit tests. See above; this task subsumes it.
+- The Windows and Linux binary builds have never been run.
+- Nothing has been exercised against live keys, a real ComfyUI, or a real
+  Grok subscription. Every provider test uses mocked routes. The request
+  shapes are faithful to what upstream established empirically, but a
+  specification derived from another person's debugging is not verification.
+- No release has been cut.
 
 ## Relationship to upstream
 
-Two pull requests and one issue are open upstream. The pull requests are a
-portability change and a notice that this fork exists. The issue reports four
-defects present in the upstream JavaScript.
-
-One correction was posted to that issue and matters to anyone reading it. The
-key colour defect was first reported as a feature never connected. That was
-wrong. The field is assigned on the handoff root and the exporter was reading
-it from the wrong object, so the remedy is a corrected read rather than a
-design decision.
+Two pull requests and one issue are open upstream, all from this fork. The
+issue reports four defects in the upstream JavaScript and carries a posted
+correction: the key colour defect was first reported as an unconnected
+feature, which was wrong, the field being read from the wrong object.
 
 ## Refreshing this file
 
-Rewrite the block above when the assertions stop being true. Do not append a
-new section and leave the old one in place, which is how the reference
-project's equivalent file reached 118 kilobytes. Superseded detail belongs in
+Rewrite the block above when its assertions stop holding. Do not append and
+leave the old one, which is how the reference project's equivalent reached 118
+kilobytes. Superseded detail belongs in
 [DESIGN_JOURNAL.md](./DESIGN_JOURNAL.md).

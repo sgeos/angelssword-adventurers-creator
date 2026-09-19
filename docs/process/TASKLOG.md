@@ -11,12 +11,25 @@ bound.
 
 ## Active
 
-None.
+**Three-layer rearchitecture.** Portable core with inverted capabilities, a
+platform layer implementing them, and entry points. Specified in
+[HANDOFF.md](./HANDOFF.md). Not started. Reference projects to read first are
+`~/projects/rust/keleusma/` and `~/projects/re/1830/`.
+
+Success is a portable core that names its required capabilities as interfaces
+rather than avoiding the need for them, a platform layer supplying them for
+the browser and for node, and the five currently untested stage modules
+brought under test as a consequence rather than as separate work.
 
 ## Recently Completed
 
 | Task | Status | Verification |
 |---|---|---|
+| Container deployment, environment keys completed | Complete | Image built and run; 276/44/22 pass |
+| ComfyUI Wan image-to-video | Complete | Letterbox verified at 832x480 |
+| ComfyUI sprites, wired | Complete | Generates with no key set |
+| Grok video, wired | Complete | Start, poll and fetch sequence |
+| Provider abstraction and Grok sprites | Complete | Toggle reaches generation |
 | Knowledge graph adopted under `docs/` | Complete | Full gate passes |
 | `tmp/` and `secret/` markers tracked | Complete | Ignore rules exercised both ways |
 | Attribution, `keyColor`, jsdom, Node single executable | Complete | 182 unit tests, binary runs |
