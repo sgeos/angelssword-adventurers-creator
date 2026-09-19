@@ -171,7 +171,10 @@ Generate panel. Video generation runs through Google Gemini or through Grok,
 selected in the Video Generation panel. Each provider uses its own key,
 entered in Settings and held in browser storage.
 
-Sprites may also be generated locally with ComfyUI, configured in Settings.
+Sprites and video may also be generated locally with ComfyUI, configured in
+Settings. Video uses Wan image-to-video, and the reference still is
+letterboxed onto the Wan canvas beforehand so that the whole character stays
+in frame rather than being cropped at the head or feet.
 Only addresses on the local network are accepted, and the endpoints the
 application may reach are restricted to the five it uses. No credential is
 involved, because ComfyUI runs on the user's own machine.

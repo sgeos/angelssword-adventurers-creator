@@ -16,7 +16,18 @@ import {
 import { base64ToBlob } from "./app-utils.mts";
 
 import { reasonText, responseErrorMessage } from "./api.mts";
-import { closestFrom, findEl, queryAll, requireEl } from "./dom.mts";
+import { closestFrom, findEl, queryAll, require2d, requireEl } from "./dom.mts";
+import {
+    COMFY_SETTINGS_KEY,
+    WAN_SETTINGS_KEY,
+    buildWanI2VWorkflow,
+    computeLetterbox,
+    extractHistoryImages,
+    extractPromptId,
+    parseComfySettings,
+    parseWanSettings,
+    viewQuery,
+} from "./comfyui-core.mts";
 import * as VideoGenCore from "./video-gen-core.mts";
 import {
     VIDEO_PROVIDERS,
@@ -35,6 +46,10 @@ import {
 
 /** Where the chosen video provider is remembered between sessions. */
 const VIDEO_PROVIDER_PREFERENCE_KEY = 'video_provider';
+
+/** Wan renders slowly, so this polls less often and waits far longer. */
+const WAN_POLL_INTERVAL_MS = 3_000;
+const WAN_MAX_POLLS = 400;
 
 // ============================================
 // STATE
@@ -130,10 +145,22 @@ async function generateVideo(): Promise<void> {
     if (generating) return;
 
     const provider = videoProviderFrom(localStorage.getItem(VIDEO_PROVIDER_PREFERENCE_KEY));
-    const apiKey = localStorage.getItem(provider.storageKey);
-    if (apiKey === null || apiKey === '') {
-        showToast(`No ${provider.label} API key. Go to Settings to add one.`, 'error');
-        return;
+
+    // ComfyUI runs on the user's own machine and holds no credential, so what
+    // can be missing is its address rather than a key.
+    let apiKey = '';
+    if (provider.id === 'comfyui') {
+        if (parseComfySettings(localStorage.getItem(COMFY_SETTINGS_KEY)).url === '') {
+            showToast('No ComfyUI address. Go to Settings to add one.', 'error');
+            return;
+        }
+    } else {
+        const stored = localStorage.getItem(provider.storageKey);
+        if (stored === null || stored === '') {
+            showToast(`No ${provider.label} API key. Go to Settings to add one.`, 'error');
+            return;
+        }
+        apiKey = stored;
     }
 
     if (referenceImages.length === 0) {
@@ -178,8 +205,9 @@ async function generateVideo(): Promise<void> {
         const promises = [];
         for (let i = 0; i < genCount; i++) {
             if (isCancelled()) break;
-            promises.push(provider.id === 'xai'
-                ? generateOneGrokVideo(apiKey, prompt, duration, mode)
+            promises.push(
+                provider.id === 'xai' ? generateOneGrokVideo(apiKey, prompt, duration, mode)
+                : provider.id === 'comfyui' ? generateOneWanVideo(prompt)
                 : generateOneVideo(apiKey, prompt, duration, mode));
         }
 
@@ -212,6 +240,119 @@ async function generateVideo(): Promise<void> {
         requireEl('vgProgress', HTMLElement).classList.remove('active');
         requireEl('vgGenerateBtn', HTMLButtonElement).disabled = false;
     }
+}
+
+/**
+ * Letterbox a still onto the Wan canvas.
+ *
+ * Wan reframes a still that does not match its aspect ratio, and reframing a
+ * full-body character means losing the head or the feet. Fitting the whole
+ * image onto the canvas first, with a margin, leaves nothing at the edge for
+ * it to crop. The padding takes the source's top-left pixel, which on a keyed
+ * sprite is the key colour, so the padding keys out with the rest.
+ */
+async function letterboxForWan(dataUrl: string, width: number, height: number): Promise<string> {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const el = new Image();
+        el.onload = (): void => { resolve(el); };
+        el.onerror = (): void => { reject(new Error('Could not read the reference image')); };
+        el.src = dataUrl;
+    });
+
+    const box = computeLetterbox(image.naturalWidth, image.naturalHeight, width, height);
+
+    const probe = document.createElement('canvas');
+    probe.width = 1;
+    probe.height = 1;
+    const probeCtx = require2d(probe);
+    probeCtx.drawImage(image, 0, 0, 1, 1, 0, 0, 1, 1);
+    const [r, g, b] = probeCtx.getImageData(0, 0, 1, 1).data;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = box.width;
+    canvas.height = box.height;
+    const ctx = require2d(canvas);
+    ctx.fillStyle = `rgb(${String(r ?? 0)},${String(g ?? 0)},${String(b ?? 0)})`;
+    ctx.fillRect(0, 0, box.width, box.height);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(image, box.offsetX, box.offsetY, box.drawWidth, box.drawHeight);
+    return canvas.toDataURL('image/png');
+}
+
+/** One call through the local ComfyUI proxy. */
+async function comfyCall(path: string, method: string, body?: unknown): Promise<Response> {
+    const baseUrl = parseComfySettings(localStorage.getItem(COMFY_SETTINGS_KEY)).url;
+    return fetch(VIDEO_PROVIDERS.comfyui.generateRoute, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ baseUrl, path, method, body }),
+    });
+}
+
+/**
+ * Generate one clip on the user's own ComfyUI, through Wan.
+ *
+ * Same four steps as the sprite path. Upload the letterboxed frame, queue the
+ * graph, poll the history, retrieve the result.
+ */
+async function generateOneWanVideo(prompt: string): Promise<GeneratedVideo | null> {
+    const reference = referenceImages[0];
+    if (reference === undefined) throw new Error('ComfyUI video needs a reference image');
+
+    const wan = parseWanSettings(localStorage.getItem(WAN_SETTINGS_KEY));
+    const framed = await letterboxForWan(reference.dataUrl, wan.width, wan.height);
+
+    const uploaded = await comfyCall('/upload/image', 'POST', {
+        image: framed,
+        filename: `as_adventurer_wan_${Date.now().toString()}.png`,
+    });
+    const uploadBody: unknown = await uploaded.json().catch(() => ({}));
+    const uploadedName = typeof uploadBody === 'object' && uploadBody !== null && 'name' in uploadBody
+        ? { ...uploadBody }.name
+        : undefined;
+    if (typeof uploadedName !== 'string' || uploadedName === '') {
+        throw new Error('ComfyUI did not accept the reference image');
+    }
+
+    const built = buildWanI2VWorkflow(wan, {
+        imageName: uploadedName,
+        positiveText: prompt === ''
+            ? 'Gentle breathing idle animation with slight body sway, seamless loop, static camera, full body in frame'
+            : prompt,
+        seed: Math.floor(Math.random() * 1_000_000_000),
+    });
+
+    const queued = await comfyCall('/prompt', 'POST', { prompt: built.workflow });
+    const queuedBody: unknown = await queued.json().catch(() => ({}));
+    if (!queued.ok) throw new Error(describeError(queuedBody, queued.status));
+    const promptId = extractPromptId(queuedBody);
+    if (promptId === undefined) throw new Error('ComfyUI did not return a prompt id');
+
+    const progressText = findEl('vgProgressText', HTMLElement);
+    for (let attempt = 0; attempt < WAN_MAX_POLLS; attempt++) {
+        if (isCancelled()) return null;
+        await wait(WAN_POLL_INTERVAL_MS);
+        if (isCancelled()) return null;
+
+        if (progressText !== undefined) {
+            const seconds = Math.floor(((attempt + 1) * WAN_POLL_INTERVAL_MS) / 1000);
+            progressText.textContent = `ComfyUI rendering… (${seconds.toString()}s)`;
+        }
+
+        const polled = await comfyCall(`/history/${promptId}`, 'GET');
+        if (!polled.ok) continue;
+        const history: unknown = await polled.json().catch(() => ({}));
+        const image = extractHistoryImages(history, promptId, built.saveNodeId)[0];
+        if (image === undefined) continue;
+
+        const view = await comfyCall(`/view?${viewQuery(image)}`, 'GET');
+        if (!view.ok) throw new Error('ComfyUI produced a clip that could not be retrieved');
+        const blob = await view.blob();
+        return { blob, url: URL.createObjectURL(blob) };
+    }
+
+    throw new Error('ComfyUI video generation timed out');
 }
 
 /** Sleep, so the poll loop yields between attempts. */

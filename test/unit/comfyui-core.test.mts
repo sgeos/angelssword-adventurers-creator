@@ -2,6 +2,9 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
     COMFY_DEFAULTS,
+    LETTERBOX_MARGIN,
+    WAN_DEFAULTS,
+    WAN_NEGATIVE_PROMPT,
     SPRITE_HEIGHT,
     SPRITE_WIDTH,
     buildFluxWorkflow,
@@ -9,7 +12,10 @@ import {
     extractHistoryImages,
     extractPromptId,
     asWorkflowKind,
+    buildWanI2VWorkflow,
     buildWorkflowFor,
+    computeLetterbox,
+    parseWanSettings,
     parseComfySettings,
     viewQuery,
     type ComfyWorkflow,
@@ -326,5 +332,144 @@ describe('buildWorkflowFor', () => {
         assert.equal(sampler?.inputs['steps'], 33);
         const guide = Object.values(workflow).find((n) => n.class_type === 'FluxGuidance');
         assert.equal(guide?.inputs['guidance'], 6);
+    });
+});
+
+describe('buildWanI2VWorkflow', () => {
+    const opts = { imageName: 'frame.png', positiveText: 'gentle idle sway', seed: 7 };
+
+    it('produces a graph whose every reference resolves', () => {
+        const { workflow } = buildWanI2VWorkflow(WAN_DEFAULTS, opts);
+        for (const id of referencedIds(workflow)) {
+            assert.ok(id in workflow, `node ${id} is referenced but absent`);
+        }
+    });
+
+    it('feeds the sampler all three WanImageToVideo outputs', () => {
+        // This is what makes it image-to-video rather than text-to-video.
+        // The conditioning comes from the Wan node, not from the encoders.
+        const { workflow } = buildWanI2VWorkflow(WAN_DEFAULTS, opts);
+        const [wanId] = nodesOfType(workflow, 'WanImageToVideo')[0] ?? [];
+        const [, sampler] = nodesOfType(workflow, 'KSampler')[0] ?? [];
+        assert.deepEqual(sampler?.inputs['positive'], [wanId, 0]);
+        assert.deepEqual(sampler.inputs['negative'], [wanId, 1]);
+        assert.deepEqual(sampler.inputs['latent_image'], [wanId, 2]);
+    });
+
+    it('disables the vision encoder crop, which would undo the letterboxing', () => {
+        const { workflow } = buildWanI2VWorkflow(WAN_DEFAULTS, opts);
+        const [, encode] = nodesOfType(workflow, 'CLIPVisionEncode')[0] ?? [];
+        assert.equal(encode?.inputs['crop'], 'none');
+    });
+
+    it('uses the uni_pc sampler Wan expects', () => {
+        const { workflow } = buildWanI2VWorkflow(WAN_DEFAULTS, opts);
+        const [, sampler] = nodesOfType(workflow, 'KSampler')[0] ?? [];
+        assert.equal(sampler?.inputs['sampler_name'], 'uni_pc');
+    });
+
+    it('loads the text encoder as a Wan CLIP', () => {
+        const { workflow } = buildWanI2VWorkflow(WAN_DEFAULTS, opts);
+        const [, clip] = nodesOfType(workflow, 'CLIPLoader')[0] ?? [];
+        assert.equal(clip?.inputs['type'], 'wan');
+    });
+
+    it('carries the anti-crop negative, which keeps head and feet in frame', () => {
+        const { workflow } = buildWanI2VWorkflow(WAN_DEFAULTS, opts);
+        const encoders = nodesOfType(workflow, 'CLIPTextEncode');
+        assert.ok(encoders.some(([, n]) => n.inputs['text'] === WAN_NEGATIVE_PROMPT));
+        assert.match(WAN_NEGATIVE_PROMPT, /cropped head/);
+        assert.match(WAN_NEGATIVE_PROMPT, /camera move/);
+    });
+
+    it('switches the loader node for GGUF weights', () => {
+        const plain = buildWanI2VWorkflow(WAN_DEFAULTS, opts);
+        assert.equal(nodesOfType(plain.workflow, 'UNETLoader').length, 1);
+        assert.equal(nodesOfType(plain.workflow, 'UnetLoaderGGUF').length, 0);
+
+        const gguf = buildWanI2VWorkflow({ ...WAN_DEFAULTS, useGguf: true }, opts);
+        assert.equal(nodesOfType(gguf.workflow, 'UnetLoaderGGUF').length, 1);
+        assert.equal(nodesOfType(gguf.workflow, 'UNETLoader').length, 0);
+    });
+
+    it('carries the configured dimensions and frame count', () => {
+        const settings = { ...WAN_DEFAULTS, width: 640, height: 384, frames: 49 };
+        const { workflow } = buildWanI2VWorkflow(settings, opts);
+        const [, wan] = nodesOfType(workflow, 'WanImageToVideo')[0] ?? [];
+        assert.equal(wan?.inputs['width'], 640);
+        assert.equal(wan.inputs['height'], 384);
+        assert.equal(wan.inputs['length'], 49);
+    });
+
+    it('saves in a form the existing history reader already collects', () => {
+        const { workflow, saveNodeId } = buildWanI2VWorkflow(WAN_DEFAULTS, opts);
+        assert.equal(workflow[saveNodeId]?.class_type, 'SaveAnimatedWEBP');
+    });
+});
+
+describe('parseWanSettings', () => {
+    it('returns the defaults for absent or unusable storage', () => {
+        for (const bad of [null, '', '{', '[]', '"x"']) {
+            assert.deepEqual(parseWanSettings(bad), WAN_DEFAULTS, JSON.stringify(bad));
+        }
+    });
+
+    it('clamps dimensions, frames and steps into usable ranges', () => {
+        assert.equal(parseWanSettings('{"width":10}').width, 64);
+        assert.equal(parseWanSettings('{"frames":0}').frames, 1);
+        assert.equal(parseWanSettings('{"frames":99999}').frames, 600);
+        assert.equal(parseWanSettings('{"steps":500}').steps, 150);
+    });
+
+    it('treats useGguf as a strict boolean', () => {
+        assert.equal(parseWanSettings('{"useGguf":true}').useGguf, true);
+        assert.equal(parseWanSettings('{"useGguf":"true"}').useGguf, false);
+        assert.equal(parseWanSettings('{"useGguf":1}').useGguf, false);
+    });
+});
+
+describe('computeLetterbox', () => {
+    it('contains a square source in a landscape canvas without cropping', () => {
+        const box = computeLetterbox(1024, 1024, 832, 480);
+        assert.ok(box.drawWidth <= box.width, 'must not exceed the canvas horizontally');
+        assert.ok(box.drawHeight <= box.height, 'must not exceed the canvas vertically');
+        // Height is the binding dimension here, so the margin applies to it.
+        assert.ok(box.drawHeight < 480);
+    });
+
+    it('preserves the source aspect ratio', () => {
+        const box = computeLetterbox(1280, 720, 832, 480);
+        const sourceRatio = 1280 / 720;
+        const drawnRatio = box.drawWidth / box.drawHeight;
+        assert.ok(Math.abs(sourceRatio - drawnRatio) < 0.01,
+            `ratio drifted: ${sourceRatio.toString()} against ${drawnRatio.toString()}`);
+    });
+
+    it('centres the drawn image', () => {
+        const box = computeLetterbox(1024, 1024, 832, 480);
+        assert.equal(box.offsetX, Math.floor((832 - box.drawWidth) / 2));
+        assert.equal(box.offsetY, Math.floor((480 - box.drawHeight) / 2));
+    });
+
+    it('leaves a margin so the subject does not touch the frame edge', () => {
+        // A subject against the edge invites Wan to reframe, cropping it.
+        const box = computeLetterbox(480, 480, 480, 480);
+        assert.ok(box.drawHeight < 480, 'the margin must shrink a perfectly fitting source');
+        assert.ok(box.offsetY > 0, 'and leave a border above it');
+    });
+
+    it('honours a supplied margin and rejects an absurd one', () => {
+        const none = computeLetterbox(1000, 1000, 500, 500, 0);
+        assert.equal(none.drawHeight, 500, 'a zero margin fills the canvas');
+        const absurd = computeLetterbox(1000, 1000, 500, 500, 0.9);
+        const standard = computeLetterbox(1000, 1000, 500, 500, LETTERBOX_MARGIN);
+        assert.equal(absurd.drawHeight, standard.drawHeight, 'an out-of-range margin falls back');
+    });
+
+    it('never produces a zero or negative dimension', () => {
+        for (const [sw, sh] of [[1, 1], [10000, 1], [1, 10000], [0, 0]] as const) {
+            const box = computeLetterbox(sw, sh, 832, 480);
+            assert.ok(box.drawWidth >= 1 && box.drawHeight >= 1, `${sw.toString()}x${sh.toString()}`);
+        }
     });
 });

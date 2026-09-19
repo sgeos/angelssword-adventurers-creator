@@ -10,9 +10,12 @@ import { PROVIDERS } from "./providers.mts";
 import {
     COMFY_DEFAULTS,
     COMFY_SETTINGS_KEY,
+    WAN_SETTINGS_KEY,
     asWorkflowKind,
     parseComfySettings,
+    parseWanSettings,
     type ComfySettings,
+    type WanSettings,
     type WorkflowKind,
 } from "./comfyui-core.mts";
 
@@ -455,8 +458,43 @@ function initSettings(): void {
         guidance: Number(comfyGuidance.value),
     }));
 
+    // Wan image-to-video shares this card and this Save button, because it is
+    // the same instance being configured.
+    const wanUnet = requireEl('settingsWanUnet', HTMLInputElement);
+    const wanVae = requireEl('settingsWanVae', HTMLInputElement);
+    const wanEncoder = requireEl('settingsWanTextEncoder', HTMLInputElement);
+    const wanClipVision = requireEl('settingsWanClipVision', HTMLInputElement);
+    const wanFrames = requireEl('settingsWanFrames', HTMLInputElement);
+    const wanFramesVal = requireEl('settingsWanFramesVal', HTMLElement);
+    const wanGguf = requireEl('settingsWanGguf', HTMLInputElement);
+
+    const loadedWan = parseWanSettings(localStorage.getItem(WAN_SETTINGS_KEY));
+    wanUnet.value = loadedWan.unet;
+    wanVae.value = loadedWan.vae;
+    wanEncoder.value = loadedWan.textEncoder;
+    wanClipVision.value = loadedWan.clipVision;
+    wanFrames.value = String(loadedWan.frames);
+    wanFramesVal.textContent = String(loadedWan.frames);
+    wanGguf.checked = loadedWan.useGguf;
+
+    wanFrames.addEventListener('input', () => { wanFramesVal.textContent = wanFrames.value; });
+
+    const readWanSettings = (): WanSettings => parseWanSettings(JSON.stringify({
+        unet: wanUnet.value,
+        vae: wanVae.value,
+        textEncoder: wanEncoder.value,
+        clipVision: wanClipVision.value,
+        width: loadedWan.width,
+        height: loadedWan.height,
+        frames: Number(wanFrames.value),
+        steps: loadedWan.steps,
+        cfg: loadedWan.cfg,
+        useGguf: wanGguf.checked,
+    }));
+
     requireEl('settingsComfySave', HTMLElement).addEventListener('click', () => {
         localStorage.setItem(COMFY_SETTINGS_KEY, JSON.stringify(readComfySettings()));
+        localStorage.setItem(WAN_SETTINGS_KEY, JSON.stringify(readWanSettings()));
         showToast('ComfyUI settings saved', 'success');
     });
 

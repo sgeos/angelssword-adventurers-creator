@@ -516,3 +516,239 @@ export const buildWorkflowFor = (
   };
   return buildSdxlWorkflow(sdxl);
 };
+
+/* ────────────────────────────────────────────────────────────────────────
+ * Wan image-to-video.
+ *
+ * A second ComfyUI path, producing a clip from a still. Reimplemented from
+ * upstream pull request 1, where the graph and the framing were settled over
+ * several commits against a running instance.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+export interface WanSettings {
+  readonly unet: string;
+  readonly vae: string;
+  readonly textEncoder: string;
+  readonly clipVision: string;
+  readonly width: number;
+  readonly height: number;
+  readonly frames: number;
+  readonly steps: number;
+  readonly cfg: number;
+  /** GGUF quantised weights load through a different node. */
+  readonly useGguf: boolean;
+}
+
+export const WAN_SETTINGS_KEY = "comfyui_wan_settings";
+
+/** On-disk names from a standard Wan 2.1 install at 480p. */
+export const WAN_DEFAULTS: WanSettings = {
+  unet: "Wan2_1-I2V-14B-480P_fp8_e4m3fn.safetensors",
+  vae: "wan_2.1_vae.safetensors",
+  textEncoder: "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+  clipVision: "clip_vision_h.safetensors",
+  width: 832,
+  height: 480,
+  frames: 97,
+  steps: 20,
+  cfg: 5,
+  useGguf: false,
+};
+
+/**
+ * The negative prompt.
+ *
+ * Longer than it looks necessary, and each clause earns its place. The
+ * framing terms exist because Wan will otherwise reframe a full-body still
+ * into a bust shot, cropping the head or feet that the pipeline needs. The
+ * camera terms hold the shot still, since the output is a looping idle
+ * animation rather than a scene.
+ */
+export const WAN_NEGATIVE_PROMPT: string =
+  "blurry, low quality, distorted face, extra limbs, text, watermark, "
+  + "camera move, zoom, pan, cropped head, cropped feet, head cut off, "
+  + "feet cut off, close-up, upper body only, out of frame";
+
+export const parseWanSettings = (raw: string | null): WanSettings => {
+  if (raw === null || raw === "") return WAN_DEFAULTS;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return WAN_DEFAULTS;
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return WAN_DEFAULTS;
+  const s: Record<string, unknown> = { ...parsed };
+  return {
+    unet: asString(s["unet"], WAN_DEFAULTS.unet),
+    vae: asString(s["vae"], WAN_DEFAULTS.vae),
+    textEncoder: asString(s["textEncoder"], WAN_DEFAULTS.textEncoder),
+    clipVision: asString(s["clipVision"], WAN_DEFAULTS.clipVision),
+    width: Math.trunc(asNumber(s["width"], WAN_DEFAULTS.width, 64, 2048)),
+    height: Math.trunc(asNumber(s["height"], WAN_DEFAULTS.height, 64, 2048)),
+    frames: Math.trunc(asNumber(s["frames"], WAN_DEFAULTS.frames, 1, 600)),
+    steps: Math.trunc(asNumber(s["steps"], WAN_DEFAULTS.steps, 1, 150)),
+    cfg: asNumber(s["cfg"], WAN_DEFAULTS.cfg, 0, 30),
+    useGguf: s["useGguf"] === true,
+  };
+};
+
+/**
+ * The Wan graph.
+ *
+ * Two details are not obvious and were arrived at empirically.
+ *
+ * WanImageToVideo yields three outputs, being a conditioned positive, a
+ * conditioned negative, and the starting latent. The sampler takes all three
+ * from it rather than from the text encoders directly, which is what
+ * distinguishes an image-to-video graph from a text-to-video one.
+ *
+ * CLIPVisionEncode is given `crop: 'none'`. The frame handed in has already
+ * been letterboxed, and letting the encoder centre-crop it again reintroduces
+ * exactly the head and feet loss the letterboxing prevents.
+ */
+export const buildWanI2VWorkflow = (
+  settings: WanSettings,
+  opts: { readonly imageName: string; readonly positiveText: string; readonly seed: number },
+): BuiltWorkflow => {
+  const ids = new NodeIds();
+  const wf: Record<string, ComfyNode> = {};
+
+  const loadId = ids.take();
+  wf[loadId] = { class_type: "LoadImage", inputs: { image: opts.imageName } };
+
+  const visLoadId = ids.take();
+  wf[visLoadId] = { class_type: "CLIPVisionLoader", inputs: { clip_name: settings.clipVision } };
+
+  const visEncId = ids.take();
+  wf[visEncId] = {
+    class_type: "CLIPVisionEncode",
+    inputs: { clip_vision: [visLoadId, 0], image: [loadId, 0], crop: "none" },
+  };
+
+  const clipId = ids.take();
+  wf[clipId] = {
+    class_type: "CLIPLoader",
+    inputs: { clip_name: settings.textEncoder, type: "wan", device: "default" },
+  };
+
+  const posId = ids.take();
+  wf[posId] = { class_type: "CLIPTextEncode", inputs: { text: opts.positiveText, clip: [clipId, 0] } };
+  const negId = ids.take();
+  wf[negId] = { class_type: "CLIPTextEncode", inputs: { text: WAN_NEGATIVE_PROMPT, clip: [clipId, 0] } };
+
+  const unetId = ids.take();
+  wf[unetId] = settings.useGguf
+    ? { class_type: "UnetLoaderGGUF", inputs: { unet_name: settings.unet } }
+    : { class_type: "UNETLoader", inputs: { unet_name: settings.unet, weight_dtype: "default" } };
+
+  const vaeId = ids.take();
+  wf[vaeId] = { class_type: "VAELoader", inputs: { vae_name: settings.vae } };
+
+  const wanId = ids.take();
+  wf[wanId] = {
+    class_type: "WanImageToVideo",
+    inputs: {
+      positive: [posId, 0],
+      negative: [negId, 0],
+      vae: [vaeId, 0],
+      clip_vision_output: [visEncId, 0],
+      start_image: [loadId, 0],
+      width: settings.width,
+      height: settings.height,
+      length: settings.frames,
+      batch_size: 1,
+    },
+  };
+
+  const sampleId = ids.take();
+  wf[sampleId] = {
+    class_type: "KSampler",
+    inputs: {
+      seed: opts.seed,
+      steps: settings.steps,
+      cfg: settings.cfg,
+      sampler_name: "uni_pc",
+      scheduler: "simple",
+      denoise: 1,
+      model: [unetId, 0],
+      // All three come from the Wan node, not from the encoders.
+      positive: [wanId, 0],
+      negative: [wanId, 1],
+      latent_image: [wanId, 2],
+    },
+  };
+
+  const decodeId = ids.take();
+  wf[decodeId] = { class_type: "VAEDecode", inputs: { samples: [sampleId, 0], vae: [vaeId, 0] } };
+
+  // SaveAnimatedWEBP rather than the newer CreateVideo and SaveVideo pair,
+  // because it appears in the history under the same `images` key the sprite
+  // path already reads, so one collection routine serves both.
+  const saveId = ids.take();
+  wf[saveId] = {
+    class_type: "SaveAnimatedWEBP",
+    inputs: {
+      images: [decodeId, 0],
+      filename_prefix: "as_adventurer_wan",
+      fps: 16,
+      lossless: false,
+      quality: 90,
+      method: "default",
+    },
+  };
+
+  return { workflow: wf, saveNodeId: saveId };
+};
+
+/** Where a letterboxed image sits on its canvas. */
+export interface LetterboxPlacement {
+  readonly width: number;
+  readonly height: number;
+  readonly drawWidth: number;
+  readonly drawHeight: number;
+  readonly offsetX: number;
+  readonly offsetY: number;
+}
+
+/** Default shrink applied so the subject does not sit against an edge. */
+export const LETTERBOX_MARGIN = 0.08;
+
+/**
+ * Where to place a source image on the Wan canvas.
+ *
+ * A contain fit rather than a cover fit, because the pipeline needs the whole
+ * character. Feeding a square or 720p full-body still straight into a
+ * landscape canvas is what crops heads and feet, and Wan will not put back
+ * what the input never had.
+ *
+ * The margin shrinks the result slightly. A subject touching the frame edge
+ * invites Wan to reframe, so the eight percent buys a border that discourages
+ * it. Geometry only; the caller draws.
+ */
+export const computeLetterbox = (
+  sourceWidth: number,
+  sourceHeight: number,
+  targetWidth: number,
+  targetHeight: number,
+  margin: number = LETTERBOX_MARGIN,
+): LetterboxPlacement => {
+  const m = Number.isFinite(margin) && margin >= 0 && margin < 0.4 ? margin : LETTERBOX_MARGIN;
+  const tw = Math.max(64, Math.trunc(targetWidth));
+  const th = Math.max(64, Math.trunc(targetHeight));
+  const sw = Math.max(1, sourceWidth);
+  const sh = Math.max(1, sourceHeight);
+
+  const scale = Math.min(tw / sw, th / sh) * (1 - m);
+  const drawWidth = Math.max(1, Math.round(sw * scale));
+  const drawHeight = Math.max(1, Math.round(sh * scale));
+
+  return {
+    width: tw,
+    height: th,
+    drawWidth,
+    drawHeight,
+    offsetX: Math.floor((tw - drawWidth) / 2),
+    offsetY: Math.floor((th - drawHeight) / 2),
+  };
+};

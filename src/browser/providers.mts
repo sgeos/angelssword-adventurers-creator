@@ -134,7 +134,7 @@ export const hasCredential = (value: string | null): boolean =>
  * is fetched through the proxy because it needs the credential attached.
  * ──────────────────────────────────────────────────────────────────────── */
 
-export type VideoProviderId = "google" | "xai";
+export type VideoProviderId = "google" | "xai" | "comfyui";
 
 export interface VideoProvider {
   readonly id: VideoProviderId;
@@ -169,13 +169,22 @@ export const VIDEO_PROVIDERS: Readonly<Record<VideoProviderId, VideoProvider>> =
     pollingRequired: true,
     requiresReferenceImage: true,
   },
+  comfyui: {
+    id: "comfyui",
+    label: "ComfyUI",
+    generateRoute: "/api/comfyui/proxy",
+    // An address, not a credential. See the image provider of the same name.
+    storageKey: "comfyui_url",
+    pollingRequired: true,
+    requiresReferenceImage: true,
+  },
 };
 
-export const VIDEO_PROVIDER_ORDER: readonly VideoProviderId[] = ["google", "xai"];
+export const VIDEO_PROVIDER_ORDER: readonly VideoProviderId[] = ["google", "xai", "comfyui"];
 
 /** Narrow an untrusted string to a video provider identifier. */
 export const asVideoProviderId = (value: string): VideoProviderId | undefined =>
-  value === "google" || value === "xai" ? value : undefined;
+  value === "google" || value === "xai" || value === "comfyui" ? value : undefined;
 
 /** The video provider a stored preference names, falling back to Gemini. */
 export const videoProviderFrom = (stored: string | null): VideoProvider => {

@@ -401,6 +401,7 @@
                             <div class="seg-toggle" id="vgProvider">
                                 <button class="seg-btn active" data-mode="google" title="Generate with Google Gemini. Uses your Google API key.">Gemini</button>
                                 <button class="seg-btn" data-mode="xai" title="Generate with Grok. Uses your xAI API key from Settings.">Grok</button>
+                                <button class="seg-btn" data-mode="comfyui" title="Generate locally with ComfyUI Wan. Configure it in Settings.">ComfyUI</button>
                             </div>
                         </div>
 
@@ -1053,6 +1054,34 @@
                         <label>Guidance</label>
                         <input type="range" id="settingsComfyGuidance" min="1" max="15" step="0.5" value="3.5" title="Flux guidance, or CFG for SDXL">
                         <span id="settingsComfyGuidanceVal">3.5</span>
+                    </div>
+
+                    <div class="panel-subtitle" style="margin-top:1rem">Video (Wan image-to-video)</div>
+
+                    <div class="form-row">
+                        <label>Wan UNET</label>
+                        <input type="text" id="settingsWanUnet" placeholder="Wan2_1-I2V-14B-480P_fp8_e4m3fn.safetensors" title="Wan image-to-video model">
+                    </div>
+                    <div class="form-row">
+                        <label>Wan VAE</label>
+                        <input type="text" id="settingsWanVae" placeholder="wan_2.1_vae.safetensors" title="Wan VAE">
+                    </div>
+                    <div class="form-row">
+                        <label>Text encoder</label>
+                        <input type="text" id="settingsWanTextEncoder" placeholder="umt5_xxl_fp8_e4m3fn_scaled.safetensors" title="Wan text encoder">
+                    </div>
+                    <div class="form-row">
+                        <label>CLIP vision</label>
+                        <input type="text" id="settingsWanClipVision" placeholder="clip_vision_h.safetensors" title="Wan CLIP vision model">
+                    </div>
+                    <div class="form-row">
+                        <label>Frames</label>
+                        <input type="range" id="settingsWanFrames" min="17" max="201" step="8" value="97" title="More frames is a longer clip and a longer wait">
+                        <span id="settingsWanFramesVal">97</span>
+                    </div>
+                    <div class="form-row">
+                        <label>GGUF weights</label>
+                        <input type="checkbox" id="settingsWanGguf" title="Tick if your Wan model is a GGUF quantisation">
                     </div>
 
                     <div class="api-key-row">

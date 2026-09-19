@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { PROVIDER_ORDER, VIDEO_PROVIDER_ORDER } from '../../../src/browser/providers.mts';
 
 
 /**
@@ -14,7 +15,7 @@ test.describe('G — Provider selection', () => {
 
     const selector = page.locator('#sgProvider');
     await expect(selector).toBeVisible();
-    await expect(selector.locator('.seg-btn')).toHaveCount(3);
+    await expect(selector.locator('.seg-btn')).toHaveCount(PROVIDER_ORDER.length);
 
     await selector.locator('[data-mode="xai"]').click();
     await expect(selector.locator('[data-mode="xai"]')).toHaveClass(/active/);
@@ -86,7 +87,7 @@ test.describe('H — Video provider selection', () => {
 
     const selector = page.locator('#vgProvider');
     await expect(selector).toBeVisible();
-    await expect(selector.locator('.seg-btn')).toHaveCount(2);
+    await expect(selector.locator('.seg-btn')).toHaveCount(VIDEO_PROVIDER_ORDER.length);
 
     await selector.locator('[data-mode="xai"]').click();
     await expect(selector.locator('[data-mode="xai"]')).toHaveClass(/active/);
@@ -160,7 +161,7 @@ test.describe('I — ComfyUI provider', () => {
     await page.goto('/');
     await page.locator('.tab-btn[data-tab="tab-sprite-prep"]').click();
     await page.locator('.mode-btn[data-mode="generate"]').click();
-    await expect(page.locator('#sgProvider .seg-btn')).toHaveCount(3);
+    await expect(page.locator('#sgProvider .seg-btn')).toHaveCount(PROVIDER_ORDER.length);
     await expect(page.locator('#sgProvider [data-mode="comfyui"]')).toBeVisible();
   });
 
@@ -257,5 +258,117 @@ test.describe('I — ComfyUI provider', () => {
 
     expect(proxied.some((c) => c.path === '/prompt' && c.method === 'POST')).toBe(true);
     expect(proxied.some((c) => c.path.startsWith('/history/'))).toBe(true);
+  });
+});
+
+test.describe('J — ComfyUI Wan video', () => {
+  test('is offered as a third video provider', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('.tab-btn[data-tab="tab-video-gen"]').click();
+    await expect(page.locator('#vgProvider .seg-btn')).toHaveCount(VIDEO_PROVIDER_ORDER.length);
+    await expect(page.locator('#vgProvider [data-mode="comfyui"]')).toBeVisible();
+  });
+
+  test('its settings round-trip through storage', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('.tab-btn[data-tab="tab-settings"]').click();
+
+    await page.locator('#settingsWanUnet').fill('custom-wan.safetensors');
+    await page.locator('#settingsWanGguf').check();
+    await page.locator('#settingsComfySave').click();
+
+    await page.reload();
+    await page.locator('.tab-btn[data-tab="tab-settings"]').click();
+    await expect(page.locator('#settingsWanUnet')).toHaveValue('custom-wan.safetensors');
+    await expect(page.locator('#settingsWanGguf')).toBeChecked();
+  });
+
+  test('renders a clip without any API key, letterboxing the reference first', async ({ page }) => {
+    const proxied: string[] = [];
+    let uploadedPng = '';
+    let saveNodeId = '';
+    let sawWanNode = false;
+
+    await page.route('**/api/comfyui/proxy', async (routeCtx) => {
+      const sent: unknown = routeCtx.request().postDataJSON();
+      const fields: Record<string, unknown> =
+        typeof sent === 'object' && sent !== null ? { ...sent } : {};
+      const rawPath = fields['path'];
+      const path = typeof rawPath === 'string' ? rawPath : '';
+      proxied.push(path);
+
+      if (path === '/upload/image') {
+        const body = fields['body'];
+        const image = typeof body === 'object' && body !== null && 'image' in body
+          ? { ...body }.image : undefined;
+        if (typeof image === 'string') uploadedPng = image;
+        await routeCtx.fulfill({ status: 200, contentType: 'application/json',
+          body: JSON.stringify({ name: 'ref.png' }) });
+        return;
+      }
+      if (path === '/prompt') {
+        const body = fields['body'];
+        const graph = typeof body === 'object' && body !== null && 'prompt' in body
+          ? { ...body }.prompt : undefined;
+        if (typeof graph === 'object' && graph !== null) {
+          const nodes: Record<string, unknown> = { ...graph };
+          for (const id of Object.keys(nodes)) {
+            const node = nodes[id];
+            if (typeof node !== 'object' || node === null || !('class_type' in node)) continue;
+            const kind = { ...node }.class_type;
+            if (kind === 'WanImageToVideo') sawWanNode = true;
+            if (kind === 'SaveAnimatedWEBP') saveNodeId = id;
+          }
+        }
+        await routeCtx.fulfill({ status: 200, contentType: 'application/json',
+          body: JSON.stringify({ prompt_id: 'w-1' }) });
+        return;
+      }
+      if (path.startsWith('/history/')) {
+        await routeCtx.fulfill({ status: 200, contentType: 'application/json',
+          body: JSON.stringify({ 'w-1': { outputs: { [saveNodeId]: { images: [
+            { filename: 'clip.webp', subfolder: '', type: 'output' },
+          ] } } } }) });
+        return;
+      }
+      if (path.startsWith('/view')) {
+        await routeCtx.fulfill({ status: 200, contentType: 'image/webp', body: 'WEBPDATA' });
+        return;
+      }
+      await routeCtx.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+    });
+
+    await page.goto('/');
+    await page.evaluate(() => {
+      localStorage.removeItem('google_api_key');
+      localStorage.removeItem('xai_api_key');
+      localStorage.setItem('video_provider', 'comfyui');
+    });
+    await page.reload();
+
+    await page.waitForFunction(() => window.ASAdventurer !== undefined);
+    await page.evaluate(() => {
+      const app = window.ASAdventurer;
+      // A 2x2 red square, so the letterbox has real dimensions to work with.
+      if (app !== undefined) app.handoff.spriteBase64 =
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFUlEQVR42mP8z8BQz0AEYBxVSF+FAP5FDvcfRYWgAAAAAElFTkSuQmCC';
+    });
+    await page.locator('.tab-btn[data-tab="tab-video-gen"]').click();
+    await page.locator('#vgGenerateBtn').click();
+
+    await expect.poll(() => proxied.some((p) => p.startsWith('/view')),
+      { timeout: 40_000 }).toBe(true);
+
+    expect(proxied).toContain('/upload/image');
+    expect(proxied).toContain('/prompt');
+    expect(sawWanNode).toBe(true);
+
+    // The uploaded frame is the letterboxed canvas, not the original still.
+    const dimensions = await page.evaluate(async (src) => new Promise<{ w: number; h: number }>((resolve) => {
+      const el = new Image();
+      el.onload = (): void => { resolve({ w: el.naturalWidth, h: el.naturalHeight }); };
+      el.src = src;
+    }), uploadedPng);
+    expect(dimensions).toEqual({ w: 832, h: 480 });
   });
 });
