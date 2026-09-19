@@ -298,7 +298,8 @@ differently, because they have to be:
 
 - **Server** (`server.mts`) runs directly. Node strips the types as it loads
   the file, so there is no build step and nothing to keep in sync.
-- **Browser** (`src/core` and `src/browser`) is compiled to `public/js/`, because
+- **Browser** (`src/core`, `src/platform-browser`, `src/platform-worker` and
+  `src/entry-browser`) is compiled to `public/js/`, because
   no browser strips types. `index.html` loads that output as ES modules.
   `npm start` builds it first, so running the app never serves a stale bundle.
 
@@ -321,7 +322,7 @@ separation is enforced rather than assumed:
 |---|---|---|
 | `tsconfig.json` | server and build scripts | Node, no DOM |
 | `tsconfig.core.json` | `src/core` | Neither. ECMAScript alone |
-| `tsconfig.browser.json` | `src/browser` | DOM, no Node |
+| `tsconfig.browser.json` | `src/platform-browser`, `src/entry-browser` | DOM, no Node |
 | `tsconfig.worker.json` | the two Web Workers | WebWorker, neither DOM nor Node |
 | `tsconfig.test.json` | tests and the Playwright config | both |
 

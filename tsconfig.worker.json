@@ -26,8 +26,7 @@
   // stays free of the DOM; this project continues to prove it survives the
   // WebWorker lib, which is a different claim.
   "include": [
-    "src/browser/gif-worker.mts",
-    "src/browser/timer-worker.mts",
+    "src/platform-worker/**/*.mts",
     "src/core/gif-worker-core.mts",
     "src/core/gif-codec.mts"
   ],

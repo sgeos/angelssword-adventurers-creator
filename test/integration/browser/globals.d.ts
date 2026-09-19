@@ -12,7 +12,7 @@
  * type is imported from the module that publishes the value, so if the
  * handoff's shape changes these specs stop compiling.
  */
-import type { AppState } from '../../../src/browser/app.mts';
+import type { AppState } from '../../../src/platform-browser/shell.mts';
 
 declare global {
   interface Window {

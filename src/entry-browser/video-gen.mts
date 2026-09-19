@@ -12,11 +12,11 @@ import {
     notificationSound,
     showToast,
     switchTab,
-} from "./app.mts";
-import { base64ToBlob } from "./app-utils.mts";
+} from "../platform-browser/shell.mts";
+import { base64ToBlob } from "../platform-browser/app-utils.mts";
 
 import { reasonText, responseErrorMessage } from "../core/api.mts";
-import { closestFrom, findEl, queryAll, require2d, requireEl } from "./dom.mts";
+import { closestFrom, findEl, queryAll, require2d, requireEl } from "../platform-browser/dom.mts";
 import {
     COMFY_SETTINGS_KEY,
     WAN_SETTINGS_KEY,

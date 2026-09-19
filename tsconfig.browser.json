@@ -1,14 +1,18 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  // The browser platform and entry layer. Separate from the root project
-  // because it needs the DOM lib, which the server must not have, and because
-  // it emits: no browser strips types the way Node 24 does.
+  // The browser platform and entry layers. Separate from the root project
+  // because they need the DOM lib, which the server must not have, and because
+  // they emit: no browser strips types the way Node 24 does.
   //
-  // `rootDir` is `src` rather than `src/browser` because these modules import
-  // the core, which sits beside them. A rootDir that excluded the core would
-  // refuse the import outright. The consequence is that emitted paths gain a
-  // layer segment, so `public/js/browser/` and `public/js/core/` rather than a
-  // flat `public/js/`, and index.html names them accordingly.
+  // Both layers share this project, because both see exactly the same globals.
+  // What separates them is the direction imports may run, which is not a thing
+  // a tsconfig can express. eslint.config.mjs carries that rule.
+  //
+  // `rootDir` is `src` rather than a single layer because these modules import
+  // the core and each other across layers. A rootDir naming one layer would
+  // refuse those imports outright. The consequence is that emitted paths carry
+  // a layer segment, so `public/js/entry-browser/` beside `public/js/core/`
+  // rather than a flat `public/js/`, and index.html names them accordingly.
   //
   // This project compiles the core sources it imports, and so does the worker
   // project. The two overlap on what they share and emit identical output for
@@ -34,8 +38,9 @@
     // actually fetch.
     "rewriteRelativeImportExtensions": true
   },
-  "include": ["src/browser/**/*.mts"],
+  "include": ["src/platform-browser/**/*.mts", "src/entry-browser/**/*.mts"],
   // Worker code belongs to tsconfig.worker.json; it needs the WebWorker lib,
-  // which cannot be loaded alongside DOM.
-  "exclude": ["src/browser/gif-worker.mts", "src/browser/timer-worker.mts"]
+  // which cannot be loaded alongside DOM. It is excluded by living outside the
+  // includes above rather than by being named here.
+  "exclude": []
 }

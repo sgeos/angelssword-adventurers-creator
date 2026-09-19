@@ -125,7 +125,7 @@
   // "dist" and "node_modules" are build output and vendored code. Add
   // your own only with a reason you would defend in review.
   //
-  // public/ holds static assets and the compiled output of src/browser.
+  // public/ holds static assets and the compiled output of src/.
   // The sources are checked by tsconfig.browser.json; what lands in
   // public/js is the compiler's own emit and is not checked again.
   "exclude": [
@@ -146,7 +146,9 @@
     // Browser sources belong to tsconfig.browser.json, which supplies the
     // DOM lib and withholds the node types. Checking them here too would
     // report every DOM global as missing.
-    "src/browser",
+    "src/platform-browser",
+    "src/entry-browser",
+    "src/platform-worker",
     // The core belongs to tsconfig.core.json, which withholds BOTH the DOM lib
     // and the node types. Checking it here would hand it the node types and
     // silently permit exactly what that project exists to refuse.

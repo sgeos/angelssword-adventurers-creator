@@ -7,14 +7,14 @@ through a router or a store.
 
 | Stage | Module | Produces |
 |---|---|---|
-| Sprite preparation | `src/browser/sprite-prep.mts` | A keyed sprite and the key colour |
-| Video generation | `src/browser/video-gen.mts` | A generated clip |
-| Video preparation | `src/browser/video-prep.mts` | A trimmed and looped clip |
-| Model export | `src/browser/model-exporter.mts` | An animated Graphics Interchange Format image or WebM file |
+| Sprite preparation | `src/entry-browser/sprite-prep.mts` | A keyed sprite and the key colour |
+| Video generation | `src/entry-browser/video-gen.mts` | A generated clip |
+| Video preparation | `src/entry-browser/video-prep.mts` | A trimmed and looped clip |
+| Model export | `src/entry-browser/model-exporter.mts` | An animated Graphics Interchange Format image or WebM file |
 
 ## The handoff object
 
-`ASAdventurer.handoff`, declared in `src/browser/app.mts`, carries values
+`ASAdventurer.handoff`, declared in `src/platform-browser/shell.mts`, carries values
 between stages. It is the one piece of genuinely shared mutable state in the
 application, and it is published on the global object deliberately, because the
 browser specifications assert on its shape.

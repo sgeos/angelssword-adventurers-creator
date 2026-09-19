@@ -11,8 +11,8 @@ import {
     initUploadZone,
     showToast,
     switchTab,
-} from "./app.mts";
-import { findEl, require2d, requireEl } from "./dom.mts";
+} from "../platform-browser/shell.mts";
+import { findEl, require2d, requireEl } from "../platform-browser/dom.mts";
 import * as VideoPrepCore from "../core/video-prep-core.mts";
 
 /**

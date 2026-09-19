@@ -1,6 +1,6 @@
 import { describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { debounce, base64ToBlob, hexToRgb, colorName } from '../../src/browser/app-utils.mts';
+import { debounce, base64ToBlob, hexToRgb, colorName } from '../../src/platform-browser/app-utils.mts';
 
 describe('app-utils', () => {
     it('hexToRgb(#00FF00) → {r:0,g:255,b:0}', () => {

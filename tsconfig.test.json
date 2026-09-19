@@ -23,12 +23,13 @@
   "include": [
     "test/**/*.mts",
     "test/**/*.ts",
-    "src/browser/**/*.mts",
+    "src/platform-browser/**/*.mts",
+    "src/entry-browser/**/*.mts",
     "src/core/**/*.mts",
     "playwright.config.ts"
   ],
   // gif-worker.mts needs the WebWorker lib, which cannot be loaded beside DOM.
   // Only its message plumbing lives there; the encoding is core and this
   // project reaches it there.
-  "exclude": ["src/browser/gif-worker.mts", "src/browser/timer-worker.mts"]
+  "exclude": ["src/platform-worker"]
 }

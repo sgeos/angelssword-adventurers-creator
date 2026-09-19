@@ -11,14 +11,14 @@ a flag.
 
 The browser half is compiled, because no browser strips types. `src/` becomes
 `public/js/`, one directory per layer, so `src/core/pixels.mts` becomes
-`public/js/core/pixels.mjs` and `src/browser/app.mts` becomes
-`public/js/browser/app.mjs`. `public/index.html` loads the five entry modules
-from there. `npm start` builds first, so the application never serves a stale
+`public/js/core/pixels.mjs` and `src/entry-browser/app.mts` becomes
+`public/js/entry-browser/app.mjs`. `public/index.html` loads the five entry
+modules from there. `npm start` builds first, so the application never serves a stale
 bundle.
 
 The layer segment in the emitted path is a consequence of the browser project
-rooting at `src` rather than at `src/browser`, which it must do because those
-modules import the core beside them.
+rooting at `src` rather than at one layer, which it must do because those
+modules import the core and each other across layers.
 
 ## Five TypeScript projects
 
@@ -30,7 +30,7 @@ crate, and its `lib` and `types` settings are its manifest.
 |---|---|---|
 | `tsconfig.core.json` | `src/core` | ECMAScript alone. Neither node nor the Document Object Model |
 | `tsconfig.json` | Server and build scripts | Node, no Document Object Model |
-| `tsconfig.browser.json` | `src/browser` | Document Object Model, no node |
+| `tsconfig.browser.json` | `src/platform-browser`, `src/entry-browser` | Document Object Model, no node |
 | `tsconfig.worker.json` | The two Web Workers and the encoder they drive | WebWorker, neither |
 | `tsconfig.test.json` | Tests and the Playwright configuration | Everything |
 

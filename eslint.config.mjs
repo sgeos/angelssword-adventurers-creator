@@ -391,12 +391,73 @@ export default defineConfig(
     },
   },
 
-  // Browser sources live in a second TypeScript project, which supplies
-  // the DOM lib and withholds the node types. The project service resolves
-  // against the root config alone, so these files name theirs explicitly.
-  // Every rule still applies; only the type information differs.
+  // ===================================================================
+  // THE LAYERING RULE, for the half of it no tsconfig can express.
+  //
+  // tsconfig.core.json enforces that the core sees no platform, by
+  // withholding the libraries. What it cannot state is the DIRECTION
+  // imports may run between two layers that see the same globals, which
+  // is exactly the platform-to-entry relationship. So it is stated here.
+  //
+  // An entry point constructs the platform, hands it over and runs. It is
+  // the top of the graph, and the property that makes it one is that
+  // NOTHING IMPORTS IT. That property was false before the layers were
+  // separated: all four stage modules imported app.mts for the shared
+  // handoff and the page chrome, which made the entry point a dependency
+  // of everything. The shell moved to the platform layer and this rule is
+  // what stops it drifting back.
+  //
+  // The core is not listed as a source zone. It cannot reach either layer
+  // anyway, since importing a platform module would pull that file into
+  // the core program, where the DOM globals it uses do not exist.
+  // ===================================================================
   {
-    files: ["src/browser/**/*.mts"],
+    files: ["src/platform-browser/**/*.mts", "src/platform-worker/**/*.mts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["**/entry-browser/**", "../entry-browser/*"],
+              message:
+                "The platform layer may not import an entry point. An entry point constructs the platform, not the other way round; if the platform needs this, it belongs in the platform.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  // An entry point may not import another entry point either, for the same
+  // reason. Each of the five is loaded independently by a script tag, and one
+  // importing another would make the importee a shared module wearing an
+  // entry point's name.
+  {
+    files: ["src/entry-browser/**/*.mts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["./*", "../entry-browser/*"],
+              message:
+                "An entry point may not import another entry point. Shared code belongs in the platform layer or the core.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  // The browser platform and entry layers live in a second TypeScript
+  // project, which supplies the DOM lib and withholds the node types. The
+  // project service resolves against the root config alone, so these files
+  // name theirs explicitly. Every rule still applies; only the type
+  // information differs.
+  {
+    files: ["src/platform-browser/**/*.mts", "src/entry-browser/**/*.mts"],
     languageOptions: {
       parserOptions: {
         projectService: false,
@@ -408,10 +469,9 @@ export default defineConfig(
 
   // Worker sources live in a third project. The WebWorker and DOM libs both
   // declare `self` and cannot be loaded together, so a worker cannot join the
-  // browser project. This block must follow the one above, whose glob also
-  // matches this file; the later entry wins. Every rule still applies here.
+  // browser project. Every rule still applies here.
   {
-    files: ["src/browser/gif-worker.mts", "src/browser/timer-worker.mts"],
+    files: ["src/platform-worker/**/*.mts"],
     languageOptions: {
       parserOptions: {
         projectService: false,

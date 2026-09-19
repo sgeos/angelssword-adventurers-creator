@@ -219,7 +219,7 @@ export function showToast(message: string, type = 'info'): void {
 // ============================================
 // TAB SWITCHING
 // ============================================
-function initTabs(): void {
+export function initTabs(): void {
     const tabBar = findEl('tabBar', HTMLElement);
     const pipelineSteps = findEl('pipelineSteps', HTMLElement);
 
@@ -241,7 +241,7 @@ function initTabs(): void {
 // ============================================
 // SETTINGS
 // ============================================
-function initSettings(): void {
+export function initSettings(): void {
     // --- OpenAI Key ---
     const openaiInput = requireEl('settingsOpenAIKey', HTMLInputElement);
     const openaiToggle = requireEl('settingsOpenAIToggle', HTMLElement);
@@ -543,7 +543,7 @@ function initSettings(): void {
 // ============================================
 // KEYBOARD SHORTCUTS
 // ============================================
-function initKeyboard(): void {
+export function initKeyboard(): void {
     document.addEventListener('keydown', (e) => {
         // Don't capture when typing in inputs
         const target = e.target;
@@ -761,7 +761,7 @@ export function markZoneEmpty(zoneId: string): void {
 // ============================================
 // CHARACTER NAME SYNC
 // ============================================
-function initCharNameSync(): void {
+export function initCharNameSync(): void {
     // Sync character name across tabs
     const inputs = ['spCharName', 'sgCharName'];
     for (const id of inputs) {
@@ -788,34 +788,3 @@ function initCharNameSync(): void {
         }
     }
 }
-
-/**
- * Publish the handoff singleton on the global object.
- *
- * ES modules create no globals, so nothing outside the module graph could see
- * this otherwise. It is published deliberately rather than as a leftover: the
- * handoff is the documented boundary between pipeline stages, and the
- * characterization suite in test/integration/browser asserts against its
- * shape. Everything else stays module-private.
- *
- * Object.defineProperty rather than an assignment through a cast: the lint
- * configuration bans type assertions and `declare global`, and defineProperty
- * needs neither.
- */
-Object.defineProperty(globalThis, 'ASAdventurer', {
-    value: ASAdventurer,
-    writable: false,
-    enumerable: true,
-    configurable: true,
-});
-
-// ============================================
-// INIT
-// ============================================
-document.addEventListener('DOMContentLoaded', () => {
-    initTabs();
-    initSettings();
-    initKeyboard();
-    initCharNameSync();
-    console.log('⚔️ AS Adventurer initialized');
-});

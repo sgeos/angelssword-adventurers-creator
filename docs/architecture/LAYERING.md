@@ -2,10 +2,12 @@
 
 > **Navigation**: [Architecture](./README.md) | [Documentation Root](../README.md)
 
-Status. **Partly implemented.** The core layer exists, is enforced, and holds
-thirteen modules. The platform and entry layers are not yet separated from one
-another, both still living under `src/browser/`. The capability interfaces are
-declared as their consumers arrive rather than in advance.
+Status. **Structurally complete, and thinly populated.** All three layers
+exist and each boundary is enforced by a check rather than by convention. What
+remains is the long part: the four stage modules are entry points that still
+hold their logic, so the core has the pure parts and the platform layer has
+everything that touches a canvas. The capability interfaces are declared as
+their consumers arrive rather than in advance.
 
 ## The rule
 
@@ -32,13 +34,19 @@ each crate may see. The equivalent here is the TypeScript project. Each layer
 is a `tsconfig.*.json` whose `lib` and `types` settings decide which globals
 exist, which makes the boundary a compile error rather than a convention.
 
-| Layer | Project | Sees | Directory |
+| Layer | Directory | Project | Sees |
 |---|---|---|---|
-| Core | `tsconfig.core.json` | ECMAScript only | `src/core/` |
-| Platform and entry, browser | `tsconfig.browser.json` | ECMAScript and the Document Object Model | `src/browser/` |
-| Platform, worker | `tsconfig.worker.json` | ECMAScript and the Web Worker scope | `src/browser/*-worker.mts` |
-| Platform and entry, node | `tsconfig.json` | ECMAScript and node | `server.mts`, `build-exe.mts` |
-| Tests | `tsconfig.test.json` | Everything | `test/` |
+| Core | `src/core/` | `tsconfig.core.json` | ECMAScript only |
+| Platform, browser | `src/platform-browser/` | `tsconfig.browser.json` | ECMAScript and the Document Object Model |
+| Platform, worker | `src/platform-worker/` | `tsconfig.worker.json` | ECMAScript and the Web Worker scope |
+| Entry, browser | `src/entry-browser/` | `tsconfig.browser.json` | ECMAScript and the Document Object Model |
+| Platform and entry, node | `server.mts`, `build-exe.mts` | `tsconfig.json` | ECMAScript and node |
+| Tests | `test/` | `tsconfig.test.json` | Everything |
+
+The browser platform and entry layers share one project, because both see
+exactly the same globals. What separates them is not what they may see but the
+direction imports may run, which no `tsconfig` can express. That half of the
+rule lives in `eslint.config.mjs` and is described below.
 
 The core project is the analogue of `no_std`. It withholds both the Document
 Object Model library and the node types, so a core module reaching for
@@ -49,6 +57,27 @@ The test project alone sees every library, because a test legitimately stands
 on both sides of a boundary it is examining. That asymmetry is deliberate and
 is what lets a test use `URLSearchParams` as an oracle for the core's own
 encoder.
+
+## The direction rule
+
+An entry point constructs the platform, hands it over, and runs. The property
+that makes it one is that **nothing imports it**.
+
+That property was false. All four stage modules imported `app.mts` for the
+shared handoff object and the page chrome, which made the entry point a
+dependency of everything that depended on it. Separating the layers meant
+splitting that module: the shared surface became `platform-browser/shell.mts`
+at 790 lines, and what remained is a 54 line entry point that publishes the
+handoff and calls four initialisers on `DOMContentLoaded`.
+
+Two `no-restricted-imports` zones keep it that way. The platform layer may not
+import an entry point, and an entry point may not import another entry point,
+each of the five being loaded independently by its own script tag. Both zones
+have been exercised against a deliberately failing file.
+
+The core needs no zone. Importing a platform module would pull that file into
+the core program, where the globals it uses do not exist, so the core project
+already refuses it.
 
 ## What the gate cannot catch, and what covers the gap
 
@@ -92,6 +121,7 @@ intention rather than a contract, and it ages badly.
 | Capability | Status | Where it is reached directly today |
 |---|---|---|
 | A raster to read and write | **Declared**, as `RgbaImage` in `src/core/pixels.mts` | Satisfied structurally by `ImageData`. No adapter exists or is wanted |
+| A scratch surface to composite onto | **Not needed after all**, see below | Nothing. `gif-composite` used a canvas and did not need one |
 | Storage | Not declared | `localStorage` at twenty-seven sites across four stage modules |
 | Time and scheduling | Not declared | `setTimeout` and `requestAnimationFrame` in polling and playback loops |
 | The network | Not declared in the browser | Already inverted on the server as `FetchLike` in `server.mts` |
@@ -119,19 +149,41 @@ said the keyer reads three fields and nothing else, which was true and which
 the types could not express. The core now declares that shape, so the stand-in
 states exactly what it provides and the fabricated field is gone.
 
+## A capability that turned out not to be one
+
+`gif-composite` declared in its own header that it was the one part of
+Graphics Interchange Format handling that needed a canvas. It was not. It used
+a canvas as a scratch buffer and called only `putImageData`, `getImageData`,
+and `clearRect`, none of which asks the platform for anything an array cannot
+do. Rewritten against plain buffers it became core, and it gained twelve tests
+where it had none.
+
+The lesson generalises and is worth applying before any capability is
+declared. A module that reaches for a platform facility has not thereby
+established that it needs one. Ask what the facility is being asked to
+compute, and whether the answer is arithmetic.
+
+Two divergences from the format came to light while writing those tests, both
+preserved rather than corrected, and both recorded in
+[../decisions/OPEN.md](../decisions/OPEN.md).
+
 ## What remains
 
-- Separate the platform layer from the entry layer. Both are currently
-  `src/browser/`, where `dom.mts`, `app-utils.mts`, and the two workers are
-  platform, and `app.mts` with the four stage modules are entry.
-- `app.mts` is imported by all four stage modules, so the entry layer is
-  currently depended upon. An entry point that anything imports is not an entry
-  point.
+- The four stage modules are entry points that still hold their logic. Moving
+  that logic into the core is the long part of this work, and it is the same
+  work as the untested-module problem.
 - Declare the storage, clock, network, randomness, and logging interfaces as
   the logic that needs them moves into the core.
 - The four core parsers that accept `string | null` take that shape from the
   Web Storage interface rather than from the core's own conventions. They
   become `string | undefined` when the storage capability is declared.
+- `Handoff` cannot move to the core as it stands, carrying an
+  `HTMLCanvasElement` and two `Blob` fields. It moves when the drawing surface
+  and the binary payload are inverted, not before.
+- There is no node platform layer. `server.mts` is an entry point with its
+  platform inline, and it already declares the one capability it inverts,
+  `FetchLike`. That interface and the browser's eventual network port are the
+  same interface and should be one.
 
 ## Related
 

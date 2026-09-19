@@ -11,11 +11,11 @@ import {
     initUploadZone,
     notificationSound,
     showToast,
-} from "./app.mts";
-import { debounce, hexToRgb } from "./app-utils.mts";
+} from "../platform-browser/shell.mts";
+import { debounce, hexToRgb } from "../platform-browser/app-utils.mts";
 import type { HandoffPayload } from "../core/video-prep-core.mts";
 import { ChromaKey } from "../core/chroma-key.mts";
-import { closestFrom, queryAll, require2d, requireEl } from "./dom.mts";
+import { closestFrom, queryAll, require2d, requireEl } from "../platform-browser/dom.mts";
 import { channel } from "../core/pixels.mts";
 import {
     MODE_LIMITS,
@@ -39,7 +39,7 @@ import {
 } from "../core/exporter-math.mts";
 import { ColorQuantizer } from "../core/gif-codec.mts";
 import type { EncodeRequest, EncodeResponse, WorkerFrame } from "../core/gif-worker-core.mts";
-import type { TimerCommand } from "./timer-worker.mts";
+import type { TimerCommand } from "../platform-worker/timer-worker.mts";
 
 /**
  * Read an integer from a numeric input, falling back when the field is blank
@@ -1273,7 +1273,7 @@ export class ModelExporter {
             const frameDelay = 1000 / exportFps;
 
             // Worker-based timer (immune to background tab throttling)
-            const timerWorker = new Worker(new URL('./timer-worker.mjs', import.meta.url), {
+            const timerWorker = new Worker(new URL('../platform-worker/timer-worker.mjs', import.meta.url), {
                 type: 'module',
             });
             let frameIdx = 0;
@@ -1534,7 +1534,7 @@ export class ModelExporter {
                 // The encoder is a real module (gif-worker.mts), compiled by
                 // tsconfig.worker.json. It used to be a template literal built
                 // into a blob URL, which put it outside the type checker.
-                const worker = new Worker(new URL('./gif-worker.mjs', import.meta.url), {
+                const worker = new Worker(new URL('../platform-worker/gif-worker.mjs', import.meta.url), {
                     type: 'module',
                 });
 

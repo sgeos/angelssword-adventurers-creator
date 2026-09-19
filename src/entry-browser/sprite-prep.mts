@@ -13,9 +13,9 @@ import {
     notificationSound,
     showToast,
     switchTab,
-} from "./app.mts";
-import { base64ToBlob, blobToBase64, colorName, debounce } from "./app-utils.mts";
-import { closestFrom, fieldValue, queryAll, require2d, requireEl } from "./dom.mts";
+} from "../platform-browser/shell.mts";
+import { base64ToBlob, blobToBase64, colorName, debounce } from "../platform-browser/app-utils.mts";
+import { closestFrom, fieldValue, queryAll, require2d, requireEl } from "../platform-browser/dom.mts";
 import * as Core from "../core/sprite-prep-core.mts";
 import {
     COMFY_SETTINGS_KEY,

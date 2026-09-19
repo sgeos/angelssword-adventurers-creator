@@ -36,7 +36,9 @@ complete.
 |---|---|
 | `server.mts` | Express server and the proxy. Runs directly, no build |
 | `src/core/*.mts` | The portable core. No platform at all. Where tests reach |
-| `src/browser/*.mts` | Browser platform and entry, compiled to `public/js/browser/` |
+| `src/platform-browser/*.mts` | Browser platform. The shell and the element helpers |
+| `src/platform-worker/*.mts` | The two Web Workers |
+| `src/entry-browser/*.mts` | The five entry points. Nothing imports these |
 | `test/unit/` | Unit tests |
 | `test/integration/` | Server and browser tests |
 | `build-exe.mts` | Standalone binary build |

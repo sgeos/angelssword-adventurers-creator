@@ -13,7 +13,8 @@ Model, named `*-core.mts`, or `exporter-math.mts` for the exporter. Where the
 tested logic lives.
 
 **Handoff.** The shared mutable object through which pipeline stages pass
-values, declared in `src/browser/app.mts` and published on the global object.
+values, declared in `src/platform-browser/shell.mts` and published on the global
+object by `src/entry-browser/app.mts`.
 Distinct from the session handoff protocol in
 [process/HANDOFF.md](../process/HANDOFF.md), which is unrelated and shares only
 the word.
