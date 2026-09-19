@@ -300,6 +300,7 @@
                                 <div class="seg-toggle" id="sgProvider">
                                     <button class="seg-btn active" data-mode="openai" title="Generate with OpenAI. Uses your OpenAI API key.">OpenAI</button>
                                     <button class="seg-btn" data-mode="xai" title="Generate with Grok. Uses your xAI API key from Settings.">Grok</button>
+                                    <button class="seg-btn" data-mode="comfyui" title="Generate locally with ComfyUI. Configure the address in Settings.">ComfyUI</button>
                                 </div>
                             </div>
 
@@ -1002,6 +1003,63 @@
                         <button class="btn btn-sm btn-secondary" id="settingsXaiSave" title="Save key to browser storage">Save</button>
                     </div>
                     <div id="settingsXaiStatus"></div>
+                </div>
+
+                <!-- ComfyUI (local) -->
+                <div class="glass-panel">
+                    <div class="panel-title"><span class="title-icon">🖥️</span> ComfyUI (local)</div>
+                    <div class="panel-subtitle">Optional. Generate sprites on your own machine instead of a paid service. Only addresses on your local network are accepted.</div>
+
+                    <div class="form-row">
+                        <label>Server address</label>
+                        <input type="text" id="settingsComfyUrl" placeholder="http://127.0.0.1:8188" title="Where your ComfyUI instance is listening">
+                    </div>
+
+                    <div class="form-row">
+                        <label>Workflow</label>
+                        <div class="seg-toggle" id="settingsComfyWorkflow">
+                            <button class="seg-btn active" data-mode="flux" title="Flux. Uses UNET, dual CLIP and VAE loaders.">Flux</button>
+                            <button class="seg-btn" data-mode="sdxl" title="SDXL or Pony. Uses a single checkpoint.">SDXL</button>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <label>Model</label>
+                        <input type="text" id="settingsComfyModel" placeholder="flux1-dev-fp8.safetensors" title="UNET name for Flux, or checkpoint name for SDXL">
+                    </div>
+
+                    <div id="settingsComfyFluxFields">
+                        <div class="form-row">
+                            <label>CLIP</label>
+                            <input type="text" id="settingsComfyClip" placeholder="clip_l.safetensors" title="Flux CLIP encoder">
+                        </div>
+                        <div class="form-row">
+                            <label>T5</label>
+                            <input type="text" id="settingsComfyT5" placeholder="t5xxl_fp8_e4m3fn.safetensors" title="Flux T5 encoder">
+                        </div>
+                        <div class="form-row">
+                            <label>VAE</label>
+                            <input type="text" id="settingsComfyVae" placeholder="ae.safetensors" title="Flux VAE">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <label>Steps</label>
+                        <input type="range" id="settingsComfySteps" min="4" max="60" value="24" title="Sampling steps. More is slower and not always better.">
+                        <span id="settingsComfyStepsVal">24</span>
+                    </div>
+
+                    <div class="form-row">
+                        <label>Guidance</label>
+                        <input type="range" id="settingsComfyGuidance" min="1" max="15" step="0.5" value="3.5" title="Flux guidance, or CFG for SDXL">
+                        <span id="settingsComfyGuidanceVal">3.5</span>
+                    </div>
+
+                    <div class="api-key-row">
+                        <button class="btn btn-sm btn-secondary" id="settingsComfySave" title="Save these settings to browser storage">Save</button>
+                        <button class="btn btn-sm btn-accent" id="settingsComfyTest" title="Check that ComfyUI is reachable">Test</button>
+                    </div>
+                    <div id="settingsComfyStatus"></div>
                 </div>
 
                 <!-- Google API Key -->

@@ -7,6 +7,14 @@
 import type { HandoffPayload } from "./video-prep-core.mts";
 import { closestFrom, findEl, queryAll, requireEl } from "./dom.mts";
 import { PROVIDERS } from "./providers.mts";
+import {
+    COMFY_DEFAULTS,
+    COMFY_SETTINGS_KEY,
+    asWorkflowKind,
+    parseComfySettings,
+    type ComfySettings,
+    type WorkflowKind,
+} from "./comfyui-core.mts";
 
 /**
  * The `error.message` an API returned, if it sent one.
@@ -384,6 +392,95 @@ function initSettings(): void {
             localStorage.removeItem(PROVIDERS.xai.storageKey);
             showToast('xAI API key removed', 'warning');
         }
+    });
+
+    // --- ComfyUI (local) ---
+    // Markup lives in index.html. Upstream injected an equivalent panel at
+    // runtime by observing the settings section and splicing HTML into it,
+    // which is a workaround for not editing the page rather than a design.
+    const comfyUrl = requireEl('settingsComfyUrl', HTMLInputElement);
+    const comfyModel = requireEl('settingsComfyModel', HTMLInputElement);
+    const comfyClip = requireEl('settingsComfyClip', HTMLInputElement);
+    const comfyT5 = requireEl('settingsComfyT5', HTMLInputElement);
+    const comfyVae = requireEl('settingsComfyVae', HTMLInputElement);
+    const comfySteps = requireEl('settingsComfySteps', HTMLInputElement);
+    const comfyStepsVal = requireEl('settingsComfyStepsVal', HTMLElement);
+    const comfyGuidance = requireEl('settingsComfyGuidance', HTMLInputElement);
+    const comfyGuidanceVal = requireEl('settingsComfyGuidanceVal', HTMLElement);
+    const comfyFluxFields = requireEl('settingsComfyFluxFields', HTMLElement);
+    const comfyStatus = requireEl('settingsComfyStatus', HTMLElement);
+
+    let comfyWorkflow: WorkflowKind = COMFY_DEFAULTS.workflow;
+
+    /** Flux needs three encoders; SDXL takes them from its checkpoint. */
+    const reflectWorkflow = (): void => {
+        comfyFluxFields.classList.toggle('hidden', comfyWorkflow !== 'flux');
+        for (const btn of queryAll(requireEl('settingsComfyWorkflow', HTMLElement), '.seg-btn', HTMLElement)) {
+            btn.classList.toggle('active', btn.dataset['mode'] === comfyWorkflow);
+        }
+    };
+
+    const loaded = parseComfySettings(localStorage.getItem(COMFY_SETTINGS_KEY));
+    comfyUrl.value = loaded.url;
+    comfyModel.value = loaded.model;
+    comfyClip.value = loaded.clipName;
+    comfyT5.value = loaded.t5Name;
+    comfyVae.value = loaded.vaeName;
+    comfySteps.value = String(loaded.steps);
+    comfyStepsVal.textContent = String(loaded.steps);
+    comfyGuidance.value = String(loaded.guidance);
+    comfyGuidanceVal.textContent = String(loaded.guidance);
+    comfyWorkflow = loaded.workflow;
+    reflectWorkflow();
+
+    comfySteps.addEventListener('input', () => { comfyStepsVal.textContent = comfySteps.value; });
+    comfyGuidance.addEventListener('input', () => { comfyGuidanceVal.textContent = comfyGuidance.value; });
+
+    initModeSelector('settingsComfyWorkflow', (mode) => {
+        const chosen = asWorkflowKind(mode);
+        if (chosen === undefined) return;
+        comfyWorkflow = chosen;
+        reflectWorkflow();
+    });
+
+    /** Read the pane back into a settings object. */
+    const readComfySettings = (): ComfySettings => parseComfySettings(JSON.stringify({
+        url: comfyUrl.value,
+        workflow: comfyWorkflow,
+        model: comfyModel.value,
+        clipName: comfyClip.value,
+        t5Name: comfyT5.value,
+        vaeName: comfyVae.value,
+        steps: Number(comfySteps.value),
+        guidance: Number(comfyGuidance.value),
+    }));
+
+    requireEl('settingsComfySave', HTMLElement).addEventListener('click', () => {
+        localStorage.setItem(COMFY_SETTINGS_KEY, JSON.stringify(readComfySettings()));
+        showToast('ComfyUI settings saved', 'success');
+    });
+
+    requireEl('settingsComfyTest', HTMLElement).addEventListener('click', () => {
+        void (async (): Promise<void> => {
+            comfyStatus.innerHTML = '<div class="status-msg info">Checking…</div>';
+            try {
+                const response = await fetch('/api/comfyui/proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        baseUrl: readComfySettings().url,
+                        path: '/system_stats',
+                        method: 'GET',
+                    }),
+                });
+                const payload: unknown = await response.json().catch(() => ({}));
+                comfyStatus.innerHTML = response.ok
+                    ? '<div class="status-msg success">ComfyUI is reachable</div>'
+                    : `<div class="status-msg error">${apiErrorMessage(payload) ?? `Not reachable (${response.status.toString()})`}</div>`;
+            } catch (err) {
+                comfyStatus.innerHTML = `<div class="status-msg error">${err instanceof Error ? err.message : 'unknown error'}</div>`;
+            }
+        })();
     });
 
     // --- Notification Sounds ---

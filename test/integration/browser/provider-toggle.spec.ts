@@ -14,7 +14,7 @@ test.describe('G — Provider selection', () => {
 
     const selector = page.locator('#sgProvider');
     await expect(selector).toBeVisible();
-    await expect(selector.locator('.seg-btn')).toHaveCount(2);
+    await expect(selector.locator('.seg-btn')).toHaveCount(3);
 
     await selector.locator('[data-mode="xai"]').click();
     await expect(selector.locator('[data-mode="xai"]')).toHaveClass(/active/);
@@ -152,5 +152,110 @@ test.describe('H — Video provider selection', () => {
     expect(calls).toContain('/api/xai/videos/generations');
     expect(calls.some((p) => p.startsWith('/api/xai/videos/req-1'))).toBe(true);
     expect(calls).not.toContain('/api/video/generate');
+  });
+});
+
+test.describe('I — ComfyUI provider', () => {
+  test('is offered as a third sprite provider', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('.tab-btn[data-tab="tab-sprite-prep"]').click();
+    await page.locator('.mode-btn[data-mode="generate"]').click();
+    await expect(page.locator('#sgProvider .seg-btn')).toHaveCount(3);
+    await expect(page.locator('#sgProvider [data-mode="comfyui"]')).toBeVisible();
+  });
+
+  test('its settings live in the page and round-trip through storage', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('.tab-btn[data-tab="tab-settings"]').click();
+
+    await expect(page.locator('#settingsComfyUrl')).toBeVisible();
+    await page.locator('#settingsComfyUrl').fill('http://192.168.1.50:8188');
+    await page.locator('#settingsComfyModel').fill('custom.safetensors');
+    await page.locator('#settingsComfySave').click();
+
+    await page.reload();
+    await page.locator('.tab-btn[data-tab="tab-settings"]').click();
+    await expect(page.locator('#settingsComfyUrl')).toHaveValue('http://192.168.1.50:8188');
+    await expect(page.locator('#settingsComfyModel')).toHaveValue('custom.safetensors');
+  });
+
+  test('choosing SDXL hides the Flux-only encoder fields', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('.tab-btn[data-tab="tab-settings"]').click();
+
+    await expect(page.locator('#settingsComfyFluxFields')).toBeVisible();
+    await page.locator('#settingsComfyWorkflow [data-mode="sdxl"]').click();
+    await expect(page.locator('#settingsComfyFluxFields')).toBeHidden();
+    await page.locator('#settingsComfyWorkflow [data-mode="flux"]').click();
+    await expect(page.locator('#settingsComfyFluxFields')).toBeVisible();
+  });
+
+  test('generates without any API key, queueing a graph and collecting the image', async ({ page }) => {
+    const proxied: { path: string; method: string }[] = [];
+    // The save node's identifier depends on how many nodes the graph needed,
+    // so the mock reads it from the posted graph rather than assuming one.
+    let saveNodeId = '';
+
+    await page.route('**/api/comfyui/proxy', async (routeCtx) => {
+      const sent: unknown = routeCtx.request().postDataJSON();
+      const fields: Record<string, unknown> =
+        typeof sent === 'object' && sent !== null ? { ...sent } : {};
+      const rawPath = fields['path'];
+      const rawMethod = fields['method'];
+      const path = typeof rawPath === 'string' ? rawPath : '';
+      proxied.push({ path, method: typeof rawMethod === 'string' ? rawMethod : '' });
+
+      if (path === '/prompt') {
+        const body = fields['body'];
+        const graph = typeof body === 'object' && body !== null && 'prompt' in body
+          ? { ...body }.prompt
+          : undefined;
+        if (typeof graph === 'object' && graph !== null) {
+          const nodes: Record<string, unknown> = { ...graph };
+          saveNodeId = Object.keys(nodes).find((id) => {
+            const node = nodes[id];
+            return typeof node === 'object' && node !== null
+              && 'class_type' in node && { ...node }.class_type === 'SaveImage';
+          }) ?? '';
+        }
+        await routeCtx.fulfill({ status: 200, contentType: 'application/json',
+          body: JSON.stringify({ prompt_id: 'p-1' }) });
+        return;
+      }
+      if (path.startsWith('/history/')) {
+        await routeCtx.fulfill({ status: 200, contentType: 'application/json',
+          body: JSON.stringify({ 'p-1': { outputs: { [saveNodeId]: { images: [
+            { filename: 'out.png', subfolder: '', type: 'output' },
+          ] } } } }) });
+        return;
+      }
+      if (path.startsWith('/view')) {
+        await routeCtx.fulfill({ status: 200, contentType: 'image/png', body: 'PNGDATA' });
+        return;
+      }
+      await routeCtx.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+    });
+
+    await page.goto('/');
+    await page.evaluate(() => {
+      // No key of any kind is set. ComfyUI must not demand one.
+      localStorage.removeItem('openai_api_key');
+      localStorage.removeItem('xai_api_key');
+      localStorage.setItem('sprite_provider', 'comfyui');
+    });
+    await page.reload();
+    await page.locator('.tab-btn[data-tab="tab-sprite-prep"]').click();
+    await page.locator('.mode-btn[data-mode="generate"]').click();
+    await page.locator('#sgCharName').fill('Test Knight');
+    await page.locator('#sgGenerateBtn').click();
+
+    await expect.poll(async () => {
+      const status = await page.locator('#sgStatus, .toast').allTextContents();
+      return { views: proxied.filter((c) => c.path.startsWith('/view')).length,
+               paths: proxied.map((c) => c.path), status };
+    }, { timeout: 30_000 }).toMatchObject({ views: 1 });
+
+    expect(proxied.some((c) => c.path === '/prompt' && c.method === 'POST')).toBe(true);
+    expect(proxied.some((c) => c.path.startsWith('/history/'))).toBe(true);
   });
 });

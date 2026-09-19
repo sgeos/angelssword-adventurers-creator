@@ -1,12 +1,16 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+    COMFY_DEFAULTS,
     SPRITE_HEIGHT,
     SPRITE_WIDTH,
     buildFluxWorkflow,
     buildSdxlWorkflow,
     extractHistoryImages,
     extractPromptId,
+    asWorkflowKind,
+    buildWorkflowFor,
+    parseComfySettings,
     viewQuery,
     type ComfyWorkflow,
 } from '../../src/browser/comfyui-core.mts';
@@ -225,5 +229,102 @@ describe('viewQuery', () => {
         assert.equal(q.get('filename'), 'a b.png');
         assert.equal(q.get('subfolder'), 's');
         assert.equal(q.get('type'), 'output');
+    });
+});
+
+describe('asWorkflowKind', () => {
+    it('accepts the two workflows and rejects everything else', () => {
+        assert.equal(asWorkflowKind('flux'), 'flux');
+        assert.equal(asWorkflowKind('sdxl'), 'sdxl');
+        for (const bad of ['', 'Flux', 'pony', 'SDXL', 'wan']) {
+            assert.equal(asWorkflowKind(bad), undefined, bad);
+        }
+    });
+});
+
+describe('parseComfySettings', () => {
+    it('returns the defaults for absent or unusable storage', () => {
+        // localStorage is writable by anything on the origin.
+        for (const bad of [null, '', '{', 'null', '[]', '"text"', '42']) {
+            assert.deepEqual(parseComfySettings(bad), COMFY_DEFAULTS, JSON.stringify(bad));
+        }
+    });
+
+    it('reads a complete stored object', () => {
+        const stored = parseComfySettings(JSON.stringify({
+            url: 'http://192.168.1.5:8188', workflow: 'sdxl', model: 'pony.safetensors',
+            clipName: 'c', t5Name: 't', vaeName: 'v', steps: 30, guidance: 7,
+        }));
+        assert.equal(stored.url, 'http://192.168.1.5:8188');
+        assert.equal(stored.workflow, 'sdxl');
+        assert.equal(stored.steps, 30);
+        assert.equal(stored.guidance, 7);
+    });
+
+    it('fills each absent field from the defaults independently', () => {
+        const stored = parseComfySettings(JSON.stringify({ steps: 12 }));
+        assert.equal(stored.steps, 12);
+        assert.equal(stored.model, COMFY_DEFAULTS.model);
+        assert.equal(stored.url, COMFY_DEFAULTS.url);
+    });
+
+    it('rejects an unrecognised workflow rather than storing it', () => {
+        assert.equal(parseComfySettings('{"workflow":"wan"}').workflow, COMFY_DEFAULTS.workflow);
+    });
+
+    it('clamps the numeric fields into usable ranges', () => {
+        assert.equal(parseComfySettings('{"steps":0}').steps, 1);
+        assert.equal(parseComfySettings('{"steps":9999}').steps, 150);
+        assert.equal(parseComfySettings('{"guidance":-5}').guidance, 0);
+        assert.equal(parseComfySettings('{"steps":"abc"}').steps, COMFY_DEFAULTS.steps);
+    });
+
+    it('trims a stored address and ignores a blank one', () => {
+        assert.equal(parseComfySettings('{"url":"  http://10.0.0.1:8188  "}').url, 'http://10.0.0.1:8188');
+        assert.equal(parseComfySettings('{"url":"   "}').url, COMFY_DEFAULTS.url);
+    });
+});
+
+describe('buildWorkflowFor', () => {
+    it('builds a Flux graph when the settings say Flux', () => {
+        const { workflow } = buildWorkflowFor(COMFY_DEFAULTS, { positiveText: 'knight', seed: 1 });
+        assert.ok(Object.values(workflow).some((n) => n.class_type === 'UNETLoader'));
+        assert.ok(!Object.values(workflow).some((n) => n.class_type === 'CheckpointLoaderSimple'));
+    });
+
+    it('builds an SDXL graph when the settings say SDXL', () => {
+        const settings = { ...COMFY_DEFAULTS, workflow: 'sdxl' as const, model: 'pony.safetensors' };
+        const { workflow } = buildWorkflowFor(settings, { positiveText: 'knight', seed: 1 });
+        assert.ok(Object.values(workflow).some((n) => n.class_type === 'CheckpointLoaderSimple'));
+        assert.ok(!Object.values(workflow).some((n) => n.class_type === 'UNETLoader'));
+    });
+
+    it('derives the fp8 weight type from the model name', () => {
+        const { workflow } = buildWorkflowFor(COMFY_DEFAULTS, { positiveText: 'x', seed: 1 });
+        const unet = Object.values(workflow).find((n) => n.class_type === 'UNETLoader');
+        assert.equal(unet?.inputs['weight_dtype'], 'fp8_e4m3fn');
+
+        const plain = buildWorkflowFor({ ...COMFY_DEFAULTS, model: 'flux1-dev.safetensors' },
+            { positiveText: 'x', seed: 1 });
+        const plainUnet = Object.values(plain.workflow).find((n) => n.class_type === 'UNETLoader');
+        assert.equal(plainUnet?.inputs['weight_dtype'], 'default');
+    });
+
+    it('passes a reference image through to the likeness node of either workflow', () => {
+        const flux = buildWorkflowFor(COMFY_DEFAULTS, { positiveText: 'x', seed: 1, referenceFilename: 'r.png' });
+        assert.ok(Object.values(flux.workflow).some((n) => n.class_type === 'ApplyPulidFlux'));
+
+        const sdxl = buildWorkflowFor({ ...COMFY_DEFAULTS, workflow: 'sdxl' },
+            { positiveText: 'x', seed: 1, referenceFilename: 'r.png' });
+        assert.ok(Object.values(sdxl.workflow).some((n) => n.class_type === 'IPAdapterAdvanced'));
+    });
+
+    it('carries the settings steps and guidance into the graph', () => {
+        const settings = { ...COMFY_DEFAULTS, steps: 33, guidance: 6 };
+        const { workflow } = buildWorkflowFor(settings, { positiveText: 'x', seed: 1 });
+        const sampler = Object.values(workflow).find((n) => n.class_type === 'KSampler');
+        assert.equal(sampler?.inputs['steps'], 33);
+        const guide = Object.values(workflow).find((n) => n.class_type === 'FluxGuidance');
+        assert.equal(guide?.inputs['guidance'], 6);
     });
 });

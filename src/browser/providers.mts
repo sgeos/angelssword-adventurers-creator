@@ -13,10 +13,17 @@
  */
 
 /** Providers the sprite stage can generate through. */
-export type ProviderId = "openai" | "xai";
+export type ProviderId = "openai" | "xai" | "comfyui";
 
 /** How a provider authenticates, which decides what the settings pane asks for. */
-export type AuthKind = "bearer-key";
+/**
+ * How a provider authenticates.
+ *
+ * ComfyUI is `none`: it is the user's own machine, reached over the local
+ * network, and holds no credential. The settings it needs are an address and
+ * a model rather than a key.
+ */
+export type AuthKind = "bearer-key" | "none";
 
 export interface Provider {
   readonly id: ProviderId;
@@ -43,6 +50,16 @@ export const PROVIDERS: Readonly<Record<ProviderId, Provider>> = {
     defaultModel: "gpt-image-1",
     supportsReferenceImages: true,
   },
+  comfyui: {
+    id: "comfyui",
+    label: "ComfyUI",
+    imageRoute: "/api/comfyui/proxy",
+    // Not a credential. The address of the user's own instance.
+    storageKey: "comfyui_url",
+    authKind: "none",
+    defaultModel: "flux1-dev-fp8.safetensors",
+    supportsReferenceImages: true,
+  },
   xai: {
     id: "xai",
     label: "Grok",
@@ -58,7 +75,7 @@ export const PROVIDERS: Readonly<Record<ProviderId, Provider>> = {
 };
 
 /** Every provider, in the order the selector shows them. */
-export const PROVIDER_ORDER: readonly ProviderId[] = ["openai", "xai"];
+export const PROVIDER_ORDER: readonly ProviderId[] = ["openai", "xai", "comfyui"];
 
 /**
  * Narrow an untrusted string to a provider identifier.
@@ -68,7 +85,7 @@ export const PROVIDER_ORDER: readonly ProviderId[] = ["openai", "xai"];
  * or from localStorage, so neither source constrains it.
  */
 export const asProviderId = (value: string): ProviderId | undefined =>
-  value === "openai" || value === "xai" ? value : undefined;
+  value === "openai" || value === "xai" || value === "comfyui" ? value : undefined;
 
 /** The provider a stored preference names, falling back to OpenAI. */
 export const providerFrom = (stored: string | null): Provider => {

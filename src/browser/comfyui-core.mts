@@ -385,3 +385,134 @@ export const viewQuery = (image: ComfyImageRef): string =>
     subfolder: image.subfolder,
     type: image.type,
   }).toString();
+
+/* ────────────────────────────────────────────────────────────────────────
+ * Settings.
+ *
+ * Kept here rather than in the settings pane so that defaults, validation
+ * and the storage round trip are testable. Upstream held these in the
+ * injected panel and read them back out of the DOM at generation time.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+export type WorkflowKind = "flux" | "sdxl";
+
+export interface ComfySettings {
+  readonly url: string;
+  readonly workflow: WorkflowKind;
+  readonly model: string;
+  readonly clipName: string;
+  readonly t5Name: string;
+  readonly vaeName: string;
+  readonly steps: number;
+  readonly guidance: number;
+}
+
+/** Where the settings live. One key, one object. */
+export const COMFY_SETTINGS_KEY = "comfyui_settings";
+
+/**
+ * Defaults chosen to work on a typical installation.
+ *
+ * The Flux model names are the on-disk names upstream converged on after
+ * several commits correcting them, having first used names that did not
+ * match what ComfyUI actually ships.
+ */
+export const COMFY_DEFAULTS: ComfySettings = {
+  url: "http://127.0.0.1:8188",
+  workflow: "flux",
+  model: "flux1-dev-fp8.safetensors",
+  clipName: "clip_l.safetensors",
+  t5Name: "t5xxl_fp8_e4m3fn.safetensors",
+  vaeName: "ae.safetensors",
+  steps: 24,
+  guidance: 3.5,
+};
+
+/** Narrow an untrusted string to a workflow kind. */
+export const asWorkflowKind = (value: string): WorkflowKind | undefined =>
+  value === "flux" || value === "sdxl" ? value : undefined;
+
+const asString = (value: unknown, fallback: string): string =>
+  typeof value === "string" && value.trim() !== "" ? value.trim() : fallback;
+
+const asNumber = (value: unknown, fallback: number, min: number, max: number): number => {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
+};
+
+/**
+ * Read settings from a stored string, filling anything absent or unusable
+ * from the defaults. localStorage is writable by anything on the origin, so
+ * nothing read back is trusted.
+ */
+export const parseComfySettings = (raw: string | null): ComfySettings => {
+  if (raw === null || raw === "") return COMFY_DEFAULTS;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return COMFY_DEFAULTS;
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return COMFY_DEFAULTS;
+  }
+  const source: Record<string, unknown> = { ...parsed };
+  const workflow = typeof source["workflow"] === "string"
+    ? asWorkflowKind(source["workflow"])
+    : undefined;
+
+  return {
+    url: asString(source["url"], COMFY_DEFAULTS.url),
+    workflow: workflow ?? COMFY_DEFAULTS.workflow,
+    model: asString(source["model"], COMFY_DEFAULTS.model),
+    clipName: asString(source["clipName"], COMFY_DEFAULTS.clipName),
+    t5Name: asString(source["t5Name"], COMFY_DEFAULTS.t5Name),
+    vaeName: asString(source["vaeName"], COMFY_DEFAULTS.vaeName),
+    steps: Math.trunc(asNumber(source["steps"], COMFY_DEFAULTS.steps, 1, 150)),
+    guidance: asNumber(source["guidance"], COMFY_DEFAULTS.guidance, 0, 30),
+  };
+};
+
+/**
+ * Build the graph these settings describe, for a prompt and optional
+ * reference image. The caller has already uploaded the reference, if any.
+ */
+export const buildWorkflowFor = (
+  settings: ComfySettings,
+  opts: {
+    readonly positiveText: string;
+    readonly negativeText?: string;
+    readonly seed: number;
+    readonly referenceFilename?: string;
+    readonly loras?: readonly LoraSlot[];
+  },
+): BuiltWorkflow => {
+  if (settings.workflow === "flux") {
+    const flux: FluxOptions = {
+      unetName: settings.model,
+      clipName: settings.clipName,
+      t5Name: settings.t5Name,
+      vaeName: settings.vaeName,
+      positiveText: opts.positiveText,
+      seed: opts.seed,
+      steps: settings.steps,
+      guidance: settings.guidance,
+      weightDtype: settings.model.includes("fp8") ? "fp8_e4m3fn" : "default",
+      ...(opts.loras === undefined ? {} : { loras: opts.loras }),
+      ...(opts.referenceFilename === undefined ? {} : { referenceFilename: opts.referenceFilename }),
+    };
+    return buildFluxWorkflow(flux);
+  }
+  const sdxl: SdxlOptions = {
+    checkpoint: settings.model,
+    positiveText: opts.positiveText,
+    negativeText: opts.negativeText ?? "",
+    seed: opts.seed,
+    steps: settings.steps,
+    cfg: settings.guidance,
+    ...(opts.loras === undefined ? {} : { loras: opts.loras }),
+    ...(opts.referenceFilename === undefined ? {} : { referenceFilename: opts.referenceFilename }),
+  };
+  return buildSdxlWorkflow(sdxl);
+};

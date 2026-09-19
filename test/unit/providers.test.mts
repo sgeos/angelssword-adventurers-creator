@@ -13,10 +13,11 @@ describe('asProviderId', () => {
     it('accepts the known providers', () => {
         assert.equal(asProviderId('openai'), 'openai');
         assert.equal(asProviderId('xai'), 'xai');
+        assert.equal(asProviderId('comfyui'), 'comfyui');
     });
 
     it('rejects anything else, including case variants', () => {
-        for (const bad of ['', 'OpenAI', 'grok', 'XAI', 'comfyui', 'openai ']) {
+        for (const bad of ['', 'OpenAI', 'grok', 'XAI', 'ComfyUI', 'openai ']) {
             assert.equal(asProviderId(bad), undefined, `expected ${JSON.stringify(bad)} rejected`);
         }
     });

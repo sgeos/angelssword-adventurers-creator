@@ -171,6 +171,11 @@ Generate panel. Video generation runs through Google Gemini or through Grok,
 selected in the Video Generation panel. Each provider uses its own key,
 entered in Settings and held in browser storage.
 
+Sprites may also be generated locally with ComfyUI, configured in Settings.
+Only addresses on the local network are accepted, and the endpoints the
+application may reach are restricted to the five it uses. No credential is
+involved, because ComfyUI runs on the user's own machine.
+
 Grok video is generated asynchronously. The request returns an identifier,
 the application polls until the clip is ready, and the finished asset is
 retrieved through the local proxy, which holds the credential the asset

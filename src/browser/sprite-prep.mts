@@ -18,6 +18,15 @@ import { base64ToBlob, blobToBase64, colorName, debounce } from "./app-utils.mts
 import { closestFrom, fieldValue, queryAll, require2d, requireEl } from "./dom.mts";
 import * as Core from "./sprite-prep-core.mts";
 import {
+    COMFY_SETTINGS_KEY,
+    buildWorkflowFor,
+    extractHistoryImages,
+    extractPromptId,
+    parseComfySettings,
+    viewQuery,
+    type ComfySettings,
+} from "./comfyui-core.mts";
+import {
     PROVIDERS,
     asProviderId,
     buildImageRequest,
@@ -28,6 +37,10 @@ import {
 
 /** Where the chosen provider is remembered between sessions. */
 const PROVIDER_PREFERENCE_KEY = 'sprite_provider';
+
+/** ComfyUI offers no completion callback, so the history is polled. */
+const COMFY_POLL_INTERVAL_MS = 2_000;
+const COMFY_MAX_POLLS = 150;
 import { channel } from "./pixels.mts";
 import { responseErrorMessage } from "./api.mts";
 
@@ -377,10 +390,23 @@ async function generate(): Promise<void> {
     }
 
     const provider = providerFrom(localStorage.getItem(PROVIDER_PREFERENCE_KEY));
-    const apiKey = localStorage.getItem(provider.storageKey);
-    if (!hasCredential(apiKey) || apiKey === null) {
-        showToast(`No ${provider.label} API key. Go to Settings to add one.`, 'error');
-        return;
+
+    // ComfyUI holds no credential. It runs on the user's own machine, so the
+    // thing that can be missing is its address rather than a key.
+    let apiKey = '';
+    if (provider.authKind === 'none') {
+        const configured = parseComfySettings(localStorage.getItem(COMFY_SETTINGS_KEY));
+        if (configured.url === '') {
+            showToast(`No ${provider.label} address. Go to Settings to add one.`, 'error');
+            return;
+        }
+    } else {
+        const stored = localStorage.getItem(provider.storageKey);
+        if (!hasCredential(stored) || stored === null) {
+            showToast(`No ${provider.label} API key. Go to Settings to add one.`, 'error');
+            return;
+        }
+        apiKey = stored;
     }
 
     // Get generation count
@@ -440,12 +466,96 @@ async function generate(): Promise<void> {
     }
 }
 
+/** One call through the local ComfyUI proxy. */
+async function comfyCall(
+    settings: ComfySettings,
+    path: string,
+    method: string,
+    body?: unknown,
+): Promise<Response> {
+    return fetch(PROVIDERS.comfyui.imageRoute, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ baseUrl: settings.url, path, method, body }),
+    });
+}
+
+/**
+ * Generate one sprite on the user's own ComfyUI.
+ *
+ * Four steps. Upload the reference if there is one, queue the graph, poll the
+ * history until the save node reports an image, then retrieve it. ComfyUI
+ * offers no completion callback, so polling is the only option.
+ */
+async function generateOneComfy(
+    prompt: string,
+    images: readonly unknown[],
+): Promise<string | null> {
+    const settings = parseComfySettings(localStorage.getItem(COMFY_SETTINGS_KEY));
+
+    // A reference image must reach ComfyUI before the graph can name it.
+    let referenceFilename: string | undefined;
+    const first = images[0];
+    if (typeof first === 'string' && first !== '') {
+        const uploaded = await comfyCall(settings, '/upload/image', 'POST', {
+            image: first,
+            filename: `as_adventurer_ref_${Date.now().toString()}.png`,
+        });
+        const uploadBody: unknown = await uploaded.json().catch(() => ({}));
+        if (uploaded.ok) {
+            const name = typeof uploadBody === 'object' && uploadBody !== null && 'name' in uploadBody
+                ? { ...uploadBody }.name
+                : undefined;
+            if (typeof name === 'string' && name !== '') referenceFilename = name;
+        }
+    }
+
+    const seed = Math.floor(Math.random() * 1_000_000_000);
+    const built = buildWorkflowFor(settings, {
+        positiveText: prompt,
+        seed,
+        ...(referenceFilename === undefined ? {} : { referenceFilename }),
+    });
+
+    const queued = await comfyCall(settings, '/prompt', 'POST', { prompt: built.workflow });
+    const queuedBody: unknown = await queued.json().catch(() => ({}));
+    if (!queued.ok) {
+        throw new Error(responseErrorMessage(queuedBody) ?? `ComfyUI refused the job (${queued.status.toString()})`);
+    }
+    const promptId = extractPromptId(queuedBody);
+    if (promptId === undefined) throw new Error('ComfyUI did not return a prompt id');
+
+    for (let attempt = 0; attempt < COMFY_MAX_POLLS; attempt++) {
+        if (isGenCancelled()) return null;
+        await new Promise<void>((resolve) => { setTimeout(resolve, COMFY_POLL_INTERVAL_MS); });
+        if (isGenCancelled()) return null;
+
+        const polled = await comfyCall(settings, `/history/${promptId}`, 'GET');
+        if (!polled.ok) continue;
+        const history: unknown = await polled.json().catch(() => ({}));
+        const found = extractHistoryImages(history, promptId, built.saveNodeId);
+        const image = found[0];
+        if (image === undefined) continue;
+
+        const view = await comfyCall(settings, `/view?${viewQuery(image)}`, 'GET');
+        if (!view.ok) throw new Error('ComfyUI produced an image that could not be retrieved');
+        const bytes = await view.arrayBuffer();
+        let binary = '';
+        for (const byte of new Uint8Array(bytes)) binary += String.fromCharCode(byte);
+        return `data:image/png;base64,${btoa(binary)}`;
+    }
+
+    throw new Error('ComfyUI generation timed out');
+}
+
 async function generateOne(
     apiKey: string,
     prompt: string,
     images: readonly unknown[],
     provider: Provider = PROVIDERS.openai,
 ): Promise<string | null> {
+    if (provider.id === 'comfyui') return generateOneComfy(prompt, images);
+
     // OpenAI keeps its own request shape, which carries a reference image
     // through /api/edits. Grok has no equivalent, so a reference image is
     // ignored there and the prompt carries the description alone.
