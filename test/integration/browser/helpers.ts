@@ -6,9 +6,9 @@ import path from 'node:path';
 // __dirname, not import.meta.url: Playwright transpiles specs to CommonJS,
 // where import.meta does not exist. This file is only ever loaded by
 // Playwright, so the CommonJS form is the correct one here.
-export const FIXTURES = path.join(__dirname, '../../fixtures/media');
-export const GREEN_SPRITE = path.join(FIXTURES, 'green-sprite.png');
-export const SPRITE_ON_GREEN = path.join(FIXTURES, 'sprite-on-green.png');
+export const FIXTURES: string = path.join(__dirname, '../../fixtures/media');
+export const GREEN_SPRITE: string = path.join(FIXTURES, 'green-sprite.png');
+export const SPRITE_ON_GREEN: string = path.join(FIXTURES, 'sprite-on-green.png');
 
 export const TAB_IDS: readonly string[] = [
   'tab-sprite-prep',

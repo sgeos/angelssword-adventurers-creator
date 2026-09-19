@@ -5,12 +5,13 @@
  * There is no OPEN_BROWSER=0 gate on current main — in CI/headless Linux
  * xdg-open typically fails harmlessly. Prefer PORT=3001 for webServer.
  */
-import { defineConfig, devices } from '@playwright/test';
+import { type PlaywrightTestConfig, defineConfig, devices } from '@playwright/test';
 
 const PORT = process.env['PORT'] ?? '3001';
 const baseURL = `http://localhost:${PORT}`;
 
-export default defineConfig({
+// Annotated because isolatedDeclarations cannot infer a default export.
+const config: PlaywrightTestConfig = defineConfig({
   testDir: 'test/integration/browser',
   fullyParallel: false,
   forbidOnly: process.env['CI'] !== undefined,
@@ -43,3 +44,5 @@ export default defineConfig({
     },
   },
 });
+
+export default config;

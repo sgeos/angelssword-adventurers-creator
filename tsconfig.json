@@ -133,7 +133,6 @@
     "dist",
     "tmp",
     "secret",
-    "tools/probe",
     // Browser code and its end-to-end harness. Both need the DOM lib,
     // which the server must not have, so they have their own projects
     // rather than being half-checked under this one.

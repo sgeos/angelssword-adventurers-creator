@@ -6,21 +6,19 @@
   // types and the DOM lib together.
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    // The only project where isolatedDeclarations is off. Tests import .js
-    // helpers and fixtures, which needs allowJs, and the two options are
-    // mutually exclusive. Nothing imports a test, so the guarantee
-    // isolatedDeclarations gives — that an exported type never has to be
-    // inferred across a file boundary — buys nothing here.
-    "isolatedDeclarations": false,
-    "declaration": false,
-    "declarationDir": null,
+    // isolatedDeclarations is inherited and stays on. It was off here while
+    // the tests imported .js helpers and fixtures, because that needs allowJs
+    // and the two are mutually exclusive; the last of those was converted, so
+    // the exemption went with it. This project is now as strict as the rest.
+    //
+    // isolatedDeclarations requires that declarations *could* be emitted, so
+    // declaration stays on; noEmit below means none actually are.
+    "declaration": true,
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["node"],
     "moduleResolution": "Bundler",
     "module": "ESNext",
-    "noEmit": true,
-    "allowJs": true,
-    "checkJs": false
+    "noEmit": true
   },
   "include": ["test/**/*.mts", "test/**/*.ts", "src/browser/**/*.mts", "playwright.config.ts"],
   // gif-worker.mts needs the WebWorker lib, which cannot be loaded beside DOM.
