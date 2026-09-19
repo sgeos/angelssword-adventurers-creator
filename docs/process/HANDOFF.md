@@ -2,7 +2,7 @@
 
 > **Navigation**: [Process](./README.md) | [Documentation Root](../README.md)
 
-**Refreshed 2026-09-19. The anchor is `9cf2a11`, the last commit before this
+**Refreshed 2026-09-19. The anchor is `169cd1b`, the last commit before this
 refresh.** Read this block, run the validity check, then read the task below.
 
 ---
@@ -16,11 +16,11 @@ itself.
 
 ### Ancestry
 
-`main` should **contain** `9cf2a11`, the last commit before this refresh. Test
+`main` should **contain** `169cd1b`, the last commit before this refresh. Test
 containment rather than equality.
 
 ```sh
-git merge-base --is-ancestor 9cf2a11 HEAD
+git merge-base --is-ancestor 169cd1b HEAD
 ```
 
 If that fails, this file predates a history rewrite and is stale. If it
@@ -40,20 +40,22 @@ of the list rather than taking the next unused number, and renumber when
 inserting, because a list whose numbers skip reads as though checks are
 missing.
 
-1. `git ls-files` reports **69** TypeScript files and exactly **one**
+1. `git ls-files` reports **81** TypeScript files and exactly **one**
    JavaScript file, `eslint.config.mjs`, which is deliberate.
 2. **Five** `tsconfig.*.json` projects exist at the repository root, and
    `src/` holds exactly four directories, `core`, `platform-browser`,
    `platform-worker`, and `entry-browser`.
-3. `npm test` reports **347** unit tests and **44** application programming
+3. `src/core/ports/` holds **three** capability interfaces, namely
+   `storage.mts`, `http.mts`, and `clock.mts`.
+4. `npm test` reports **396** unit tests and **44** application programming
    interface tests, all passing.
-4. `npx playwright test` reports **24** passing browser specifications.
-5. `tsc -p tsconfig.core.json` succeeds, and adding `localStorage` to any file
+5. `npx playwright test` reports **24** passing browser specifications.
+6. `tsc -p tsconfig.core.json` succeeds, and adding `localStorage` to any file
    under `src/core/` makes it fail.
-6. `docker compose up --build` produces a container that serves on port 3001.
+7. `docker compose up --build` produces a container that serves on port 3001.
 
-Assertions 1 through 5 were executed at the anchor. Assertion 6 was last
-exercised at `69addb8`, two refreshes ago, and has not been repeated since. It
+Assertions 1 through 6 were executed at the anchor. Assertion 7 was last
+exercised at `69addb8`, several refreshes ago, and has not been repeated. It
 is recorded as unverified rather than restated as though it had been run.
 
 If an assertion fails, this file is stale. Trust the repository and say so.
@@ -65,7 +67,8 @@ If an assertion fails, this file is stale. Trust the repository and say so.
    mistake made in this repository. Two of them were repeated after being
    written down, so it is not merely decorative.
 3. Read [../architecture/LAYERING.md](../architecture/LAYERING.md), which is
-   the design the current work implements.
+   the design the current work implements and which records why the capability
+   list is now closed.
 4. Read the task below.
 5. Stop and wait for a prompt.
 
@@ -80,89 +83,96 @@ Sprites generate through OpenAI, Grok, or a local ComfyUI. Video generates
 through Gemini, Grok, or ComfyUI with Wan image-to-video. A local server
 proxies every outbound call.
 
-**The three-layer rearchitecture is structurally complete and has one
-capability inverted.** Three increments landed.
+**The three-layer rearchitecture is structurally complete, and every
+capability the core needs is inverted.** Five increments landed.
 
 - `e579ee5` established `src/core/` and `tsconfig.core.json`, which withholds
   the Document Object Model library and the node types together.
-- `5da3c11` separated `src/platform-browser/`, `src/platform-worker/`, and
-  `src/entry-browser/`, and added the import-direction rule that no tsconfig
-  can express.
-- `9cf2a11` inverted storage end to end, from `KeyValueStore` through a
-  browser adapter to twenty-seven converted call sites.
+- `5da3c11` separated the platform and entry layers, and added the
+  import-direction rule that no tsconfig can express.
+- `9cf2a11` inverted storage, twenty-seven call sites becoming none.
+- `8f75eb5` inverted the network and time, unified the browser's client with
+  the server's, and moved the ComfyUI and Grok exchanges into the core.
+- `169cd1b` extracted the video stage's loop arithmetic, and struck logging
+  and binary payloads off the capability list as not being capabilities.
 
 ## The next task
 
-Continue inverting capabilities. The order below is by value, not by size.
+**Not architectural.** Nothing further needs an interface. What remains is the
+ordinary work of separating the arithmetic still tangled with the Document
+Object Model inside the four stage modules, which is the same work as making
+them testable.
 
-**The network, and it is the most valuable.** The server already inverted it
-as `FetchLike` in `server.mts`, and the browser has not inverted it at all.
-Those are the same interface and should be one, living in `src/core/ports/`.
-Doing this unlocks the real prize. The ComfyUI call sequence, meaning upload,
-queue, poll the history, retrieve, is written twice, once in `sprite-prep.mts`
-and once in `video-gen.mts`, and it is logic rather than presentation. So is
-the Grok polling loop, whose pure parts already sit in `grok-video-core.mts`
-while the loop that drives them sits in `video-gen`.
+`169cd1b` is the worked example to follow. It found a count computed two ways,
+two label vocabularies for one concept, and an epsilon whose reason was
+unrecorded, all inside forty lines of a stage. The method was to read a
+function, ask which lines would still mean something without a document, and
+move those.
 
-**Time, which the network work needs anyway.** Every polling loop reaches
-`setTimeout` directly, so none can be tested without waiting. A `Clock` with
-`now` and `sleep` is what makes a poll loop assertable.
+Sizes at the anchor, largest first. `model-exporter` 1,660, `sprite-prep`
+1,119, `video-prep` 914, `shell` 784, `video-gen` 671.
 
-**Randomness, which is three sites and an afternoon.** All three generate
-seeds. Inverting it makes a generation reproducible under test.
-
-**Logging and binary payloads**, the latter being `Blob`, `File`, and object
-URLs at thirty-eight sites. Binary payloads are what block `Handoff` from
-moving to the core, since it carries an `HTMLCanvasElement` and two `Blob`
-fields.
+`model-exporter` is the largest and the least examined. `sprite-prep` is the
+next. Neither has been read function by function in the way `video-prep` just
+was.
 
 ### What is already true
 
 Measured at the anchor over code with comments and string literals stripped.
 The core has **zero** references to a platform facility of any kind, which
-`tsconfig.core.json` also refuses to compile. What remains, by layer:
+`tsconfig.core.json` also refuses to compile.
 
-| Capability | Entry | Platform | Worker |
-|---|---|---|---|
-| Binary payloads | 32 | 6 | 0 |
-| Time and scheduling | 24 | 5 | 2 |
-| Logging | 10 | 2 | 0 |
-| The network | 9 | 4 | 0 |
-| Randomness | 2 | 1 | 0 |
+| Facility | Entry | Platform | Worker | Status |
+|---|---|---|---|---|
+| Document Object Model | 320 | 100 | 0 | The remaining work |
+| Binary payloads | 33 | 7 | 0 | Not a capability, see LAYERING.md |
+| Time and scheduling | 22 | 7 | 2 | Inverted; what is left is animation |
+| Logging | 10 | 2 | 0 | Not a capability, see LAYERING.md |
+| Storage | 0 | 3 | 0 | Inverted, confined by lint |
+| The network | 0 | 3 | 0 | Inverted, confined by lint |
+| Randomness | 0 | 2 | 0 | Resolved without an interface |
 
 ### Traps specific to this task
 
 **Measure with a compiler, not with a search.** A search that stripped
 comments and strings reported twelve modules portable. The core project
 refused two of them, for `ImageData` and for `URLSearchParams`, neither of
-which the search had looked for. A search establishes what a pattern matches.
-A compiler establishes what a file requires.
+which the search had looked for.
 
 **A module reaching for a platform facility has not established that it needs
 one.** `gif-composite` asserted in its own header that it needed a canvas. It
-used one as a scratch buffer and did not need one. Ask what the facility is
-being asked to compute, and whether the answer is arithmetic, before declaring
-a capability for it.
+did not.
+
+**A facility the platform uses on its own account is not a capability.** The
+original capability list was a count of what the browser layers reach for,
+which is a different question from what the core needs handed to it. Two
+entries did not survive being asked the right question.
 
 **Preserve behaviour across a move, and characterise it.** Writing
 `gif-composite`'s first tests found two divergences from the format. Both were
-preserved and pinned, and the decision to correct them recorded in
-[../decisions/OPEN.md](../decisions/OPEN.md), because the change moved a
-module rather than altering one.
+preserved and pinned, and the decision recorded in
+[../decisions/OPEN.md](../decisions/OPEN.md).
 
 **Check that a new rule fires.** Every gate added so far was exercised against
 a deliberately failing file before being believed.
+
+**Check that two formulas agree before unifying them.** The loop count was
+computed two ways and they turned out to agree, which was established rather
+than assumed, and the agreement is now a test.
 
 ## Open matters
 
 Recorded in [../decisions/OPEN.md](../decisions/OPEN.md).
 
-- The four stage modules have no unit tests, and this task subsumes it.
+- The five largest modules still have no unit tests, which the task above
+  addresses.
 - `gif-composite` diverges from the Graphics Interchange Format in two ways.
 - The format's decode path has no production consumer at all.
 - The Windows and Linux binary builds have never been run.
 - Nothing has been exercised against live keys, a real ComfyUI, or a real Grok
-  subscription.
+  subscription. Both extracted exchanges are covered by unit tests against a
+  scripted client and by a browser specification against mocked routes, which
+  is not the same as having run against the service.
 - No release has been cut.
 
 ## Relationship to upstream

@@ -11,30 +11,35 @@ bound.
 
 ## Active
 
-**Three-layer rearchitecture.** Structurally complete, one capability of six
-inverted. Specified in [HANDOFF.md](./HANDOFF.md) and designed in
-[../architecture/LAYERING.md](../architecture/LAYERING.md).
+**Extracting the arithmetic still tangled with the Document Object Model.**
+The stage modules are the last untested code. Specified in
+[HANDOFF.md](./HANDOFF.md). Not architectural, and needs no new interface.
 
-Success is a portable core that names its required capabilities as interfaces
-rather than avoiding the need for them, a platform layer supplying them for
-the browser and for node, and the currently untested stage modules brought
-under test as a consequence rather than as separate work.
+Success is `model-exporter`, `sprite-prep`, `video-prep`, `shell`, and
+`video-gen` reduced to presentation, with what they compute moved to the core
+and tested there.
 
-Done. The three layers exist as four directories under `src/`, and each
-boundary is checked rather than promised: `tsconfig.core.json` withholds both
-platform libraries, and two lint zones carry the import-direction rule no
-tsconfig can express. Storage is inverted end to end.
+## Completed: the three-layer rearchitecture
 
-Remaining, in the order the handoff argues for. The network, which the server
-has already inverted and which unlocks the twice-written ComfyUI call
-sequence. Time, which every polling loop reaches directly. Randomness, three
-sites. Logging and binary payloads, the latter being what blocks `Handoff`
-from moving to the core.
+Structurally complete, and every capability the core needs inverted. Designed
+in [../architecture/LAYERING.md](../architecture/LAYERING.md).
+
+The three layers exist as four directories under `src/`, and each boundary is
+checked rather than promised. `tsconfig.core.json` withholds both platform
+libraries; two lint zones carry the import-direction rule no tsconfig can
+express; storage and the network are each confined to named adapter files.
+
+Storage, the network, and time are inverted end to end. Randomness is resolved
+by passing a seed rather than a generator. Logging and binary payloads were
+examined and are not capabilities, which is recorded rather than quietly
+dropped.
 
 ## Recently Completed
 
 | Task | Status | Verification |
 |---|---|---|
+| Loop arithmetic extracted; capability list closed | Complete | 14 new tests; two formulas asserted to agree |
+| Network and time capabilities inverted | Complete | 35 new tests; server shares the port; ban exercised |
 | Storage capability inverted | Complete | 27 sites converted to 0; 37 new tests; ban exercised |
 | Platform and entry layers separated | Complete | Both import zones refuse a failing file; workers exercised |
 | Portable core established and enforced | Complete | Core project refuses a failing file; two couplings found |

@@ -12,10 +12,98 @@ file is arranged this way rather than being rewritten wholesale.
 
 ## Last Updated
 
+2026-09-19. Three-layer rearchitecture, five increments. Structurally
+complete, and every capability the core needs inverted.
+
+## Verification
+
+`npm run check` passes across all five projects. 396 unit tests, 44
+application programming interface tests, 24 browser specifications, all
+passing. Every gate added was exercised against a deliberately failing file:
+the core project, the two determinism bans, the two import-direction zones,
+the storage ban, and the network ban. The container was not rebuilt and is
+marked unverified at the anchor in [HANDOFF.md](./HANDOFF.md).
+
+## Summary
+
+The pattern is from `~/projects/re/1830/`, whose architecture document states
+the part that matters: the rule is enforceable by inspection, and a core that
+needs a clock or a socket declares an interface for it. A layering nobody can
+check is a naming convention.
+
+A TypeScript project is this codebase's crate and its `lib` and `types` are
+its manifest, so `tsconfig.core.json` withholds both platform libraries and
+the core sees the language alone. Two lint zones carry the half no tsconfig
+can express, namely the direction imports may run.
+
+Three capabilities are inverted end to end. Storage, the network, and time.
+Randomness is resolved by passing a seed rather than a generator, following
+the reference project's rules crate. Two entries on the original list,
+logging and binary payloads, were examined and are not capabilities.
+
+The inversions were not the point in themselves. They made four things
+testable that had never been reachable from a node test: the Graphics
+Interchange Format compositor, the ComfyUI exchange, the Grok exchange, and
+the storage round trips. 120 tests were added across the five increments.
+
+## Questions for Human Pilot
+
+Two decisions are recorded in [../decisions/OPEN.md](../decisions/OPEN.md) and
+neither is mine to take.
+
+The Graphics Interchange Format decode path has no production consumer.
+`GifDecoder` and `compositeFrames` are reached only by tests. Either an import
+path returns, which is what upstream had, or roughly 200 lines go. That
+decides whether the two format divergences pinned beside them are worth
+correcting.
+
+## Technical Concerns
+
+**The capability list was wrong when first written, and the correction matters
+more than the entries.** It began as a count of what the browser layers reach
+for, which is not the same question as what the core needs handed to it. Two
+of seven entries did not survive being asked the right question. Anything
+added to such a list in future should be asked whether the core would call it.
+
+The core's freedom from the platform is checked by the compiler, but
+`Math.random`, `Date.now`, and `new Date` are ECMAScript and outside what any
+library setting excludes. A lint rule is the only instrument there.
+
+The storage adapter drops a failed write silently, which is a stated trade: a
+lost preference against a page that will not load where site data is blocked.
+
+Neither extracted exchange has run against a live service. Both are covered by
+unit tests against a scripted client and by a browser specification against
+mocked routes, which establishes that the sequence is right and not that the
+service agrees with it.
+
+## Intended Next Step
+
+Separating the arithmetic still tangled with the Document Object Model in the
+five largest modules. Not architectural, and needing no new interface.
+`169cd1b` is the worked example: read a function, ask which lines would still
+mean something without a document, move those. `model-exporter` at 1,660 lines
+is the largest and the least examined.
+
+## Session Context
+
+`main` at `169cd1b` before this refresh. Upstream carries two open pull
+requests and one open issue, all from this fork.
+
+---
+
+## Superseded history
+
+Nothing below this line describes the present.
+
+### Superseded 2026-09-19 — rearchitecture, first three increments
+
+#### Last Updated
+
 2026-09-19. Three-layer rearchitecture, three increments. Structurally
 complete, one capability of six inverted.
 
-## Verification
+#### Verification
 
 `npm run check` passes across all five projects. 347 unit tests, 44
 application programming interface tests, 24 browser specifications, all
@@ -24,7 +112,7 @@ before being believed: the core project, the two determinism bans, the two
 import-direction zones, and the storage ban. The container was not rebuilt and
 is marked unverified at the anchor in [HANDOFF.md](./HANDOFF.md).
 
-## Summary
+#### Summary
 
 The pattern is taken from `~/projects/re/1830/`, whose architecture document
 states it plainly: a core holding all logic and declaring an interface for
@@ -43,7 +131,7 @@ property that makes it one. Storage was inverted end to end, from
 `KeyValueStore` through a browser adapter to twenty-seven converted call
 sites, all of which are now tested against a Map.
 
-## Questions for Human Pilot
+#### Questions for Human Pilot
 
 Two decisions are recorded in [../decisions/OPEN.md](../decisions/OPEN.md) and
 neither is mine to take.
@@ -58,7 +146,7 @@ clearing the whole canvas for disposal 2 rather than the disposed frame's
 area. Both predate this fork and are now pinned by characterisation tests.
 Correcting them is only worth doing if the path is kept.
 
-## Technical Concerns
+#### Technical Concerns
 
 The core's freedom from the platform is checked by the compiler, but three
 ECMAScript facilities are outside what any library setting can exclude, namely
@@ -76,23 +164,17 @@ Concerns carried forward unchanged. Nothing added for Grok or ComfyUI has run
 against a live service. The four stage modules still have no unit tests, which
 the remaining capability work subsumes.
 
-## Intended Next Step
+#### Intended Next Step
 
 The network capability, argued for in [HANDOFF.md](./HANDOFF.md). The server
 already inverted it as `FetchLike`, the browser has not inverted it at all,
 and they are the same interface. It unlocks the ComfyUI call sequence, which
 is written twice and is logic rather than presentation.
 
-## Session Context
+#### Session Context
 
 `main` at `9cf2a11` before this refresh. Upstream carries two open pull
 requests and one open issue, all from this fork.
-
----
-
-## Superseded history
-
-Nothing below this line describes the present.
 
 ### Superseded 2026-09-19 — handoff validity anchored on commit N minus one
 

@@ -160,3 +160,64 @@ refactor that quietly alters behaviour is a refactor nobody can review, and
 because the same reasoning governed the original conversion. The divergences
 are pinned by tests that say at their own site that they characterise rather
 than specify.
+
+## 2026-09-19 — The capability list was wrong, and the correction is the entry
+
+The rearchitecture finished its architectural half today. Three capabilities
+inverted, one resolved without an interface, and two struck off. The last of
+those is the part worth writing down, because the mistake was in the method
+rather than in an answer.
+
+**The list was a count of what the browser layers reach for.** That is a
+question a search can answer, which is why it was the question asked. It is
+not the question the architecture poses. The architecture asks what the core
+would *call* if it held the logic, and those two produce different lists.
+
+Logging survived on the first list with twelve sites and died on the second,
+every site being a user interface diagnostic reporting that a module
+initialised or that an export failed. Binary payloads survived with forty and
+died the same way, every site constructing a `File` for a video element or an
+object URL for a `src` attribute. Had either been given an interface, it would
+have had a declaration, an implementation, and no caller, and it would have
+looked like progress.
+
+The rule that saved both was already written down here before either was
+examined: an interface is declared when a consumer for it exists. Applying it
+honestly means the list sometimes gets shorter without anything being built.
+
+**Randomness is the interesting middle case.** It has a genuine core
+consumer, the seeds that reach ComfyUI, and it still wants no interface. The
+core takes the value rather than the generator, following the reference
+project's rules crate, which makes a run reproducible from its inputs and
+makes non-determinism impossible rather than merely discouraged. So the test
+is not "does the core need this" but "does the core need to *call* this".
+
+## 2026-09-19 — What inverting a capability actually bought
+
+Three findings, none of which was the reason for the work.
+
+**The tested fraction was measuring the wrong thing.** `grok-video-core.mts`
+had every pure part of the Grok exchange extracted and covered: the request
+shape, the poll classification, the backoff schedule, the limits. The loop
+that uses them had no test, because a loop needs a clock and a network. So the
+easy parts were tested and the part that decides what happens was not, and no
+count of tests would have shown it. That is the shape of the gap, and it
+generalises: extraction stops exactly where the capabilities begin, which is
+exactly where the interesting code is.
+
+**Two copies that agree are still a problem.** The video stage computed its
+output frame count in a switch reading `loopPoint * 2` while the core computed
+`n + max(0, n - 2)`. They agree, which was checked across the whole permitted
+range rather than assumed. Nothing was wrong and nothing kept it right. The
+unification is worth the same as a bug fix and reads like none.
+
+**An assertion in a header is not evidence.** `gif-composite` said it was the
+one part of Graphics Interchange Format handling needing a canvas. It used a
+canvas as a scratch buffer. The header had been written by whoever moved it
+there, and repeating a claim in a comment is how it survives review.
+
+One process note. Every gate added across the five increments was exercised
+against a deliberately failing file before being believed, and two of them
+would otherwise have been reported as working while matching nothing. That
+practice cost about a minute each and is the only reason the claims in
+`LAYERING.md` are worth anything.
