@@ -6,6 +6,8 @@ import {
     strideFromSkip,
 } from '../../src/core/exporter-math.mts';
 import {
+    MIN_LOOP_SPAN,
+    describeLoop,
     exportRangeFromHandoff,
     loopSummary,
 } from '../../src/core/video-prep-core.mts';
@@ -185,6 +187,79 @@ describe('a loop that does not start at zero', () => {
                 mode === 'none' ? 'forward' : mode,
             );
             assert.equal(exported.length, summary.outputFrames, mode);
+        }
+    });
+});
+
+describe('describeLoop judges the pair rather than refusing a value', () => {
+    /**
+     * WHY REFUSING WAS WRONG. Each button used to reject a frame that did not
+     * already sit correctly against the other end, which made the ORDER of
+     * two independent actions matter. Moving a loop from 0..50 out to 100..150
+     * had to be done end first; moving it back had to be done start first.
+     * Neither order is discoverable and the refusing button never hinted that
+     * the other one would have worked.
+     */
+    it('accepts either order when moving a loop later', () => {
+        // Start first, which the old guard refused outright.
+        let start = 0, end = 50;
+        start = 100;
+        assert.equal(describeLoop('none', start, end, 300).kind, 'unusable',
+            'an inverted pair is a state to describe, not one to prevent');
+        end = 150;
+        assert.equal(describeLoop('none', start, end, 300).kind, 'ok');
+    });
+
+    it('accepts either order when moving a loop earlier', () => {
+        // End first, which the old guard refused outright.
+        let start = 200, end = 299;
+        end = 100;
+        assert.equal(describeLoop('none', start, end, 300).kind, 'unusable');
+        start = 50;
+        assert.equal(describeLoop('none', start, end, 300).kind, 'ok');
+    });
+
+    it('reaches the same place by both orders', () => {
+        assert.deepEqual(describeLoop('none', 100, 150, 300), describeLoop('none', 100, 150, 300));
+    });
+
+    it('says which way an inverted pair is wrong', () => {
+        const status = describeLoop('none', 100, 50, 300);
+        assert.equal(status.kind, 'unusable');
+        assert.match(status.reason, /end 50 is before its start 100/);
+    });
+
+    it('says how short a too-short span is', () => {
+        const status = describeLoop('none', 50, 51, 300);
+        assert.equal(status.kind, 'unusable');
+        assert.match(status.reason, /spans 1 frame/);
+    });
+
+    it('treats a cleared loop as unset rather than complaining about it', () => {
+        // A cleared loop is loopStart 0 with loopPoint -1. Reporting that its
+        // end precedes its start would be true and useless.
+        assert.deepEqual(describeLoop('none', 0, -1, 300), { kind: 'unset' });
+    });
+
+    it('accepts the shortest usable span at any offset', () => {
+        assert.equal(describeLoop('none', 0, MIN_LOOP_SPAN, 300).kind, 'ok');
+        assert.equal(describeLoop('none', 200, 200 + MIN_LOOP_SPAN, 300).kind, 'ok');
+    });
+
+    it('carries the summary through when the pair is usable', () => {
+        const status = describeLoop('pingpong', 50, 74, 300);
+        assert.equal(status.kind, 'ok');
+        assert.equal(status.summary.outputFrames, 48);
+        assert.equal(status.summary.label, 'Ping-Pong: 50 → 74 → 50');
+    });
+
+    it('agrees with the export range about which pairs are usable', () => {
+        const pairs = [[0, 50], [100, 150], [100, 50], [50, 51], [0, 2], [298, 299]] as const;
+        for (const [start, end] of pairs) {
+            const usable = describeLoop('none', start, end, 300).kind === 'ok';
+            const ranged = exportRangeFromHandoff({ loopStart: start, loopPoint: end, totalFrames: 300 })
+                !== undefined;
+            assert.equal(usable, ranged, `${start.toString()}..${end.toString()}`);
         }
     });
 });

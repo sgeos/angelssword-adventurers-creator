@@ -173,7 +173,7 @@ function updateVideoInfo(): void {
         <div><strong>Frames:</strong> ${state.totalFrames.toString()}</div>
     `;
 
-    if (state.loopPoint - state.loopStart >= MIN_LOOP_SPAN) {
+    if (state.loopPoint - state.loopStart >= VideoPrepCore.MIN_LOOP_SPAN) {
         const summary = VideoPrepCore.loopSummary(
             state.loopMode, state.loopPoint, state.totalFrames, state.loopStart,
         );
@@ -496,9 +496,6 @@ function pauseVideo(): void {
 // CORE: LOOP POINT
 // ================================================================
 
-/** Fewest frames a loop can span and still be worth playing. */
-const MIN_LOOP_SPAN = 2;
-
 /*
  * Two buttons rather than one that alternates.
  *
@@ -518,48 +515,42 @@ const MIN_LOOP_SPAN = 2;
  * worked and read as though the loop point were about to move.
  */
 function refreshLoopInfo(): void {
-    const summary = VideoPrepCore.loopSummary(
-        state.loopMode, state.loopPoint, state.totalFrames, state.loopStart,
+    const status = VideoPrepCore.describeLoop(
+        state.loopMode, state.loopStart, state.loopPoint, state.totalFrames,
     );
-    const usable = state.loopPoint - state.loopStart >= MIN_LOOP_SPAN;
-    requireEl('vpLoopInfo', HTMLElement).textContent = usable
-        ? `${summary.label} · ${summary.outputFrames.toString()} output frames`
-        : '';
-    requireEl('vpPreviewLoopBtn', HTMLButtonElement).disabled = !usable;
-    requireEl('vpClearLoopBtn', HTMLButtonElement).disabled = !usable;
+    requireEl('vpLoopInfo', HTMLElement).textContent =
+        status.kind === 'ok'
+            ? `${status.summary.label} · ${status.summary.outputFrames.toString()} output frames`
+            : status.kind === 'unusable' ? status.reason : '';
+
+    requireEl('vpPreviewLoopBtn', HTMLButtonElement).disabled = status.kind !== 'ok';
+    // Clearing stays available for an unusable pair, which is the state most
+    // likely to want it.
+    requireEl('vpClearLoopBtn', HTMLButtonElement).disabled = status.kind === 'unset';
     updateVideoInfo();
 }
 
-/** Set the first frame of the loop to wherever the scrubber sits. */
-function setLoopStart(): void {
+/**
+ * Set one end of the loop to wherever the scrubber sits.
+ *
+ * The value is always accepted. Judging the PAIR rather than refusing a
+ * value is what makes the order of the two buttons irrelevant, so a loop can
+ * be moved by setting either end first and fixing the other afterwards.
+ */
+function setLoopEdge(edge: 'start' | 'end'): void {
     if (!state.videoLoaded) return;
     const frame = state.currentFrame;
-    if (frame > state.loopPoint - MIN_LOOP_SPAN) {
-        showToast(
-            `A loop start must be at least ${MIN_LOOP_SPAN.toString()} frames before its end`,
-            'error',
-        );
-        return;
-    }
-    state.loopStart = frame;
-    refreshLoopInfo();
-    showToast(`Loop starts at frame ${frame.toString()}`, 'success');
-}
+    if (edge === 'start') state.loopStart = frame;
+    else state.loopPoint = frame;
 
-/** Set the last frame of the loop to wherever the scrubber sits. */
-function setLoopEnd(): void {
-    if (!state.videoLoaded) return;
-    const frame = state.currentFrame;
-    if (frame < state.loopStart + MIN_LOOP_SPAN) {
-        showToast(
-            `A loop end must be at least ${MIN_LOOP_SPAN.toString()} frames after its start`,
-            'error',
-        );
-        return;
-    }
-    state.loopPoint = frame;
     refreshLoopInfo();
-    showToast(`Loop ends at frame ${frame.toString()}`, 'success');
+
+    const status = VideoPrepCore.describeLoop(
+        state.loopMode, state.loopStart, state.loopPoint, state.totalFrames,
+    );
+    const where = edge === 'start' ? 'starts' : 'ends';
+    if (status.kind === 'unusable') showToast(status.reason, 'warning');
+    else showToast(`Loop ${where} at frame ${frame.toString()}`, 'success');
 }
 
 function clearLoop(): void {
@@ -614,7 +605,7 @@ function frameSignature(ctx: CanvasRenderingContext2D, width: number, height: nu
 }
 
 async function previewLoop(): Promise<void> {
-    if (state.loopPoint - state.loopStart < MIN_LOOP_SPAN) return;
+    if (state.loopPoint - state.loopStart < VideoPrepCore.MIN_LOOP_SPAN) return;
     state.previewPlaying = true;
     pauseVideo();
     requireEl('vpPreviewLoopBtn', HTMLElement).textContent = '⏸ Stop Preview';
@@ -952,8 +943,10 @@ function init(): void {
     });
 
     // ── Loop Point ──
-    requireEl('vpSetLoopStartBtn', HTMLElement).addEventListener('click', setLoopStart);
-    requireEl('vpSetLoopEndBtn', HTMLElement).addEventListener('click', setLoopEnd);
+    requireEl('vpSetLoopStartBtn', HTMLElement)
+        .addEventListener('click', () => { setLoopEdge('start'); });
+    requireEl('vpSetLoopEndBtn', HTMLElement)
+        .addEventListener('click', () => { setLoopEdge('end'); });
     requireEl('vpClearLoopBtn', HTMLElement).addEventListener('click', clearLoop);
     requireEl('vpPreviewLoopBtn', HTMLElement).addEventListener('click', () => {
         if (state.previewPlaying) stopPreview();

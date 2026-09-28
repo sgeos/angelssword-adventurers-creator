@@ -275,3 +275,68 @@ export const exportRangeFromHandoff = (
     end: Math.min(payload.loopPoint, lastFrame),
   };
 };
+
+/* ────────────────────────────────────────────────────────────────────────
+ * Whether a loop is usable, and why not when it is not.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/** Fewest frames a loop can span and still be worth playing. */
+export const MIN_LOOP_SPAN = 2;
+
+/** What the loop controls should say about the current pair of ends. */
+export type LoopStatus =
+  /** No end has been set. The controls say nothing. */
+  | { readonly kind: "unset" }
+  /** Both ends are set and the pair is unusable. Says which way. */
+  | { readonly kind: "unusable"; readonly reason: string }
+  /** Ready to preview and to export. */
+  | { readonly kind: "ok"; readonly summary: LoopSummary };
+
+/**
+ * Judge a pair of loop ends.
+ *
+ * # Why refusing the value was wrong
+ *
+ * The two ends are separate controls and each used to refuse a value that
+ * did not already sit correctly against the other. That made the ORDER of
+ * two independent actions matter: moving a loop from frames 0 to 50 out to
+ * frames 100 to 150 had to be done end first, and moving it the other way
+ * had to be done start first. Neither order is discoverable, and the button
+ * that refused gave no hint that the other one would have worked.
+ *
+ * So a value is always accepted and the PAIR is judged. An unusable pair is
+ * a state the controls describe rather than a state they prevent, which is
+ * also what lets a user set either end first and fix the other afterwards.
+ *
+ * # The three states
+ *
+ * Unset is distinct from unusable on purpose. A cleared loop should say
+ * nothing, not complain that its end precedes its start.
+ */
+export const describeLoop = (
+  loopMode: string,
+  loopStart: number,
+  loopPoint: number,
+  totalFrames: number,
+): LoopStatus => {
+  if (loopPoint < 0) return { kind: "unset" };
+
+  if (loopPoint < loopStart) {
+    return {
+      kind: "unusable",
+      reason: `Loop end ${loopPoint.toString()} is before its start `
+        + `${loopStart.toString()}. Move the end after the start.`,
+    };
+  }
+
+  const span = loopPoint - loopStart;
+  if (span < MIN_LOOP_SPAN) {
+    return {
+      kind: "unusable",
+      reason: `Loop spans ${span.toString()} frame(s); at least `
+        + `${MIN_LOOP_SPAN.toString()} are needed.`,
+    };
+  }
+
+  return { kind: "ok", summary: loopSummary(loopMode, loopPoint, totalFrames, loopStart) };
+};
