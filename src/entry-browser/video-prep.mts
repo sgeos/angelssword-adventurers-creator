@@ -575,6 +575,25 @@ function clearLoop(): void {
 // ================================================================
 
 /**
+ * Playback rate used while capturing frames for the preview.
+ *
+ * This was 3, to build the cache in a third of the wall time. A capture at
+ * that rate was observed producing 76 frames across 3.7 seconds of clip, at
+ * 76 genuinely different times with the media fully buffered, and ONE
+ * distinct image among them. The element advanced and never presented.
+ *
+ * The rate is the one thing that differs between this path and `playVideo`,
+ * which draws from the same hidden element in the same way and works. The
+ * element being hidden is constant across both, so it cannot be what
+ * separates them.
+ *
+ * So this is 1 until the observation says otherwise. The cost is that
+ * caching takes as long as the loop lasts rather than a third of it, which
+ * is a few seconds of visible progress rather than a stall.
+ */
+const CAPTURE_PLAYBACK_RATE = 1;
+
+/**
  * A cheap fingerprint of one captured frame.
  *
  * Samples a small central block rather than the whole frame, which is enough
@@ -620,7 +639,7 @@ async function previewLoop(): Promise<void> {
     let lastCaptureTime = -1;
 
     await seekVideoAsync(video, startTime, state.duration);
-    video.playbackRate = 3;
+    video.playbackRate = CAPTURE_PLAYBACK_RATE;
     playOrWarn(video);
 
     // The cache is rebuilt for this preview run; bind it locally so the
@@ -684,7 +703,7 @@ async function previewLoop(): Promise<void> {
         console.warn(
             `[VideoPrep] Preview capture froze: ${frames.length.toString()} frames captured, `
             + `${signatures.size.toString()} distinct image(s). `
-            + `rate=${video.playbackRate.toString()} readyState=${video.readyState.toString()} `
+            + `rate=${CAPTURE_PLAYBACK_RATE.toString()} readyState=${video.readyState.toString()} `
             + `start=${startTime.toFixed(3)} end=${loopTime.toFixed(3)} `
             + `last=${lastCaptureTime.toFixed(3)}`,
         );
