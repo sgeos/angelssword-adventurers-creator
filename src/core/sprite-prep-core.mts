@@ -148,6 +148,8 @@ export interface PromptOptions {
   readonly raceMode?: string;
   /** How much of the character to show. Absent means the shipped default. */
   readonly framing?: Framing;
+  /** What the character should look like. Absent means the shipped default. */
+  readonly style?: SpriteStyle;
   readonly colorNameFn?: (hex: string) => string;
 }
 
@@ -213,6 +215,77 @@ export const FRAMING_DIRECTIVES: Readonly<Record<Framing, readonly [string, stri
   ],
 };
 
+/**
+ * What the character should look like.
+ *
+ * # Why this is a choice rather than a constant
+ *
+ * The style line was hardcoded and sent on every generation, after the user's
+ * own text and stating a competing style outright. A claymation reference
+ * supplied in the character slot produced an anime sprite, and correctly so:
+ * the character reference asks only that the CHARACTER match, never the
+ * style, so the hardcoded line was the single substantive appearance
+ * instruction in the prompt and nothing contested it.
+ *
+ * With every text field left blank, which is a reasonable way to use a
+ * reference image, the whole prompt reduced to "A single Character, standing
+ * in a neutral idle position" plus that line.
+ *
+ * # Why two lines
+ *
+ * The edge line matters for chroma keying and is not style-neutral. "Bold
+ * dark outlines" is an anime instruction, and asking for it alongside
+ * claymation asks for two incompatible things. So each style states its own,
+ * and every one of them keeps the part that keying depends on: crisp edges
+ * and a well-defined silhouette against the flat background.
+ *
+ * The anime pair is the shipped wording, unchanged, so the default prompt is
+ * byte for byte what this tool has always produced.
+ */
+export type SpriteStyle = "anime" | "claymation" | "painterly" | "pixel" | "reference";
+
+/** Narrow an untrusted string to a style. */
+export const asSpriteStyle = (value: string): SpriteStyle | undefined =>
+  value === "anime" || value === "claymation" || value === "painterly"
+    || value === "pixel" || value === "reference"
+    ? value
+    : undefined;
+
+/** The style used when nothing has been chosen. */
+export const DEFAULT_STYLE: SpriteStyle = "anime";
+
+/** The style line, and the edge line that keying depends on. */
+export interface StyleDirective {
+  readonly style: string;
+  readonly edges: string;
+}
+
+export const STYLE_DIRECTIVES: Readonly<Record<SpriteStyle, StyleDirective>> = {
+  anime: {
+    style: `The character should be drawn in a high-quality anime/JRPG art style with clean linework and cel-shading.`,
+    edges: `The character has crisp, clean edges with bold dark outlines and a well-defined silhouette against the flat colored background.`,
+  },
+  claymation: {
+    style: `The character should be rendered as stop-motion claymation: sculpted modelling clay with visible fingerprints and tool marks, soft matte surfaces, and the slight asymmetry of something made by hand.`,
+    edges: `The character has crisp, clean edges and a well-defined silhouette against the flat colored background, with sculpted volume and material texture rather than drawn linework.`,
+  },
+  painterly: {
+    style: `The character should be painted in a richly illustrated style with visible brushwork, soft colour blending, and no hard outlines.`,
+    edges: `The character has crisp, clean edges and a well-defined silhouette against the flat colored background, with softly blended shading inside that silhouette.`,
+  },
+  pixel: {
+    style: `The character should be drawn as high-resolution pixel art with a limited palette and hard pixel edges.`,
+    edges: `The character has crisp, clean edges and a well-defined silhouette against the flat colored background, with no anti-aliasing or partially transparent pixels at the outline.`,
+  },
+  reference: {
+    // The one that fixes the reported case. It asks for the reference's style
+    // AND says not to substitute, because the failure was substitution by a
+    // competing instruction rather than absence of one.
+    style: `Match the art style of the provided reference image exactly, including its medium, surface treatment, linework and colour. Do not substitute a different art style.`,
+    edges: `The character has crisp, clean edges and a well-defined silhouette against the flat colored background.`,
+  },
+};
+
 /** Compose the generation prompt. */
 export const buildPrompt = (opts: PromptOptions): string => {
   const name = opts.name?.trim() !== undefined && opts.name.trim() !== "" ? opts.name.trim() : "Character";
@@ -220,6 +293,7 @@ export const buildPrompt = (opts: PromptOptions): string => {
   const action = opts.action?.trim() ?? "";
   const raceMode = opts.raceMode ?? "normal";
   const framing = opts.framing ?? DEFAULT_FRAMING;
+  const style = opts.style ?? DEFAULT_STYLE;
   const colorNameFn = opts.colorNameFn ?? defaultColorName;
 
   const keyName = colorNameFn(opts.keyHex);
@@ -234,9 +308,9 @@ export const buildPrompt = (opts: PromptOptions): string => {
     FRAMING_DIRECTIVES[framing][0],
     `The entire background must be a solid, uniform ${keyName.toUpperCase()} (${opts.keyHex}) with absolutely no gradients, shadows, or variations.`,
     `Every pixel of background must be the exact same shade of ${keyName.toLowerCase()} — a single uniform matte color.`,
-    `The character should be drawn in a high-quality anime/JRPG art style with clean linework and cel-shading.`,
+    STYLE_DIRECTIVES[style].style,
     `The image must be exactly 1280×720 pixels.`,
-    `The character has crisp, clean edges with bold dark outlines and a well-defined silhouette against the flat colored background.`,
+    STYLE_DIRECTIVES[style].edges,
     FRAMING_DIRECTIVES[framing][1],
   ]
     .filter((line) => line !== "")

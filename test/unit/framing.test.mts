@@ -3,11 +3,21 @@ import assert from 'node:assert/strict';
 import { memoryStore } from '../helpers/memory-store.mts';
 import {
     DEFAULT_FRAMING,
+    DEFAULT_STYLE,
     FRAMING_DIRECTIVES,
+    STYLE_DIRECTIVES,
     asFraming,
+    asSpriteStyle,
     buildPrompt,
 } from '../../src/core/sprite-prep-core.mts';
-import { FRAMING_KEY, loadFraming, saveFraming } from '../../src/core/preferences.mts';
+import {
+    FRAMING_KEY,
+    SPRITE_STYLE_KEY,
+    loadFraming,
+    loadSpriteStyle,
+    saveFraming,
+    saveSpriteStyle,
+} from '../../src/core/preferences.mts';
 
 /**
  * The product brief specifies a sprite with "Full body visible from head to
@@ -137,5 +147,111 @@ describe('the framing is remembered', () => {
         saveFraming(store, 'fullBody');
         assert.equal(store.read('sp-zoom'), undefined, 'it has its own key');
         assert.equal(loadFraming(store), 'fullBody');
+    });
+});
+
+describe('the art style is a choice too', () => {
+    /**
+     * THE REPORTED CASE. A claymation reference supplied in the CHARACTER
+     * slot produced an anime sprite, and correctly so. The character
+     * reference asks only that the character match, never the style, so the
+     * hardcoded anime line was the single substantive appearance instruction
+     * in the prompt and nothing contested it.
+     *
+     * With every text field left blank, which is a reasonable way to use a
+     * reference, the whole prompt reduced to one sentence plus that line.
+     */
+    it('no longer forces anime when the reference supplies the style', () => {
+        const matched = buildPrompt({ ...BASE, style: 'reference' });
+        assert.doesNotMatch(matched, /anime/i, 'nothing may compete with the reference');
+        assert.doesNotMatch(matched, /bold dark outlines/i, 'that is an anime instruction too');
+        assert.match(matched, /Match the art style of the provided reference image/);
+        assert.match(matched, /Do not substitute a different art style/);
+    });
+
+    it('defaults to the shipped wording, so nothing changes for anyone', () => {
+        assert.equal(DEFAULT_STYLE, 'anime');
+        assert.equal(buildPrompt(BASE), buildPrompt({ ...BASE, style: 'anime' }));
+        assert.match(buildPrompt(BASE), /high-quality anime\/JRPG art style/);
+        assert.match(buildPrompt(BASE), /bold dark outlines/);
+    });
+
+    it('asks for each style and for no other', () => {
+        // Typed pairs rather than Object.entries, because
+        // exactOptionalPropertyTypes refuses a possibly-undefined style where
+        // the option is optional rather than nullable.
+        const wanted = [
+            ['anime', /anime\/JRPG/],
+            ['claymation', /modelling clay/],
+            ['painterly', /visible brushwork/],
+            ['pixel', /pixel art/],
+        ] as const;
+        for (const [style, pattern] of wanted) {
+            const prompt = buildPrompt({ ...BASE, style });
+            assert.match(prompt, pattern, style);
+            for (const [other, otherPattern] of wanted) {
+                if (other === style) continue;
+                assert.doesNotMatch(prompt, otherPattern, `${style} must not ask for ${other}`);
+            }
+        }
+    });
+
+    /**
+     * WHY THE EDGE LINE IS PER STYLE. "Bold dark outlines" is an anime
+     * instruction, and asking for it alongside claymation asks for two
+     * incompatible things. Every style still keeps what keying depends on.
+     */
+    it('keeps the keying requirement in every style', () => {
+        for (const style of ['anime', 'claymation', 'painterly', 'pixel', 'reference'] as const) {
+            const prompt = buildPrompt({ ...BASE, style });
+            assert.match(prompt, /crisp, clean edges/, style);
+            assert.match(prompt, /well-defined silhouette against the flat colored background/, style);
+        }
+    });
+
+    it('asks for bold dark outlines only where they belong', () => {
+        for (const style of ['claymation', 'painterly', 'pixel', 'reference'] as const) {
+            assert.doesNotMatch(buildPrompt({ ...BASE, style }), /bold dark outlines/, style);
+        }
+    });
+
+    it('changes nothing but its own two lines', () => {
+        const lines = (style: 'anime' | 'claymation'): string[] =>
+            buildPrompt({ ...BASE, style })
+                .split('\n')
+                .filter((line) => line !== STYLE_DIRECTIVES[style].style
+                    && line !== STYLE_DIRECTIVES[style].edges);
+        assert.deepEqual(lines('anime'), lines('claymation'));
+    });
+
+    it('is independent of the framing', () => {
+        const prompt = buildPrompt({ ...BASE, style: 'claymation', framing: 'fullBody' });
+        assert.match(prompt, /modelling clay/);
+        assert.match(prompt, /head to toe/i);
+    });
+
+    it('refuses a value that names no style', () => {
+        for (const bad of ['', 'ANIME', 'clay', '3d', 'true']) {
+            assert.equal(asSpriteStyle(bad), undefined, JSON.stringify(bad));
+        }
+    });
+
+    it('round-trips through the store and falls back when corrupt', () => {
+        const store = memoryStore();
+        saveSpriteStyle(store, 'claymation');
+        assert.equal(loadSpriteStyle(store), 'claymation');
+        assert.equal(loadSpriteStyle(memoryStore({ [SPRITE_STYLE_KEY]: 'nope' })), DEFAULT_STYLE);
+    });
+
+    /**
+     * The scenario as reported: every field blank, one reference image. The
+     * prompt is then almost entirely the tool's own wording, which is what
+     * made the hardcoded style line decisive.
+     */
+    it('leaves the reference in charge when every field is blank', () => {
+        const bare = buildPrompt({ keyHex: '#00FF00', style: 'reference', framing: 'fullBody' });
+        assert.match(bare, /A single Character, standing in a neutral idle position\./);
+        assert.doesNotMatch(bare, /anime/i);
+        assert.match(bare, /head to toe/i);
     });
 });

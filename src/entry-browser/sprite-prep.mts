@@ -30,7 +30,9 @@ import {
 } from "../core/providers.mts";
 import {
     loadFraming,
+    loadSpriteStyle,
     saveFraming,
+    saveSpriteStyle,
     loadSpriteOffset,
     loadSpriteZoom,
     saveCharacterName,
@@ -89,6 +91,7 @@ let charRefBase64: string | null = null;
 let styleRefBase64: string | null = null;
 let raceMode = 'normal'; // 'normal', 'kanolith', or 'zoalith'
 let framing: Core.Framing = loadFraming(browserStore);
+let spriteStyle: Core.SpriteStyle = loadSpriteStyle(browserStore);
 
 // ============================================
 // MANUAL MODE — CANVAS SYSTEM
@@ -352,6 +355,7 @@ function buildPrompt(): string {
         keyHex: selectedKeyColor,
         raceMode,
         framing,
+        style: spriteStyle,
         colorNameFn: colorName
     });
 }
@@ -846,6 +850,17 @@ function initSpritePrep(): void {
     // generation would actually ask for.
     for (const btn of queryAll(requireEl('sgFraming', HTMLElement), '.mode-btn', HTMLElement)) {
         btn.classList.toggle('active', btn.dataset['mode'] === framing);
+    }
+
+    initModeSelector('sgStyle', (mode) => {
+        const chosen = Core.asSpriteStyle(mode);
+        if (chosen === undefined) return;
+        spriteStyle = chosen;
+        saveSpriteStyle(browserStore, chosen);
+    });
+
+    for (const btn of queryAll(requireEl('sgStyle', HTMLElement), '.mode-btn', HTMLElement)) {
+        btn.classList.toggle('active', btn.dataset['mode'] === spriteStyle);
     }
 
     // Generate button

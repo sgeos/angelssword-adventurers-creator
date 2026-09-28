@@ -14,7 +14,14 @@
  */
 
 import type { KeyValueStore } from "./ports/storage.mts";
-import { DEFAULT_FRAMING, asFraming, type Framing } from "./sprite-prep-core.mts";
+import {
+    DEFAULT_FRAMING,
+    DEFAULT_STYLE,
+    asFraming,
+    asSpriteStyle,
+    type Framing,
+    type SpriteStyle,
+} from "./sprite-prep-core.mts";
 
 /** Storage key holding the character name shared by two stages. */
 export const CHARACTER_NAME_KEY = "as_char_name";
@@ -113,4 +120,22 @@ export const loadFraming = (store: KeyValueStore): Framing =>
 /** Remember the framing. */
 export const saveFraming = (store: KeyValueStore, framing: Framing): void => {
     store.write(FRAMING_KEY, framing);
+};
+
+/** Storage key holding the art style a sprite is asked for. */
+export const SPRITE_STYLE_KEY = "sprite_style";
+
+/**
+ * The art style the user last chose, or the default.
+ *
+ * Remembered for the same reason framing is. It describes the character
+ * rather than the request, and a user who has settled on a look wants it on
+ * every generation.
+ */
+export const loadSpriteStyle = (store: KeyValueStore): SpriteStyle =>
+    asSpriteStyle(store.read(SPRITE_STYLE_KEY) ?? "") ?? DEFAULT_STYLE;
+
+/** Remember the art style. */
+export const saveSpriteStyle = (store: KeyValueStore, style: SpriteStyle): void => {
+    store.write(SPRITE_STYLE_KEY, style);
 };
