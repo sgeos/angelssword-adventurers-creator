@@ -143,6 +143,39 @@ describe('runGrokVideo, throttling', () => {
             'the backoff is an extra wait, not a replacement for the interval');
     });
 
+    /**
+     * THE SAVING, MEASURED. A 429 carrying a quota marker stops on the first
+     * poll. Before the distinction existed this spent five requests across
+     * fifty-five seconds and then reported that the service had throttled it
+     * repeatedly, which was both a waste and the wrong reason.
+     */
+    it('stops on the first poll when a 429 says the balance is exhausted', async () => {
+        const { clock, waits } = countingClock();
+        const { http, calls } = scriptedHttp([
+            STARTED,
+            {
+                status: 429,
+                body: {
+                    error: {
+                        message: 'You have no credits remaining.',
+                        code: 'insufficient_quota',
+                    },
+                },
+            },
+        ]);
+
+        await assert.rejects(
+            runGrokVideo(http, clock, {
+                auth: AUTH, request: REQUEST, pollIntervalMs: 5_000, maxPolls: 90,
+            }),
+            /no credits remaining/,
+            'the service own wording reaches the user, not a throttling message',
+        );
+
+        assert.equal(calls.length, 2, 'the start and one poll, and no retries');
+        assert.deepEqual(waits, [5_000], 'one interval, and no backoff');
+    });
+
     it('gives up after a run of consecutive throttles', async () => {
         const replies: ScriptedReply[] = [STARTED];
         for (let i = 0; i < MAX_CONSECUTIVE_THROTTLES; i++) replies.push({ status: 429, body: {} });

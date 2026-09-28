@@ -6,6 +6,7 @@ import {
     buildGrokVideoRequest,
     classifyPoll,
     describeError,
+    isQuotaRefusal,
     extractRequestId,
     extractVideoUrl,
     throttleBackoffMs,
@@ -90,6 +91,108 @@ describe('classifyPoll', () => {
     it('treats throttling as retryable', () => {
         assert.deepEqual(classifyPoll(403, {}), { kind: 'throttled' });
         assert.deepEqual(classifyPoll(429, {}), { kind: 'throttled' });
+    });
+
+    /**
+     * A PLAIN RATE LIMIT, which is the case that must keep retrying. This is
+     * the shape a service sends when the caller is genuinely going too fast,
+     * and a delay clears it.
+     */
+    it('retries a 429 that carries no quota marker', () => {
+        const rateLimited = {
+            error: {
+                message: 'Rate limit reached for requests',
+                type: 'requests',
+                code: 'rate_limit_exceeded',
+            },
+        };
+        assert.deepEqual(classifyPoll(429, rateLimited), { kind: 'throttled' });
+    });
+
+    /**
+     * AN EXHAUSTED BALANCE WEARING THE SAME STATUS. Observed on OpenAI during
+     * a live session, verbatim below. No delay clears it, so retrying spends
+     * five requests across fifty-five seconds and then reports the wrong
+     * reason.
+     */
+    it('refuses a 429 that carries a quota marker, since no delay clears it', () => {
+        const exhausted = {
+            error: {
+                message: 'You have no credits remaining. Add credits to continue using the API.',
+                type: 'insufficient_quota',
+                code: 'insufficient_quota',
+            },
+        };
+        const outcome = classifyPoll(429, exhausted);
+        // assert.equal narrows the union, so `reason` is reachable directly.
+        assert.equal(outcome.kind, 'fatal');
+        assert.match(
+            outcome.reason,
+            /no credits remaining/,
+            'the service own wording reaches the user, not ours',
+        );
+    });
+
+    /**
+     * 403 is deliberately unchanged. It probably wants the same treatment,
+     * being a more common shape for a hard refusal than a transient one, but
+     * that is a separate question and this pins the present answer.
+     */
+    it('still retries a 403 carrying a quota marker, the change being scoped to 429', () => {
+        assert.deepEqual(
+            classifyPoll(403, { error: { code: 'insufficient_quota' } }),
+            { kind: 'throttled' },
+        );
+    });
+});
+
+describe('isQuotaRefusal', () => {
+    it('recognises a marker in any of the three fields services use', () => {
+        for (const field of ['code', 'type', 'status']) {
+            assert.equal(isQuotaRefusal({ error: { [field]: 'insufficient_quota' } }), true, field);
+        }
+    });
+
+    it('recognises the markers the observed services and Google use', () => {
+        for (const marker of ['insufficient_quota', 'quota_exceeded', 'RESOURCE_EXHAUSTED']) {
+            assert.equal(isQuotaRefusal({ error: { status: marker } }), true, marker);
+        }
+    });
+
+    it('is case-insensitive, Google shouting its status codes', () => {
+        assert.equal(isQuotaRefusal({ error: { status: 'RESOURCE_EXHAUSTED' } }), true);
+    });
+
+    it('reports nothing for a plain rate limit', () => {
+        assert.equal(isQuotaRefusal({ error: { code: 'rate_limit_exceeded' } }), false);
+    });
+
+    it('reports nothing for a body that carries no error at all', () => {
+        for (const body of [undefined, null, {}, 'text', 42, [], { error: null }]) {
+            assert.equal(isQuotaRefusal(body), false, JSON.stringify(body ?? null));
+        }
+    });
+
+    /**
+     * THE HONEST LIMIT OF THIS CHECK, and the reason it is written down. The
+     * message Google was observed sending says "Rate limit exceeded" with a
+     * limit of zero, which is an entitlement refusal in throttling clothing.
+     * It carries no structured marker in that text, so this returns false and
+     * the loop retries.
+     *
+     * Matching the prose instead would catch that wording today and break on
+     * the next one, in a path no test can exercise against the real service.
+     * The waste is a minute and a misleading message. The alternative fails in
+     * the worse direction, calling a genuine rate limit fatal.
+     */
+    it('does NOT recognise exhaustion reported only in prose', () => {
+        const googleShaped = {
+            error: {
+                message: 'Rate limit exceeded for model gemini-omni-flash '
+                    + '(limit: 0 input tokens per minute on Free Tier).',
+            },
+        };
+        assert.equal(isQuotaRefusal(googleShaped), false);
     });
 
     it('treats an expired credential as fatal, since retrying cannot help', () => {

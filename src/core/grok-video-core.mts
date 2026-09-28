@@ -112,6 +112,57 @@ const DONE_STATES = new Set(["done", "completed", "succeeded", "success"]);
 const FAILED_STATES = new Set(["failed", "error", "cancelled", "expired"]);
 
 /**
+ * Structured markers a service uses to say a refusal is about entitlement.
+ *
+ * Matched against `error.code`, `error.type` and `error.status`, which is
+ * where the services that carry such a marker put it.
+ */
+const QUOTA_MARKERS: ReadonlySet<string> = new Set([
+  "insufficient_quota",
+  "quota_exceeded",
+  "resource_exhausted",
+]);
+
+/**
+ * Whether a refusal is about entitlement rather than pace.
+ *
+ * # Why this is needed, and how it was found
+ *
+ * A 429 does not mean only that a caller is going too fast. Two services were
+ * observed answering an exhausted balance with one during a single session.
+ * OpenAI sent `insufficient_quota` with the text "You have no credits
+ * remaining". Google sent a limit of zero tokens per minute with the text
+ * "Rate limit exceeded", which reads as throttling and is not.
+ *
+ * Retrying either is futile, and the poll loop would have spent five requests
+ * across fifty-five seconds before reporting that the service throttled it
+ * repeatedly, which is the wrong reason shown to the user.
+ *
+ * # What this deliberately does NOT do
+ *
+ * **It does not read the message.** Matching prose such as "no credits" or
+ * "upgrade your tier" would catch Google's phrasing today and break on the
+ * next wording change, in a path no test can exercise against the real
+ * service. Structured fields are the only part of an error body a service
+ * treats as an interface.
+ *
+ * **The consequence is stated rather than hidden.** A service that reports
+ * exhaustion only in prose, as Google's observed message does, is still
+ * retried. That is the honest limit of this check. It costs a wasted minute
+ * and a misleading message, which is what happened before, and it is better
+ * than a message matcher that fails silently in the other direction by
+ * treating a genuine rate limit as fatal.
+ */
+export const isQuotaRefusal = (body: unknown): boolean => {
+  const error = obj(body, "error");
+  for (const field of ["code", "type", "status"]) {
+    const value = str(error, field)?.toLowerCase();
+    if (value !== undefined && QUOTA_MARKERS.has(value)) return true;
+  }
+  return false;
+};
+
+/**
  * Classify one poll response.
  *
  * Returning a discriminated union rather than throwing keeps the decision
@@ -119,11 +170,21 @@ const FAILED_STATES = new Set(["failed", "error", "cancelled", "expired"]);
  * specific and were learned the hard way.
  *
  * 202 means the work continues. 403 and 429 are throttling and are retried
- * with a growing delay. 401 means the credential died mid-run and retrying
- * cannot help. A 5xx is transient. Anything else is the service refusing.
+ * with a growing delay, EXCEPT a 429 carrying a structured quota marker,
+ * which no delay can clear. 401 means the credential died mid-run and
+ * retrying cannot help. A 5xx is transient. Anything else is the service
+ * refusing.
+ *
+ * 403 is left alone on purpose. It is a more common shape for a hard
+ * authorisation refusal than for a transient one, so it probably wants the
+ * same treatment, but that is a separate question from the one this answers
+ * and changing both together would make neither reviewable.
  */
 export const classifyPoll = (status: number, body: unknown): PollOutcome => {
   if (status === 202) return { kind: "pending" };
+  if (status === 429 && isQuotaRefusal(body)) {
+    return { kind: "fatal", reason: describeError(body, status) };
+  }
   if (status === 403 || status === 429) return { kind: "throttled" };
   if (status === 401) return { kind: "fatal", reason: "Grok authentication expired during generation" };
   if (status >= 500) return { kind: "pending" };
