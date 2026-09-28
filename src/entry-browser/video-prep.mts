@@ -433,6 +433,16 @@ function playVideo(): void {
     requireEl('vpPlayBtn', HTMLElement).textContent = '⏸';
     requireEl('vpPlayBtn', HTMLElement).title = 'Pause video';
 
+    // Bring the element to where the display already is before playing.
+    //
+    // `seekToFrame` draws a cached frame and returns without moving the
+    // element, which is what makes scrubbing instant. The cost is that the
+    // two drift apart, and `autoCacheFrames` leaves the element on the LAST
+    // frame. Resuming from there fires `ended` on the first animation frame
+    // and playback stops before it starts.
+    const resumeAt = frameTime(state.currentFrame, state.fps, state.duration);
+    if (!isAtTime(video.currentTime, resumeAt)) video.currentTime = resumeAt;
+
     playOrWarn(video);
 
     const renderFrame = (): void => {

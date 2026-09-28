@@ -199,3 +199,49 @@ export const buildVideoPrepHandoffPayload = (
         }
       : null,
 });
+
+/* ────────────────────────────────────────────────────────────────────────
+ * Carrying the loop across to the exporter.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/** A frame range for the exporter, inclusive at both ends. */
+export interface ExportRange {
+  readonly start: number;
+  readonly end: number;
+}
+
+/**
+ * The frame range a handoff asks the exporter to use.
+ *
+ * # Why this did not exist
+ *
+ * `loopPoint` has always been written into the handoff and never read. The
+ * exporter takes `loopMode` from it, so ping-pong and reverse carry across,
+ * and then takes its frame range from its own two inputs, which are reset to
+ * the whole clip every time a clip loads.
+ *
+ * The consequence was silent and large. A loop set at frame 74 of 300 with
+ * ping-pong produced an export of 598 frames over the whole clip rather than
+ * the 148 the panel promised. The field was written, ignored, and the panel
+ * reported a number the export did not honour.
+ *
+ * This is the mirror of the `keyColor` defect reported upstream, which was a
+ * field read with no producer. Both predate this fork.
+ *
+ * # When there is no range
+ *
+ * Returns undefined when no loop was set, which the control expresses as a
+ * loop point below 2. The exporter then keeps its own default of the whole
+ * clip, which is the behaviour anyone who never set a loop point already has.
+ *
+ * A loop point beyond the clip is clamped rather than refused. It cannot
+ * arise from the control, which takes the value from the current frame, but
+ * the handoff is an object another stage could write.
+ */
+export const exportRangeFromHandoff = (
+  payload: Pick<HandoffPayload, "loopPoint" | "totalFrames">,
+): ExportRange | undefined => {
+  if (payload.loopPoint < 2) return undefined;
+  const lastFrame = Math.max(0, payload.totalFrames - 1);
+  return { start: 0, end: Math.min(payload.loopPoint, lastFrame) };
+};

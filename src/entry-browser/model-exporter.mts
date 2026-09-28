@@ -15,7 +15,7 @@ import {
 import { debounce } from "../platform-browser/app-utils.mts";
 import { detectKeyColor, hexToRgb, rgbToHex } from "../core/color.mts";
 import { clampSeekTime, frameTime, isAtTime } from "../core/video-time.mts";
-import type { HandoffPayload } from "../core/video-prep-core.mts";
+import { exportRangeFromHandoff, type ExportRange, type HandoffPayload } from "../core/video-prep-core.mts";
 import { ChromaKey } from "../core/chroma-key.mts";
 import { closestFrom, queryAll, require2d, requireEl } from "../platform-browser/dom.mts";
 import { channel } from "../core/pixels.mts";
@@ -145,6 +145,17 @@ export class ModelExporter {
      */
     playbackMode: PlaybackMode = 'forward';
 
+    /**
+     * The frame range a handoff asked for, held until metadata arrives.
+     *
+     * `loadVideo` resets the two inputs from its `loadedmetadata` handler,
+     * which fires after the handoff has been consumed. Writing them directly
+     * alongside the playback mode would be silently overwritten, so the
+     * request waits here and is applied after the defaults are written. The
+     * frame rate already crosses the same gap the same way.
+     */
+    private _pendingRange: ExportRange | null = null;
+
     /** Reference still for auto-detect, when the user supplies one. */
     private _refImageData: ImageData | null = null;
     private _keyPreviewTimer: ReturnType<typeof setTimeout> | null = null;
@@ -219,6 +230,7 @@ export class ModelExporter {
             // Set export range defaults
             requireEl('exStartFrame', HTMLInputElement).value = String(0);
             requireEl('exEndFrame', HTMLInputElement).value = String(this.totalFrames - 1);
+            this._applyPendingRange();
             requireEl('exWidth', HTMLInputElement).value = String(this.videoWidth);
             requireEl('exHeight', HTMLInputElement).value = String(this.videoHeight);
 
@@ -265,6 +277,7 @@ export class ModelExporter {
 
             requireEl('exStartFrame', HTMLInputElement).value = String(0);
             requireEl('exEndFrame', HTMLInputElement).value = String(this.totalFrames - 1);
+            this._applyPendingRange();
             requireEl('exWidth', HTMLInputElement).value = String(this.videoWidth);
             requireEl('exHeight', HTMLInputElement).value = String(this.videoHeight);
 
@@ -286,6 +299,25 @@ export class ModelExporter {
         this.video.load();
     }
 
+    /**
+     * Adopt a frame range a handoff asked for, if one is waiting.
+     *
+     * Clamped to the clip this exporter actually loaded, which may differ
+     * from the one Video Prep measured if its frame rate detection guessed
+     * differently. A range beyond the end would otherwise select nothing.
+     */
+    private _applyPendingRange(): void {
+        const range = this._pendingRange;
+        this._pendingRange = null;
+        if (range === null || this.totalFrames < 1) return;
+
+        const last = this.totalFrames - 1;
+        const start = Math.max(0, Math.min(range.start, last));
+        const end = Math.max(start, Math.min(range.end, last));
+        requireEl('exStartFrame', HTMLInputElement).value = String(start);
+        requireEl('exEndFrame', HTMLInputElement).value = String(end);
+    }
+
     // ─── HANDOFF FROM VIDEO PREP ───
     bindHandoff(): void {
         const fromVP = requireEl('exFromVideoPrep', HTMLElement);
@@ -301,6 +333,9 @@ export class ModelExporter {
                 // See the videoPrepData shape in video-prep-core.mts.
                 const videoSource = data.videoSrc;
                 if (videoSource !== undefined && videoSource !== '') {
+                    // Set before loading: the handler that writes the default
+                    // range fires later and calls _applyPendingRange after it.
+                    this._pendingRange = exportRangeFromHandoff(data) ?? null;
                     try {
                         this.loadVideo(await fetchBlob(videoSource));
                     } catch (e) {
