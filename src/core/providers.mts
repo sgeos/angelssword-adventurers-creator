@@ -313,3 +313,24 @@ export const describeVideoOutput = (
   }
   return "Follows your reference image · ~$0.10/sec (estimate, unverified)";
 };
+
+/**
+ * How many reference images the video stage will read.
+ *
+ * Enforced when the files are loaded, so a fourth is dropped before any
+ * provider sees it.
+ */
+export const MAX_REFERENCE_IMAGES = 3;
+
+/**
+ * What a provider does with the reference images it is given.
+ *
+ * The interface accepted three, read three and announced three, while every
+ * provider used the first. Gemini now receives all of them; the other two
+ * still take one, because their requests carry a single image by shape
+ * rather than by omission.
+ */
+export const describeReferenceUse = (provider: VideoProviderId): string =>
+  provider === "google"
+    ? `Uses every image you add, up to ${MAX_REFERENCE_IMAGES.toString()}`
+    : "Uses the first image only";

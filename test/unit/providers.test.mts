@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 import {
     PROVIDERS,
     PROVIDER_ORDER,
+    MAX_REFERENCE_IMAGES,
     VIDEO_PROVIDER_ORDER,
     asProviderId,
     buildImageRequest,
     credentialFrom,
+    describeReferenceUse,
     describeVideoOutput,
     providerFrom,
 } from '../../src/core/providers.mts';
@@ -174,6 +176,29 @@ describe('describeVideoOutput says what each provider actually produces', () => 
     it('says something for every provider in the table', () => {
         for (const id of VIDEO_PROVIDER_ORDER) {
             assert.ok(describeVideoOutput(id).length > 0, id);
+        }
+    });
+});
+
+describe('describeReferenceUse tells the user what becomes of the extras', () => {
+    it('says Gemini uses them all, and names the limit', () => {
+        assert.match(describeReferenceUse('google'), /every image you add, up to 3/);
+        assert.equal(MAX_REFERENCE_IMAGES, 3);
+    });
+
+    /**
+     * The other two take one image by the SHAPE of their request rather than
+     * by omission. Grok's body carries a single `image.url`; the Wan graph
+     * takes one uploaded filename.
+     */
+    it('says the other two use the first only', () => {
+        assert.match(describeReferenceUse('xai'), /first image only/);
+        assert.match(describeReferenceUse('comfyui'), /first image only/);
+    });
+
+    it('says something for every provider in the table', () => {
+        for (const id of VIDEO_PROVIDER_ORDER) {
+            assert.ok(describeReferenceUse(id).length > 0, id);
         }
     });
 });

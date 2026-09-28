@@ -30,6 +30,8 @@ import * as VideoGenCore from "../core/video-gen-core.mts";
 import {
     VIDEO_PROVIDERS,
     asVideoProviderId,
+    MAX_REFERENCE_IMAGES,
+    describeReferenceUse,
     describeVideoOutput,
     loadCredential,
     loadVideoProvider,
@@ -104,7 +106,7 @@ function loadReferenceFiles(files: FileList): void {
 
     requireEl('vgRefFromSprite', HTMLElement).classList.add('hidden');
 
-    const maxFiles = Math.min(files.length, 3);
+    const maxFiles = Math.min(files.length, MAX_REFERENCE_IMAGES);
     let loaded = 0;
 
     for (let i = 0; i < maxFiles; i++) {
@@ -561,9 +563,14 @@ function handoffToVideoPrep(): void {
  */
 function refreshOutputNote(provider: VideoProviderId): void {
     const note = findEl('vgOutputNote', HTMLElement);
-    if (note === undefined) return;
-    const wan = loadWanSettings(browserStore);
-    note.textContent = describeVideoOutput(provider, { width: wan.width, height: wan.height });
+    if (note !== undefined) {
+        const wan = loadWanSettings(browserStore);
+        note.textContent = describeVideoOutput(provider, { width: wan.width, height: wan.height });
+    }
+    // The references panel says what becomes of the extras, which differs by
+    // provider: only Gemini is sent more than the first.
+    const refs = findEl('vgReferenceUse', HTMLElement);
+    if (refs !== undefined) refs.textContent = describeReferenceUse(provider);
 }
 
 function initVideoGen(): void {

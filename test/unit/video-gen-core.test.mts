@@ -22,10 +22,7 @@ describe('video-gen-core buildVideoRequestBody', () => {
         const body = buildVideoRequestBody({
             prompt: 'walk cycle',
             mode: 'reference',
-            referenceImages: [
-                { dataUrl: 'data:image/png;base64,AAAA' },
-                { dataUrl: 'data:image/png;base64,BBBB' }, // second ignored in reference
-            ],
+            referenceImages: [{ dataUrl: 'data:image/png;base64,AAAA' }],
         });
 
         assert.equal(body.model, MODEL);
@@ -65,8 +62,16 @@ describe('video-gen-core buildVideoRequestBody', () => {
         assert.equal(textPart(body.input, 1).text, DEFAULT_PROMPT);
     });
 
-    it('keyframe: only first image sent; motion text prefixed (end image NOT sent — quirk)', () => {
-        // Quirk: keyframe UI requires start+end, but POST body only includes the first image.
+    /**
+     * RESOLVED 2026-09-28. Keyframe mode REFUSED to proceed without a second
+     * image and then discarded it, describing the end pose in prose. Both
+     * images are now sent and the prose names which is which.
+     *
+     * The old behaviour was an omission rather than a finding, so nothing is
+     * lost by changing it. What Gemini makes of two images is not
+     * established, and neither was what it made of one.
+     */
+    it('keyframe: both images sent, and the text says which is which', () => {
         const body = buildVideoRequestBody({
             prompt: 'morph',
             mode: 'keyframe',
@@ -76,14 +81,72 @@ describe('video-gen-core buildVideoRequestBody', () => {
             ],
         });
 
-        assert.equal(body.input.length, 2);
+        assert.equal(body.input.length, 3, 'two images and the text');
         assert.equal(imagePart(body.input, 0).data, 'START');
-        assert.ok(!JSON.stringify(body).includes('END'));
+        assert.equal(imagePart(body.input, 1).data, 'END');
         assert.match(
-            textPart(body.input, 1).text,
-            /^Starting from this image \(start frame\), animate the character transitioning to the end pose\. morph$/
+            textPart(body.input, 2).text,
+            /^The first image is the start frame and the last image is the end frame\. Animate a smooth transition between them\. morph$/
         );
         assert.equal(body.generation_config?.video_config.task, 'image_to_video');
+    });
+
+    describe('every reference image is sent', () => {
+        /**
+         * The interface accepted three, read three and announced three,
+         * while the request carried one. The extras were read, counted,
+         * previewed away and discarded.
+         */
+        it('sends all three, in the order they were supplied', () => {
+            const body = buildVideoRequestBody({
+                prompt: 'idle',
+                mode: 'reference',
+                referenceImages: [
+                    { dataUrl: 'data:image/png;base64,ONE' },
+                    { dataUrl: 'data:image/png;base64,TWO' },
+                    { dataUrl: 'data:image/png;base64,THREE' },
+                ],
+            });
+            assert.equal(body.input.length, 4, 'three images and the text');
+            assert.deepEqual(
+                [0, 1, 2].map((i) => imagePart(body.input, i).data),
+                ['ONE', 'TWO', 'THREE'],
+            );
+            assert.equal(textPart(body.input, 3).text, 'idle');
+        });
+
+        it('keeps the text last, whatever the image count', () => {
+            for (const count of [1, 2, 3]) {
+                const images = Array.from({ length: count }, (_v, i) => ({
+                    dataUrl: `data:image/png;base64,IMG${i.toString()}`,
+                }));
+                const body = buildVideoRequestBody({ prompt: 'x', mode: 'reference', referenceImages: images });
+                assert.equal(body.input.length, count + 1, count.toString());
+                assert.equal(textPart(body.input, count).text, 'x');
+            }
+        });
+
+        it('carries each image own mime type rather than the first one', () => {
+            const body = buildVideoRequestBody({
+                prompt: 'x',
+                mode: 'reference',
+                referenceImages: [
+                    { dataUrl: 'data:image/png;base64,P' },
+                    { dataUrl: 'data:image/jpeg;base64,J' },
+                ],
+            });
+            assert.equal(imagePart(body.input, 0).mime_type, 'image/png');
+            assert.equal(imagePart(body.input, 1).mime_type, 'image/jpeg');
+        });
+
+        it('is unchanged for a single image, which is what most callers send', () => {
+            const one = buildVideoRequestBody({
+                prompt: 'idle', mode: 'reference',
+                referenceImages: [{ dataUrl: 'data:image/png;base64,AAAA' }],
+            });
+            assert.equal(one.input.length, 2);
+            assert.equal(imagePart(one.input, 0).data, 'AAAA');
+        });
     });
 
     it('duration is unused in POST body (quirk — UI collects it, body omits it)', () => {

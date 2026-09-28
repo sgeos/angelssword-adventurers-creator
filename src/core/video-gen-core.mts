@@ -1,10 +1,19 @@
 /**
  * Pure logic extracted from video-gen.
  *
- * Known quirks, locked as-is — do not "fix" them here, the tests pin them:
- *  - `duration` is collected by the UI but is not placed in the POST body.
- *  - Keyframe mode requires a start and an end image, but only the first is
- *    sent; the end frame is described in text only.
+ * One quirk remains locked, and the tests pin it: `duration` is collected by
+ * the UI and is not placed in the POST body.
+ *
+ * A second quirk is RESOLVED as of 2026-09-28. Every reference image is now
+ * sent rather than only the first. The interface accepted three, read three,
+ * and announced three, while the request carried one; keyframe mode went
+ * further and REFUSED to proceed without a second image it then discarded,
+ * describing the end pose in prose instead.
+ *
+ * This is a behaviour change on a path that has been exercised against the
+ * live service exactly once, so what Gemini makes of several images is not
+ * established here. The previous behaviour was not established either: it
+ * was an omission rather than a finding.
  */
 
 export const DEFAULT_PROMPT =
@@ -63,18 +72,26 @@ export const buildVideoRequestBody = (opts: VideoRequestOptions = {}): VideoRequ
     return { model: MODEL, input: textPrompt };
   }
 
-  // Keyframe mode names the end pose in prose. The end image is not sent.
+  // Keyframe names which image is which, now that both are sent. It used to
+  // describe the end pose in prose because the end image never arrived.
   const text =
     mode === "keyframe" && images.length >= 2
-      ? `Starting from this image (start frame), animate the character transitioning to the end pose. ${textPrompt}`
+      ? `The first image is the start frame and the last image is the end frame. `
+        + `Animate a smooth transition between them. ${textPrompt}`
       : textPrompt;
+
+  // Every image, in the order the user supplied them, then the text. A
+  // caller that supplied one gets exactly what it got before.
+  const parts: RequestPart[] = images.map((image) => ({
+    type: "image",
+    data: stripDataUrl(image.dataUrl),
+    mime_type: detectMime(image.dataUrl),
+  }));
+  parts.push({ type: "text", text });
 
   return {
     model: MODEL,
-    input: [
-      { type: "image", data: stripDataUrl(first.dataUrl), mime_type: detectMime(first.dataUrl) },
-      { type: "text", text },
-    ],
+    input: parts,
     generation_config: IMAGE_TO_VIDEO,
   };
 };
