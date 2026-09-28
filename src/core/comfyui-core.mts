@@ -39,9 +39,22 @@ export interface LoraSlot {
   readonly strength: number;
 }
 
-/** Sprite dimensions the pipeline expects downstream. */
+/**
+ * Sprite dimensions the pipeline expects downstream.
+ *
+ * The default is landscape, which suits a bust. A caller asking for a
+ * standing figure passes portrait instead, because a full body down the
+ * middle of a landscape canvas spends most of its pixels on background that
+ * the chroma key then discards.
+ */
 export const SPRITE_WIDTH = 1280;
 export const SPRITE_HEIGHT = 720;
+
+/** A canvas for the sprite graphs. */
+export interface SpriteCanvas {
+  readonly width: number;
+  readonly height: number;
+}
 
 /**
  * Allocates sequential node identifiers.
@@ -71,6 +84,8 @@ export interface FluxOptions {
   readonly loras?: readonly LoraSlot[];
   /** A reference image already uploaded to ComfyUI, enabling PuLID. */
   readonly referenceFilename?: string;
+  /** Canvas to generate into. Absent means the landscape default. */
+  readonly canvas?: SpriteCanvas;
   readonly pulidFile?: string;
   readonly pulidWeight?: number;
   readonly insightFaceProvider?: string;
@@ -168,7 +183,11 @@ export const buildFluxWorkflow = (opts: FluxOptions): BuiltWorkflow => {
   const latentId = ids.take();
   wf[latentId] = {
     class_type: "EmptySD3LatentImage",
-    inputs: { width: SPRITE_WIDTH, height: SPRITE_HEIGHT, batch_size: 1 },
+    inputs: {
+      width: opts.canvas?.width ?? SPRITE_WIDTH,
+      height: opts.canvas?.height ?? SPRITE_HEIGHT,
+      batch_size: 1,
+    },
   };
 
   const sampleId = ids.take();
@@ -217,6 +236,8 @@ export interface SdxlOptions {
   readonly ipAdapterFile?: string;
   readonly clipVisionFile?: string;
   readonly ipWeight?: number;
+  /** Canvas to generate into. Absent means the landscape default. */
+  readonly canvas?: SpriteCanvas;
 }
 
 /**
@@ -296,7 +317,11 @@ export const buildSdxlWorkflow = (opts: SdxlOptions): BuiltWorkflow => {
   const latentId = ids.take();
   wf[latentId] = {
     class_type: "EmptyLatentImage",
-    inputs: { width: SPRITE_WIDTH, height: SPRITE_HEIGHT, batch_size: 1 },
+    inputs: {
+      width: opts.canvas?.width ?? SPRITE_WIDTH,
+      height: opts.canvas?.height ?? SPRITE_HEIGHT,
+      batch_size: 1,
+    },
   };
 
   const sampleId = ids.take();
@@ -489,6 +514,7 @@ export const buildWorkflowFor = (
     readonly seed: number;
     readonly referenceFilename?: string;
     readonly loras?: readonly LoraSlot[];
+    readonly canvas?: SpriteCanvas;
   },
 ): BuiltWorkflow => {
   if (settings.workflow === "flux") {
@@ -504,6 +530,7 @@ export const buildWorkflowFor = (
       weightDtype: settings.model.includes("fp8") ? "fp8_e4m3fn" : "default",
       ...(opts.loras === undefined ? {} : { loras: opts.loras }),
       ...(opts.referenceFilename === undefined ? {} : { referenceFilename: opts.referenceFilename }),
+      ...(opts.canvas === undefined ? {} : { canvas: opts.canvas }),
     };
     return buildFluxWorkflow(flux);
   }
@@ -516,6 +543,7 @@ export const buildWorkflowFor = (
     cfg: settings.guidance,
     ...(opts.loras === undefined ? {} : { loras: opts.loras }),
     ...(opts.referenceFilename === undefined ? {} : { referenceFilename: opts.referenceFilename }),
+    ...(opts.canvas === undefined ? {} : { canvas: opts.canvas }),
   };
   return buildSdxlWorkflow(sdxl);
 };

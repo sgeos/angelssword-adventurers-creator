@@ -500,6 +500,7 @@ async function generateOneComfy(
     const built = buildWorkflowFor(settings, {
         positiveText: prompt,
         seed: drawSeed(),
+        canvas: Core.framingCanvas(framing),
         ...(referenceFilename === undefined ? {} : { referenceFilename }),
     });
 
@@ -528,7 +529,7 @@ async function generateOne(
     // through /api/edits. Grok has no equivalent, so a reference image is
     // ignored there and the prompt carries the description alone.
     const { endpoint, body } = provider.id === 'openai'
-        ? Core.buildGenerateRequest({ prompt, images })
+        ? Core.buildGenerateRequest({ prompt, images, framing })
         : {
             endpoint: provider.imageRoute,
             body: buildImageRequest(provider, { prompt, count: 1 }),

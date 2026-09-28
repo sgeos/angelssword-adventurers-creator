@@ -87,7 +87,7 @@ describe('buildPrompt', () => {
         return names[hex.toUpperCase()] ?? hex;
     }
 
-    it('includes solid key name/hex, 1280×720, waist-up; empty action → idle default', () => {
+    it('includes solid key name/hex, the requested canvas, waist-up; empty action → idle default', () => {
         const prompt = buildPrompt({
             name: 'Luna',
             desc: 'silver hair',
@@ -100,7 +100,11 @@ describe('buildPrompt', () => {
         assert.match(prompt, /standing in a neutral idle position/);
         assert.match(prompt, /solid, uniform GREEN \(#00FF00\)/);
         assert.match(prompt, /exact same shade of green/);
-        assert.match(prompt, /exactly 1280×720 pixels/);
+        // 1536×1024 rather than 1280×720. The prompt used to claim the
+        // latter while the request asked for the former, so the placement
+        // guidance was calibrated against a canvas that never existed. The
+        // line is now derived from the size actually requested.
+        assert.match(prompt, /exactly 1536×1024 pixels/);
         assert.match(prompt, /waist up/i);
         assert.match(prompt, /Waist-up portrait/);
         assert.match(prompt, /A single Luna, silver hair, standing in a neutral idle position\./);

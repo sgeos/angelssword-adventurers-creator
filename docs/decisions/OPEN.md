@@ -67,6 +67,14 @@ letterboxing remains correct for preserving whatever framing does arrive.
 stage: framing is a user choice, remembered, defaulting to the shipped bust
 wording so nothing changes for anyone who does not touch it.
 
+**A portrait sprite reaches a landscape video canvas.** Wan defaults to 832
+by 480, and the letterboxing fits whatever arrives inside it. A full-body
+portrait sprite therefore lands as a narrow column with wide bars either side,
+spending most of the video's pixels on background. The Wan width and height
+are user-editable, so the workaround exists, but nothing suggests it. Making
+the video canvas follow the framing the way the sprite canvas now does would
+resolve it, and needs the framing to cross the handoff.
+
 **The video half is not yet told.** The Wan negative prompt still guards
 against cropped feet and the ComfyUI video prompt still ends "full body in
 frame", whatever the sprite actually shows. That is harmless for a full-body

@@ -5,10 +5,14 @@ import {
     DEFAULT_FRAMING,
     DEFAULT_STYLE,
     FRAMING_DIRECTIVES,
+    FRAMING_SIZES,
     STYLE_DIRECTIVES,
     asFraming,
     asSpriteStyle,
+    buildGenerateRequest,
     buildPrompt,
+    describeSize,
+    framingCanvas,
 } from '../../src/core/sprite-prep-core.mts';
 import {
     FRAMING_KEY,
@@ -93,13 +97,16 @@ describe('buildPrompt framing', () => {
         }
     });
 
-    it('changes nothing else about the prompt', () => {
-        // Every line that is not a framing directive must be identical, so
-        // the choice cannot quietly alter the background or the style rules.
+    it('changes its two directives and the canvas, and nothing else', () => {
+        // The canvas is part of the framing: a standing figure down the
+        // middle of a landscape canvas spends most of its pixels on
+        // background the chroma key then discards. Everything else, the
+        // background rules and the style rules, must be identical.
         const lines = (framing: 'bust' | 'fullBody'): string[] =>
             buildPrompt({ ...BASE, framing })
                 .split('\n')
-                .filter((line) => !FRAMING_DIRECTIVES[framing].includes(line));
+                .filter((line) => !FRAMING_DIRECTIVES[framing].includes(line))
+                .filter((line) => !line.startsWith('The image must be exactly'));
         assert.deepEqual(lines('bust'), lines('fullBody'));
     });
 
@@ -112,10 +119,41 @@ describe('buildPrompt framing', () => {
         assert.match(prompt, /a knight/);
     });
 
-    it('states the same canvas size for both, the framing deciding content not size', () => {
+    /**
+     * A STANDING FIGURE DOES NOT FIT A LANDSCAPE CANVAS. Full body in 3:2
+     * puts the character down the middle and leaves both sides empty.
+     */
+    it('asks for landscape for a bust and portrait for a full body', () => {
+        assert.match(buildPrompt({ ...BASE, framing: 'bust' }), /exactly 1536×1024 pixels/);
+        assert.match(buildPrompt({ ...BASE, framing: 'fullBody' }), /exactly 1024×1536 pixels/);
+    });
+
+    /**
+     * THE PROMPT USED TO CONTRADICT THE REQUEST. It claimed 1280×720 while
+     * the request asked for 1536×1024, two different sizes AND two different
+     * aspect ratios, so the placement guidance was calibrated against a
+     * canvas that never existed. One source now, asserted rather than hoped.
+     */
+    it('states in the prompt exactly the size it asks the service for', () => {
         for (const framing of ['bust', 'fullBody'] as const) {
-            assert.match(buildPrompt({ ...BASE, framing }), /exactly 1280×720 pixels/);
+            const requested = buildGenerateRequest({ prompt: 'x', framing }).body.size;
+            assert.match(
+                buildPrompt({ ...BASE, framing }),
+                new RegExp(`exactly ${describeSize(requested)} pixels`),
+                framing,
+            );
+            assert.equal(requested, FRAMING_SIZES[framing]);
         }
+    });
+
+    it('keeps the bust canvas unchanged, so nothing moves for anyone who keeps it', () => {
+        assert.equal(FRAMING_SIZES.bust, '1536x1024');
+        assert.equal(buildGenerateRequest({ prompt: 'x' }).body.size, '1536x1024');
+    });
+
+    it('offers the same canvas as numbers, for ComfyUI which takes a pair', () => {
+        assert.deepEqual(framingCanvas('bust'), { width: 1536, height: 1024 });
+        assert.deepEqual(framingCanvas('fullBody'), { width: 1024, height: 1536 });
     });
 });
 

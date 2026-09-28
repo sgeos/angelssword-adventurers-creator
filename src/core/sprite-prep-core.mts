@@ -204,6 +204,46 @@ export const DEFAULT_FRAMING: Framing = "bust";
  * The bust pair is the shipped wording, unchanged, so choosing bust
  * reproduces every sprite this tool has generated to date.
  */
+/**
+ * The canvas each framing asks for.
+ *
+ * # A standing figure does not fit a landscape canvas
+ *
+ * Full body in 3:2 landscape puts the character down the middle and leaves
+ * both sides empty, so most of the pixels paid for carry background that the
+ * chroma key then discards. Portrait spends them on the character.
+ *
+ * # This also corrects a prompt that contradicted the request
+ *
+ * The prompt has always stated "exactly 1280×720 pixels" while the request
+ * asked for `1536x1024`. Two different sizes AND two different aspect ratios,
+ * so the composition guidance about placement in the canvas was calibrated
+ * against a canvas that never existed. The line is now derived from the size
+ * actually requested, so the two cannot disagree again.
+ *
+ * The bust size is unchanged, so nothing moves for anyone who keeps it.
+ */
+export const FRAMING_SIZES: Readonly<Record<Framing, string>> = {
+  bust: "1536x1024",
+  fullBody: "1024x1536",
+};
+
+/** The requested size as the prompt should state it. */
+export const describeSize = (size: string): string => size.replace("x", "×");
+
+/**
+ * The same canvas as a pair, for callers that need numbers.
+ *
+ * ComfyUI takes width and height rather than a size string, and its graphs
+ * generated 1280 by 720 while OpenAI was asked for 1536 by 1024 and the
+ * prompt claimed 1280 by 720. Three sizes, two of which disagreed with the
+ * request that carried them. One source now.
+ */
+export const framingCanvas = (framing: Framing): { readonly width: number; readonly height: number } => {
+  const [w, h] = FRAMING_SIZES[framing].split("x");
+  return { width: Number(w), height: Number(h) };
+};
+
 export const FRAMING_DIRECTIVES: Readonly<Record<Framing, readonly [string, string]>> = {
   bust: [
     `Character shown from the waist up (upper body, chest, shoulders, head). The character is positioned in the lower portion of the canvas, centered horizontally, with plenty of solid background space above the character's head.`,
@@ -309,7 +349,7 @@ export const buildPrompt = (opts: PromptOptions): string => {
     `The entire background must be a solid, uniform ${keyName.toUpperCase()} (${opts.keyHex}) with absolutely no gradients, shadows, or variations.`,
     `Every pixel of background must be the exact same shade of ${keyName.toLowerCase()} — a single uniform matte color.`,
     STYLE_DIRECTIVES[style].style,
-    `The image must be exactly 1280×720 pixels.`,
+    `The image must be exactly ${describeSize(FRAMING_SIZES[framing])} pixels.`,
     STYLE_DIRECTIVES[style].edges,
     FRAMING_DIRECTIVES[framing][1],
   ]
@@ -357,6 +397,8 @@ export interface GenerateRequest {
 export const buildGenerateRequest = (opts: {
   readonly prompt: string;
   readonly images?: readonly unknown[];
+  /** Decides the canvas. Absent means the shipped landscape. */
+  readonly framing?: Framing;
 }): GenerateRequest => {
   const images = opts.images ?? [];
   const hasImages = images.length > 0;
@@ -364,9 +406,9 @@ export const buildGenerateRequest = (opts: {
     model: "gpt-image-2",
     prompt: opts.prompt,
     n: 1,
-    size: "1536x1024",
+    size: FRAMING_SIZES[opts.framing ?? DEFAULT_FRAMING],
     quality: "high",
-  } as const;
+  };
 
   return {
     endpoint: hasImages ? "/api/edits" : "/api/generate",
