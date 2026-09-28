@@ -90,6 +90,16 @@ equality.
 
 ## Tests
 
+**The browser suite will test a stale bundle.** Playwright reuses an
+already-running server outside continuous integration, so its `webServer`
+command, which rebuilds, never runs when one is up. Editing a browser source
+and then running `npx playwright test` tests the previous build. Two
+specifications failed this way against markup that had been updated and code
+that had not, which looks like a regression and is not. `npm run test:browser`
+now rebuilds first; prefer it over the bare command.
+
+
+
 **`assert.equal` narrows.** Its `asserts actual is T` signature means a
 defensive `?.` or `?? []` written after it is dead code, which the lint
 reports as an unnecessary condition. Assert once that a value is present,

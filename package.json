@@ -13,7 +13,7 @@
     "check": "npm run typecheck && npm run lint",
     "test:unit": "node --test test/unit/*.test.mts",
     "test:api": "node --test test/integration/api/*.test.mts",
-    "test:browser": "playwright test",
+    "test:browser": "npm run build:browser && playwright test",
     "test": "npm run test:unit && npm run test:api",
     "test:all": "npm run check && npm run test && npm run test:browser",
     "build:exe": "node build-exe.mts",

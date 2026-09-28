@@ -13,7 +13,7 @@ import {
     showToast,
     switchTab,
 } from "../platform-browser/shell.mts";
-import { base64ToBlob } from "../platform-browser/app-utils.mts";
+import { base64ToBlob, blobToBase64 } from "../platform-browser/app-utils.mts";
 
 import { reasonText, responseErrorMessage } from "../core/api.mts";
 import { closestFrom, findEl, queryAll, require2d, requireEl } from "../platform-browser/dom.mts";
@@ -88,12 +88,7 @@ function loadReferenceFromHandoff(): void {
     const handoff = ASAdventurer.handoff;
     if (handoff.spriteBase64 !== null && handoff.spriteBase64 !== '') {
         referenceImages = [{ dataUrl: handoff.spriteBase64 }];
-
-        // Show preview
-        const preview = requireEl('vgRefImagePreview', HTMLElement);
-        const img = requireEl('vgRefImage', HTMLImageElement);
-        img.src = handoff.spriteBase64;
-        preview.classList.remove('hidden');
+        renderReferencePreviews();
 
         // Show "from sprite prep" indicator
         requireEl('vgRefFromSprite', HTMLElement).classList.remove('hidden');
@@ -101,42 +96,83 @@ function loadReferenceFromHandoff(): void {
     }
 }
 
-function loadReferenceFiles(files: FileList): void {
-    referenceImages = [];
+/**
+ * Show every reference image, in the order it will be sent.
+ *
+ * One image used to be shown while the toast announced three, which was the
+ * visible half of the extras being discarded. Order is labelled because it
+ * is load-bearing: keyframe mode takes the first as the start frame and the
+ * last as the end.
+ */
+function renderReferencePreviews(): void {
+    const preview = requireEl('vgRefImagePreview', HTMLElement);
+    const list = requireEl('vgRefImageList', HTMLElement);
+    list.replaceChildren();
+
+    if (referenceImages.length === 0) {
+        preview.classList.add('hidden');
+        return;
+    }
+
+    const many = referenceImages.length > 1;
+    referenceImages.forEach((reference, index) => {
+        const cell = document.createElement('div');
+        cell.style.flex = '1';
+        cell.style.minWidth = '0';
+
+        const img = document.createElement('img');
+        img.src = reference.dataUrl;
+        img.style.width = '100%';
+        img.style.display = 'block';
+        cell.append(img);
+
+        // Numbered only when there is an order to be confused about.
+        if (many) {
+            const caption = document.createElement('div');
+            caption.className = 'text-dim';
+            caption.style.fontSize = '0.65rem';
+            caption.style.textAlign = 'center';
+            caption.textContent = `${(index + 1).toString()} of ${referenceImages.length.toString()}`;
+            cell.append(caption);
+        }
+        list.append(cell);
+    });
+
+    preview.classList.remove('hidden');
+}
+
+/**
+ * Read the dropped files, keeping the order they were given in.
+ *
+ * This used to start a FileReader per file and push from each `onload`, so
+ * the order depended on which file finished reading first. That was harmless
+ * while only the first image was sent and is not harmless now: keyframe mode
+ * distinguishes the first from the last. `Promise.all` preserves order.
+ */
+async function loadReferenceFiles(files: FileList): Promise<void> {
+    const chosen = Array.from(files).slice(0, MAX_REFERENCE_IMAGES);
+    if (chosen.length === 0) return;
 
     requireEl('vgRefFromSprite', HTMLElement).classList.add('hidden');
 
-    const maxFiles = Math.min(files.length, MAX_REFERENCE_IMAGES);
-    let loaded = 0;
+    try {
+        const dataUrls = await Promise.all(chosen.map(async (file) => blobToBase64(file)));
+        referenceImages = dataUrls.map((dataUrl) => ({ dataUrl }));
+    } catch (err) {
+        showToast(`Could not read reference image: ${reasonText(err)}`, 'error');
+        return;
+    }
 
-    for (let i = 0; i < maxFiles; i++) {
-        const reader = new FileReader();
-        reader.onload = (): void => {
-            const result = reader.result;
-            // readAsDataURL always yields a string, but FileReader.result is
-            // typed for every read method at once.
-            if (typeof result !== 'string') return;
-            referenceImages.push({ dataUrl: result });
-            loaded++;
-
-            if (loaded === maxFiles) {
-                // Show first image preview
-                const preview = requireEl('vgRefImagePreview', HTMLElement);
-                const img = requireEl('vgRefImage', HTMLImageElement);
-                const first = referenceImages[0];
-                if (first !== undefined) img.src = first.dataUrl;
-                preview.classList.remove('hidden');
-                showToast(`${referenceImages.length.toString()} reference image(s) loaded`, 'success');
-            }
-        };
-        const file = files[i];
-        if (file !== undefined) reader.readAsDataURL(file);
+    renderReferencePreviews();
+    if (files.length > chosen.length) {
+        showToast(
+            `Only the first ${MAX_REFERENCE_IMAGES.toString()} reference images are used`,
+            'warning',
+        );
+    } else {
+        showToast(`${referenceImages.length.toString()} reference image(s) loaded`, 'success');
     }
 }
-
-// ============================================
-// VIDEO GENERATION
-// ============================================
 
 async function generateVideo(): Promise<void> {
     if (generating) return;
@@ -599,7 +635,7 @@ function initVideoGen(): void {
 
     // Upload zone
     initUploadZone('vgUploadZone', 'vgFileInput', (files) => {
-        loadReferenceFiles(files);
+        void loadReferenceFiles(files);
     });
 
     // Keyframe uploads
