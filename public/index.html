@@ -393,9 +393,14 @@
                         <div class="panel-title"><span class="title-icon">🖼️</span> Reference Image</div>
                         <div class="panel-subtitle">Use the sprite from Step 1, or upload your own reference image(s). <span id="vgReferenceUse" title="What the selected provider does with the images you add">Uses every image you add, up to 3</span>.</div>
 
-                        <div id="vgRefImagePreview" class="canvas-container mb-2 hidden">
-                            <div id="vgRefImageList" style="display:flex;gap:0.25rem;align-items:flex-start"></div>
+                        <div id="vgRefImagePreview" class="mb-2 hidden">
+                            <div class="canvas-container">
+                                <img id="vgRefPrimary" style="width:100%;display:block" title="The first image. Every provider uses this one; only Gemini is sent the others.">
+                            </div>
+                            <div id="vgRefSlots" style="display:flex;gap:0.25rem;margin-top:0.25rem"></div>
+                            <button class="btn btn-sm btn-secondary mt-1 hidden" id="vgRefClearBtn" title="Remove every reference image">✖ Clear References</button>
                         </div>
+                        <input type="file" id="vgRefSlotInput" accept="image/*" style="display:none">
 
                         <div class="upload-zone" id="vgUploadZone" title="Upload reference image(s) for video generation">
                             <div class="upload-icon">🖼️</div>

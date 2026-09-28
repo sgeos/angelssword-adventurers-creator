@@ -97,48 +97,127 @@ function loadReferenceFromHandoff(): void {
 }
 
 /**
- * Show every reference image, in the order it will be sent.
+ * Which slot a file dialogue is currently filling.
  *
- * One image used to be shown while the toast announced three, which was the
- * visible half of the extras being discarded. Order is labelled because it
- * is load-bearing: keyframe mode takes the first as the start frame and the
- * last as the end.
+ * The dialogue is shared rather than one input per slot, so the target has
+ * to be remembered across the click that opens it and the change that
+ * follows. Null means no dialogue is open for a slot.
+ */
+let slotBeingFilled: number | null = null;
+
+/**
+ * Show the references: the first large, then every slot beneath it.
+ *
+ * The large one is the first deliberately. Every provider uses that image,
+ * and only Gemini is sent the rest, so the layout says which one always
+ * matters. The strip beneath shows all three positions, filled or empty, and
+ * each is replaceable on its own.
  */
 function renderReferencePreviews(): void {
     const preview = requireEl('vgRefImagePreview', HTMLElement);
-    const list = requireEl('vgRefImageList', HTMLElement);
-    list.replaceChildren();
+    const slots = requireEl('vgRefSlots', HTMLElement);
+    const primary = requireEl('vgRefPrimary', HTMLImageElement);
+    const clear = requireEl('vgRefClearBtn', HTMLButtonElement);
+    slots.replaceChildren();
 
-    if (referenceImages.length === 0) {
+    const first = referenceImages[0];
+    if (first === undefined) {
         preview.classList.add('hidden');
+        clear.classList.add('hidden');
         return;
     }
+    primary.src = first.dataUrl;
 
-    const many = referenceImages.length > 1;
-    referenceImages.forEach((reference, index) => {
+    for (let index = 0; index < MAX_REFERENCE_IMAGES; index++) {
+        const image = referenceImages[index];
         const cell = document.createElement('div');
         cell.style.flex = '1';
         cell.style.minWidth = '0';
+        cell.style.cursor = 'pointer';
+        cell.style.border = '1px dashed rgba(255,255,255,0.25)';
+        cell.style.borderRadius = '4px';
+        cell.style.overflow = 'hidden';
+        cell.style.textAlign = 'center';
+        cell.title = image === undefined
+            ? 'Click or drop an image to add it here'
+            : `Image ${(index + 1).toString()}. Click or drop to replace it.`;
 
-        const img = document.createElement('img');
-        img.src = reference.dataUrl;
-        img.style.width = '100%';
-        img.style.display = 'block';
-        cell.append(img);
-
-        // Numbered only when there is an order to be confused about.
-        if (many) {
+        if (image === undefined) {
+            cell.style.padding = '0.75rem 0';
+            cell.style.fontSize = '0.75rem';
+            cell.classList.add('text-dim');
+            cell.textContent = '+';
+        } else {
+            const img = document.createElement('img');
+            img.src = image.dataUrl;
+            img.style.width = '100%';
+            img.style.display = 'block';
+            cell.append(img);
             const caption = document.createElement('div');
             caption.className = 'text-dim';
             caption.style.fontSize = '0.65rem';
-            caption.style.textAlign = 'center';
-            caption.textContent = `${(index + 1).toString()} of ${referenceImages.length.toString()}`;
+            caption.textContent = (index + 1).toString();
             cell.append(caption);
         }
-        list.append(cell);
-    });
 
+        cell.addEventListener('click', () => {
+            slotBeingFilled = index;
+            requireEl('vgRefSlotInput', HTMLInputElement).click();
+        });
+        cell.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            cell.style.borderColor = 'rgba(255,255,255,0.7)';
+        });
+        cell.addEventListener('dragleave', () => {
+            cell.style.borderColor = 'rgba(255,255,255,0.25)';
+        });
+        cell.addEventListener('drop', (e) => {
+            e.preventDefault();
+            cell.style.borderColor = 'rgba(255,255,255,0.25)';
+            const dropped = e.dataTransfer?.files[0];
+            if (dropped !== undefined) void setReferenceSlot(index, dropped);
+        });
+
+        slots.append(cell);
+    }
+
+    // Offered once there is no empty slot left to drop into, which is the
+    // point at which a user has no other way to start again.
+    clear.classList.toggle('hidden', referenceImages.length < MAX_REFERENCE_IMAGES);
     preview.classList.remove('hidden');
+}
+
+/**
+ * Put one image into one slot.
+ *
+ * A slot past the end appends rather than leaving a hole, so the list stays
+ * dense and its order stays the order that is sent. Keyframe mode reads the
+ * first and the last, so a hole would silently change which is which.
+ */
+async function setReferenceSlot(index: number, file: File): Promise<void> {
+    let dataUrl: string;
+    try {
+        dataUrl = await blobToBase64(file);
+    } catch (err) {
+        showToast(`Could not read reference image: ${reasonText(err)}`, 'error');
+        return;
+    }
+
+    if (index < referenceImages.length) referenceImages[index] = { dataUrl };
+    else referenceImages.push({ dataUrl });
+
+    requireEl('vgRefFromSprite', HTMLElement).classList.add('hidden');
+    renderReferencePreviews();
+}
+
+/** Forget every reference image and offer the upload zone again. */
+function clearReferences(): void {
+    referenceImages = [];
+    requireEl('vgRefFromSprite', HTMLElement).classList.add('hidden');
+    requireEl('vgUploadZone', HTMLElement).classList.remove('hidden');
+    requireEl('vgFileInput', HTMLInputElement).value = '';
+    renderReferencePreviews();
+    showToast('Reference images cleared', 'info');
 }
 
 /**
@@ -706,6 +785,20 @@ function initVideoGen(): void {
 
     // Bind video result events once (persistent delegation)
     bindVideoResultEvents();
+
+    // The shared file dialogue the slots open, and the clear it offers once
+    // every slot is full.
+    requireEl('vgRefSlotInput', HTMLInputElement).addEventListener('change', (e) => {
+        const input = e.target;
+        const chosen = input instanceof HTMLInputElement ? input.files?.[0] : undefined;
+        const target = slotBeingFilled;
+        slotBeingFilled = null;
+        // Cleared so the same file can be chosen again for the same slot,
+        // which otherwise fires no change event.
+        if (input instanceof HTMLInputElement) input.value = '';
+        if (chosen !== undefined && target !== null) void setReferenceSlot(target, chosen);
+    });
+    requireEl('vgRefClearBtn', HTMLButtonElement).addEventListener('click', clearReferences);
 
     // Check for handoff from Sprite Prep when tab becomes active
     const observer = new MutationObserver((mutations) => {
