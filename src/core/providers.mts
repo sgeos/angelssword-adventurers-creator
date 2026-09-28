@@ -287,8 +287,15 @@ export interface VideoCanvas {
  * service, and saying which matters: a user who wants portrait can change it
  * here, not by arguing with the model.
  *
- * **Gemini is sent nothing about shape.** The request carries the model, the
- * image, the text and `image_to_video`, so the result follows the reference.
+ * **Gemini is sent nothing about shape, and does not follow the reference.**
+ * The request carries the model, the image, the text and `image_to_video`,
+ * and nothing about dimensions. From that I reasoned the result would follow
+ * the reference image. IT DOES NOT: a 1024 by 1536 portrait sprite returned a
+ * landscape clip. The label now reports the observation rather than the
+ * inference, which is the right way round and was not what I did first.
+ *
+ * One run, so the strength of the claim is one run. It is still better
+ * evidence than the reasoning it replaced, which was contradicted outright.
  *
  * **ComfyUI takes a canvas from settings**, which defaults near 16:9 and is
  * editable, so it is a default rather than a lock.
@@ -311,7 +318,7 @@ export const describeVideoOutput = (
       : `${canvas.width.toString()}×${canvas.height.toString()} from Settings`;
     return `${size} · runs locally, no per-second cost`;
   }
-  return "Follows your reference image · ~$0.10/sec (estimate, unverified)";
+  return "Landscape, whatever your reference · ~$0.10/sec (estimate)";
 };
 
 /**

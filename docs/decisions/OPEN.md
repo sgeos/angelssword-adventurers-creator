@@ -67,6 +67,19 @@ letterboxing remains correct for preserving whatever framing does arrive.
 stage: framing is a user choice, remembered, defaulting to the shipped bust
 wording so nothing changes for anyone who does not touch it.
 
+**Gemini returns landscape whatever the reference, observed 2026-09-28.** A
+1024 by 1536 portrait sprite produced a landscape clip. Nothing about shape is
+sent, and the reasoning that the result would therefore follow the reference
+was wrong. Whether the Interactions API accepts an aspect ratio hint is
+unknown, and no field has been added on speculation.
+
+**That makes the portrait sprite canvas counterproductive on the Gemini
+path**, since the character is fitted into a landscape frame anyway and ends
+up smaller than a landscape sprite would have been. It remains right for
+ComfyUI, whose canvas the user sets, and untested on Grok, which is sent 16:9
+explicitly. Whether framing should therefore influence the sprite canvas only
+for some providers is a question this has raised and not answered.
+
 **A portrait sprite reaches a landscape video canvas.** Wan defaults to 832
 by 480, and the letterboxing fits whatever arrives inside it. A full-body
 portrait sprite therefore lands as a narrow column with wide bars either side,

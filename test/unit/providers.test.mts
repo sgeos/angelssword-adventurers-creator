@@ -122,10 +122,17 @@ describe('describeVideoOutput says what each provider actually produces', () => 
      * Three assertions, and the ratio was true of exactly one provider, which
      * was not the one named.
      */
-    it('tells Gemini users the shape follows their reference, because nothing is sent', () => {
+    /**
+     * OBSERVED, not reasoned. Nothing about shape is sent to Gemini, from
+     * which I reasoned the result would follow the reference. It does not: a
+     * 1024 by 1536 portrait sprite returned a landscape clip. One run, so the
+     * claim is worth one run, and still better than the inference it
+     * replaced, which was contradicted outright.
+     */
+    it('tells Gemini users the output is landscape whatever they supply', () => {
         const note = describeVideoOutput('google');
-        assert.match(note, /Follows your reference image/);
-        assert.doesNotMatch(note, /16:9/, 'no aspect ratio is sent to Gemini');
+        assert.match(note, /Landscape, whatever your reference/);
+        assert.doesNotMatch(note, /Follows your reference/, 'that claim was wrong');
     });
 
     /**
@@ -169,7 +176,7 @@ describe('describeVideoOutput says what each provider actually produces', () => 
      * was never measured on.
      */
     it('marks the only price it carries as an estimate', () => {
-        assert.match(describeVideoOutput('google'), /estimate, unverified/);
+        assert.match(describeVideoOutput('google'), /\(estimate\)/);
         assert.doesNotMatch(describeVideoOutput('xai'), /\$/, 'no invented price for Grok');
     });
 
