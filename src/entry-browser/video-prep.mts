@@ -57,6 +57,7 @@ interface VideoPrepState {
 
     onionSkin: boolean;
 
+    loopStart: number;
     loopPoint: number;
     loopMode: string;
 
@@ -98,6 +99,7 @@ const state: VideoPrepState = {
     onionSkin: false,
 
     // Loop
+    loopStart: 0,
     loopPoint: -1,
     loopMode: 'none',      // 'none' | 'pingpong' | 'reverse'
 
@@ -171,11 +173,13 @@ function updateVideoInfo(): void {
         <div><strong>Frames:</strong> ${state.totalFrames.toString()}</div>
     `;
 
-    if (state.loopPoint >= 2) {
-        const summary = VideoPrepCore.loopSummary(state.loopMode, state.loopPoint, state.totalFrames);
+    if (state.loopPoint - state.loopStart >= MIN_LOOP_SPAN) {
+        const summary = VideoPrepCore.loopSummary(
+            state.loopMode, state.loopPoint, state.totalFrames, state.loopStart,
+        );
         html += `
             <hr style="border-color:rgba(255,255,255,0.1);margin:0.4rem 0">
-            <div><strong>Loop Point:</strong> Frame ${state.loopPoint.toString()}</div>
+            <div><strong>Loop:</strong> Frames ${state.loopStart.toString()} → ${state.loopPoint.toString()}</div>
             <div><strong>Mode:</strong> ${summary.modeLabel}</div>
             <div><strong>Output Frames:</strong> ${summary.outputFrames.toString()}</div>
         `;
@@ -295,9 +299,16 @@ async function loadVideo(file: File): Promise<void> {
         state.frame0Image = captureCanvas;
     }
 
-    // ── Default loop point to full video ──
-    state.currentFrame = state.totalFrames - 1;
-    setLoopPoint();
+    // ── Default the loop to the whole clip ──
+    // Assigned rather than routed through the button, which used to be done
+    // by setting `currentFrame` to the last frame, calling the setter and
+    // putting `currentFrame` back. That also emitted a success toast on load
+    // for a loop the user had not set.
+    state.loopStart = 0;
+    state.loopPoint = state.totalFrames - 1;
+    loopEdge = 'start';
+    refreshLoopButton();
+    refreshLoopInfo();
     state.currentFrame = 0;
     seekToFrame(0);
 
@@ -487,36 +498,93 @@ function pauseVideo(): void {
 // CORE: LOOP POINT
 // ================================================================
 
-function setLoopPoint(): void {
-    if (!state.videoLoaded || state.currentFrame < 2) {
-        showToast('Move to at least frame 2 to set a loop point', 'error');
-        return;
-    }
-    state.loopPoint = state.currentFrame;
+/** Fewest frames a loop can span and still be worth playing. */
+const MIN_LOOP_SPAN = 2;
 
-    const summary = VideoPrepCore.loopSummary(state.loopMode, state.loopPoint, state.totalFrames);
-    const loopInfo = requireEl('vpLoopInfo', HTMLElement);
-    loopInfo.textContent = `${summary.label} · ${summary.outputFrames.toString()} output frames`;
+/**
+ * Which end the button will set next.
+ *
+ * The loop was end-only until now, always running from frame 0, which the
+ * label "Set Loop Point" described accurately and unhelpfully. One button
+ * alternating between the two ends keeps the control count unchanged.
+ */
+let loopEdge: 'start' | 'end' = 'start';
 
-    requireEl('vpPreviewLoopBtn', HTMLButtonElement).disabled = false;
-    requireEl('vpClearLoopBtn', HTMLButtonElement).disabled = false;
+/** Put the button's label where the next click will act. */
+function refreshLoopButton(): void {
+    const btn = requireEl('vpSetLoopBtn', HTMLElement);
+    btn.textContent = loopEdge === 'start' ? '📍 Set Loop Start' : '📍 Set Loop End';
+    btn.title = loopEdge === 'start'
+        ? 'Set the current frame as the first frame of the loop'
+        : 'Set the current frame as the last frame of the loop';
+}
 
+/**
+ * Re-render the loop readouts from the values already held.
+ *
+ * Separate from setting them, because the loop mode selector needs to
+ * recalculate without moving either end. It used to do that by assigning
+ * `currentFrame`, calling the setter and putting `currentFrame` back, which
+ * worked and read as though the loop point were about to move.
+ */
+function refreshLoopInfo(): void {
+    const summary = VideoPrepCore.loopSummary(
+        state.loopMode, state.loopPoint, state.totalFrames, state.loopStart,
+    );
+    const usable = state.loopPoint - state.loopStart >= MIN_LOOP_SPAN;
+    requireEl('vpLoopInfo', HTMLElement).textContent = usable
+        ? `${summary.label} · ${summary.outputFrames.toString()} output frames`
+        : '';
+    requireEl('vpPreviewLoopBtn', HTMLButtonElement).disabled = !usable;
+    requireEl('vpClearLoopBtn', HTMLButtonElement).disabled = !usable;
     updateVideoInfo();
-    showToast(`Loop set at frame ${state.loopPoint.toString()}! Preview it, then send to Model Exporter.`, 'success');
+}
+
+/** Set whichever end the button is offering, then offer the other. */
+function setLoopEdge(): void {
+    if (!state.videoLoaded) return;
+    const frame = state.currentFrame;
+
+    if (loopEdge === 'start') {
+        if (frame > state.loopPoint - MIN_LOOP_SPAN) {
+            showToast(
+                `A loop start must be at least ${MIN_LOOP_SPAN.toString()} frames before its end`,
+                'error',
+            );
+            return;
+        }
+        state.loopStart = frame;
+        loopEdge = 'end';
+        showToast(`Loop starts at frame ${frame.toString()}. Now set the end.`, 'info');
+    } else {
+        if (frame < state.loopStart + MIN_LOOP_SPAN) {
+            showToast(
+                `A loop end must be at least ${MIN_LOOP_SPAN.toString()} frames after its start`,
+                'error',
+            );
+            return;
+        }
+        state.loopPoint = frame;
+        loopEdge = 'start';
+        showToast(
+            `Loop set, frames ${state.loopStart.toString()} to ${frame.toString()}. `
+            + 'Preview it, then send to Model Exporter.',
+            'success',
+        );
+    }
+
+    refreshLoopButton();
+    refreshLoopInfo();
 }
 
 function clearLoop(): void {
     stopPreview();
+    state.loopStart = 0;
     state.loopPoint = -1;
-
-    const loopInfo = requireEl('vpLoopInfo', HTMLElement);
-    loopInfo.textContent = '';
-
-    requireEl('vpPreviewLoopBtn', HTMLButtonElement).disabled = true;
-    requireEl('vpClearLoopBtn', HTMLButtonElement).disabled = true;
-
-    updateVideoInfo();
-    showToast('Loop point cleared', 'info');
+    loopEdge = 'start';
+    refreshLoopButton();
+    refreshLoopInfo();
+    showToast('Loop cleared', 'info');
 }
 
 // ================================================================
@@ -524,7 +592,7 @@ function clearLoop(): void {
 // ================================================================
 
 async function previewLoop(): Promise<void> {
-    if (state.loopPoint < 2) return;
+    if (state.loopPoint - state.loopStart < MIN_LOOP_SPAN) return;
     state.previewPlaying = true;
     pauseVideo();
     requireEl('vpPreviewLoopBtn', HTMLElement).textContent = '⏸ Stop Preview';
@@ -534,7 +602,12 @@ async function previewLoop(): Promise<void> {
     const canvas = requireEl('vpCanvas', HTMLCanvasElement);
     const ctx = require2d(canvas);
     const loopPoint = state.loopPoint;
+    const loopStart = state.loopStart;
+    // The preview plays the loop, so it begins where the loop begins. It
+    // always began at zero before the control could express a start.
+    const startTime = frameTime(loopStart, state.fps, state.duration);
     const loopTime = loopPoint / state.fps;
+    const loopSeconds = loopTime - startTime;
     const cw = canvas.width, ch = canvas.height;
     const minGap = 0.8 / state.fps;
 
@@ -543,8 +616,7 @@ async function previewLoop(): Promise<void> {
     state.cachedFrames = [];
     let lastCaptureTime = -1;
 
-    video.currentTime = 0;
-    await new Promise(r => { video.addEventListener('seeked', r, { once: true }); });
+    await seekVideoAsync(video, startTime, state.duration);
     video.playbackRate = 3;
     playOrWarn(video);
 
@@ -591,7 +663,7 @@ async function previewLoop(): Promise<void> {
     const sequence = VideoPrepCore.buildLoopSequence(frames.length, state.loopMode);
 
     let idx = 0;
-    const frameDelay = (loopTime * 1000) / frames.length;
+    const frameDelay = (loopSeconds * 1000) / frames.length;
     let lastFrameTime = performance.now();
 
     const playSequence = (now: number): void => {
@@ -613,7 +685,8 @@ async function previewLoop(): Promise<void> {
             ctx.drawImage(frame, 0, 0);
 
             // Map index back to video frame for UI
-            const videoFrame = Math.round((frameIndex / (frames.length - 1)) * loopPoint);
+            const videoFrame = loopStart
+                + Math.round((frameIndex / (frames.length - 1)) * (loopPoint - loopStart));
             const dirLabel = state.loopMode === 'reverse' ? '←' :
                 (state.loopMode === 'pingpong' && idx >= frames.length) ? '←' : '→';
             requireEl('vpFrameInfo', HTMLElement).textContent =
@@ -749,7 +822,9 @@ export function clearAll(): void {
     removeConcatVideo(true);
 
     state.videoLoaded = false;
+    state.loopStart = 0;
     state.loopPoint = -1;
+    loopEdge = 'start';
     state.currentFrame = 0;
     state.onionSkin = false;
     state.fromVideoGen = false;
@@ -825,7 +900,7 @@ function init(): void {
     });
 
     // ── Loop Point ──
-    requireEl('vpSetLoopBtn', HTMLElement).addEventListener('click', setLoopPoint);
+    requireEl('vpSetLoopBtn', HTMLElement).addEventListener('click', setLoopEdge);
     requireEl('vpClearLoopBtn', HTMLElement).addEventListener('click', clearLoop);
     requireEl('vpPreviewLoopBtn', HTMLElement).addEventListener('click', () => {
         if (state.previewPlaying) stopPreview();
@@ -839,15 +914,7 @@ function init(): void {
     // ── Loop Mode (seg-toggle) ──
     initModeSelector('vpLoopMode', (mode) => {
         state.loopMode = mode;
-        // Re-calculate loop info if we have a point set
-        if (state.loopPoint >= 2) {
-            // Temporarily set currentFrame to loopPoint to recalculate
-            const saved = state.currentFrame;
-            state.currentFrame = state.loopPoint;
-            setLoopPoint();
-            state.currentFrame = saved;
-        }
-        updateVideoInfo();
+        refreshLoopInfo();
     });
 
     // ── Concatenation ──

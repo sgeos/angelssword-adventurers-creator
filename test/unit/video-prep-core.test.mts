@@ -130,6 +130,9 @@ describe('video-prep-core buildVideoPrepHandoffPayload', () => {
             fps: 30,
             totalFrames: 75,
             loopMode: 'pingpong',
+            // Defaults to 0 for a state predating the control's start point,
+            // which keeps every existing loop meaning what it meant.
+            loopStart: 0,
             loopPoint: 10,
             outputFrameCount: 20, // 2 * L
             concat: null,

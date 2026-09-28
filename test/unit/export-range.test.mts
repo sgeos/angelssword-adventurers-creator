@@ -113,3 +113,78 @@ describe('the panel promise and the export now agree', () => {
         }
     });
 });
+
+describe('a loop that does not start at zero', () => {
+    /**
+     * The control could only ever set an end, so every loop ran from frame 0
+     * and the label "Set Loop Point" described that accurately. These pin the
+     * generalisation, and the first pins that it IS a generalisation: an
+     * absent or zero start reproduces every previous answer exactly.
+     */
+    it('reproduces the old answers when the start is zero or absent', () => {
+        for (const loopPoint of [2, 10, 74, 299]) {
+            const withStart = loopSummary('pingpong', loopPoint, 300, 0);
+            const without = loopSummary('pingpong', loopPoint, 300);
+            assert.deepEqual(withStart, without, loopPoint.toString());
+        }
+    });
+
+    it('counts the frames the loop actually spans', () => {
+        // 50 to 74 inclusive is 25 frames.
+        assert.equal(loopSummary('none', 74, 300, 50).outputFrames, 25);
+        assert.equal(loopSummary('reverse', 74, 300, 50).outputFrames, 25);
+        // Ping-pong returns through the interior, so 25 + 23.
+        assert.equal(loopSummary('pingpong', 74, 300, 50).outputFrames, 48);
+    });
+
+    it('names both ends on the control', () => {
+        assert.equal(loopSummary('none', 74, 300, 50).label, 'Forward: 50 → 74');
+        assert.equal(loopSummary('reverse', 74, 300, 50).label, 'Reverse: 74 → 50');
+        assert.equal(loopSummary('pingpong', 74, 300, 50).label, 'Ping-Pong: 50 → 74 → 50');
+    });
+
+    it('reports the whole clip when the span is too short to loop', () => {
+        // The span rather than the end is what decides, which is the whole
+        // point: frames 50 to 51 is as unusable as frames 0 to 1.
+        assert.equal(loopSummary('none', 51, 300, 50).outputFrames, 300);
+        assert.equal(loopSummary('none', 50, 300, 50).outputFrames, 300);
+    });
+
+    it('carries both ends to the exporter', () => {
+        assert.deepEqual(
+            exportRangeFromHandoff({ loopStart: 50, loopPoint: 74, totalFrames: 300 }),
+            { start: 50, end: 74 },
+        );
+    });
+
+    it('asks for nothing when the span is too short, whatever the start', () => {
+        assert.equal(exportRangeFromHandoff({ loopStart: 50, loopPoint: 51, totalFrames: 300 }), undefined);
+    });
+
+    it('treats a negative start as zero rather than selecting before the clip', () => {
+        assert.deepEqual(
+            exportRangeFromHandoff({ loopStart: -10, loopPoint: 74, totalFrames: 300 }),
+            { start: 0, end: 74 },
+        );
+    });
+
+    /**
+     * THE PROMISE AND THE DELIVERY, for an offset loop. The same agreement
+     * the zero-start case asserts, which is what makes the generalisation
+     * worth having rather than merely present.
+     */
+    it('produces the frame count the panel shows, for an offset loop', () => {
+        for (const mode of ['none', 'reverse', 'pingpong'] as const) {
+            const summary = loopSummary(mode, 74, 300, 50);
+            const range = exportRangeFromHandoff({ loopStart: 50, loopPoint: 74, totalFrames: 300 });
+            assert.ok(range !== undefined);
+            const exported = buildExportFrameList(
+                range.start,
+                range.end,
+                strideFromSkip(0),
+                mode === 'none' ? 'forward' : mode,
+            );
+            assert.equal(exported.length, summary.outputFrames, mode);
+        }
+    });
+});

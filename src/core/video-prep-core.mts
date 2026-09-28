@@ -5,6 +5,12 @@
 export type LoopMode = "none" | "reverse" | "pingpong";
 
 export interface FrameCountOptions {
+  /**
+   * First frame of the loop, inclusive. Defaults to 0, which is where every
+   * loop began before the control could express a start.
+   */
+  readonly loopStart?: number;
+  /** Last frame of the loop, inclusive. */
   readonly loopPoint: number;
   readonly loopMode: string;
   readonly totalFrames: number;
@@ -16,8 +22,13 @@ export interface FrameCountOptions {
  * A loop point below 2 means no loop was set, so the whole clip is used.
  */
 export const getOutputFrameCount = (opts: FrameCountOptions): number => {
-  if (opts.loopPoint < 2) return opts.totalFrames;
-  const n = opts.loopPoint + 1; // frames 0..loopPoint
+  const start = opts.loopStart ?? 0;
+  // A span below 2 means no usable loop. With a start of 0 this is the old
+  // `loopPoint < 2` test unchanged, which is what keeps every existing
+  // caller and every existing expectation intact.
+  const span = opts.loopPoint - start;
+  if (span < 2) return opts.totalFrames;
+  const n = span + 1; // frames start..loopPoint, inclusive
   // Ping-pong returns through the interior, so neither endpoint repeats.
   // Reverse and none both emit n frames, in opposite directions.
   return opts.loopMode === "pingpong" ? n + Math.max(0, n - 2) : n;
@@ -66,14 +77,16 @@ export const loopSummary = (
   loopMode: string,
   loopPoint: number,
   totalFrames: number,
+  loopStart = 0,
 ): LoopSummary => {
-  const outputFrames = getOutputFrameCount({ loopPoint, loopMode, totalFrames });
+  const outputFrames = getOutputFrameCount({ loopStart, loopPoint, loopMode, totalFrames });
   const end = loopPoint.toString();
+  const from = loopStart.toString();
   const label = loopMode === "pingpong"
-    ? `Ping-Pong: 0 → ${end} → 0`
+    ? `Ping-Pong: ${from} → ${end} → ${from}`
     : loopMode === "reverse"
-      ? `Reverse: ${end} → 0`
-      : `Forward: 0 → ${end}`;
+      ? `Reverse: ${end} → ${from}`
+      : `Forward: ${from} → ${end}`;
   const known = loopMode === "none" || loopMode === "reverse" || loopMode === "pingpong"
     ? loopMode
     : undefined;
@@ -129,6 +142,8 @@ export interface VideoPrepState {
   readonly fps?: number;
   readonly totalFrames: number;
   readonly loopMode: string;
+  /** First frame of the loop. Absent means 0, for a caller predating it. */
+  readonly loopStart?: number;
   readonly loopPoint: number;
   readonly concatVideo?: { readonly src?: string } | null;
   readonly concatWidth?: number;
@@ -161,6 +176,15 @@ export interface HandoffPayload {
   readonly fps: number | undefined;
   readonly totalFrames: number;
   readonly loopMode: string;
+  /**
+   * First frame of the loop, inclusive.
+   *
+   * Added when the control gained a start. Required rather than optional,
+   * because a consumer reading a range needs both ends and silently treating
+   * an absent start as 0 is how a field comes to be written and never read.
+   */
+  readonly loopStart: number;
+  /** Last frame of the loop, inclusive. */
   readonly loopPoint: number;
   readonly outputFrameCount: number;
   readonly concat: ConcatPayload | null;
@@ -179,8 +203,10 @@ export const buildVideoPrepHandoffPayload = (
   totalFrames: state.totalFrames,
 
   loopMode: state.loopMode,
+  loopStart: state.loopStart ?? 0,
   loopPoint: state.loopPoint,
   outputFrameCount: getOutputFrameCount({
+    loopStart: state.loopStart ?? 0,
     loopPoint: state.loopPoint,
     loopMode: state.loopMode,
     totalFrames: state.totalFrames,
@@ -239,9 +265,13 @@ export interface ExportRange {
  * the handoff is an object another stage could write.
  */
 export const exportRangeFromHandoff = (
-  payload: Pick<HandoffPayload, "loopPoint" | "totalFrames">,
+  payload: Pick<HandoffPayload, "loopPoint" | "totalFrames"> & { readonly loopStart?: number },
 ): ExportRange | undefined => {
-  if (payload.loopPoint < 2) return undefined;
+  const start = Math.max(0, payload.loopStart ?? 0);
+  if (payload.loopPoint - start < 2) return undefined;
   const lastFrame = Math.max(0, payload.totalFrames - 1);
-  return { start: 0, end: Math.min(payload.loopPoint, lastFrame) };
+  return {
+    start: Math.min(start, lastFrame),
+    end: Math.min(payload.loopPoint, lastFrame),
+  };
 };
