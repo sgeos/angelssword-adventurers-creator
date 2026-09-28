@@ -1117,7 +1117,9 @@ export class ModelExporter {
         const start = intFromField('exStartFrame', 0);
         const end = intFromField('exEndFrame', 0);
         const skip = intFromField('exFrameSkip', 0);
-        return getOutputFrameCount(start, end, skip, this.playbackMode === 'pingpong');
+        return getOutputFrameCount(
+            start, end, skip, this.playbackMode === 'pingpong', this.totalFrames,
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -1158,7 +1160,9 @@ export class ModelExporter {
         const videoScale = positiveOr(this.videoScale, 1);
         const videoOffset = Number.isFinite(this.videoOffset) ? this.videoOffset : 0;
 
-        const frameList = buildExportFrameList(startFrame, endFrame, skip, this.playbackMode);
+        const frameList = buildExportFrameList(
+            startFrame, endFrame, skip, this.playbackMode, this.totalFrames,
+        );
         const totalFrames = frameList.length;
 
         this.isExporting = true;
@@ -1354,7 +1358,9 @@ export class ModelExporter {
         const videoScale = positiveOr(this.videoScale, 1);
         const videoOffset = Number.isFinite(this.videoOffset) ? this.videoOffset : 0;
 
-        const frameList = buildExportFrameList(startFrame, endFrame, skip, this.playbackMode);
+        const frameList = buildExportFrameList(
+            startFrame, endFrame, skip, this.playbackMode, this.totalFrames,
+        );
         const totalFrames = frameList.length;
 
         this.isExporting = true;
@@ -1422,7 +1428,7 @@ export class ModelExporter {
             // The same selection the ordering above starts from, so the two
             // cannot drift. Decoding needs each frame once; the ordering may
             // repeat them.
-            const uniqueFrames = selectExportFrames(startFrame, endFrame, skip);
+            const uniqueFrames = selectExportFrames(startFrame, endFrame, skip, this.totalFrames);
 
             const frameCache = new Map<number, WorkerFrame>();
             // Nearest-palette-index cache, keyed by packed RGB, shared across frames.

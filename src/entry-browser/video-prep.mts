@@ -33,7 +33,6 @@ function playOrWarn(video: HTMLVideoElement): void {
  * preview loops await, which is precisely what these re-reads check for.
  */
 const stillCaching = (): boolean => state.videoLoaded;
-const stillPreviewing = (): boolean => state.previewPlaying;
 
 // ================================================================
 // STATE
@@ -63,7 +62,6 @@ interface VideoPrepState {
 
     previewPlaying: boolean;
     previewRAF: number | null;
-    cachedFrames: HTMLCanvasElement[] | null;
 
     /** One offscreen canvas per frame, for instant scrubbing. */
     frameCache: HTMLCanvasElement[] | null;
@@ -106,7 +104,6 @@ const state: VideoPrepState = {
     // Preview
     previewPlaying: false,
     previewRAF: null,
-    cachedFrames: null,
 
     // Auto frame cache (for instant scrubbing)
     frameCache: null,         // array of offscreen canvases, one per frame
@@ -566,148 +563,58 @@ function clearLoop(): void {
 // ================================================================
 
 /**
- * Playback rate used while capturing frames for the preview.
+ * Play the loop from the frame cache.
  *
- * This was 3, to build the cache in a third of the wall time. A capture at
- * that rate was observed producing 76 frames across 3.7 seconds of clip, at
- * 76 genuinely different times with the media fully buffered, and ONE
- * distinct image among them. The element advanced and never presented.
+ * # Why this no longer captures by playing
  *
- * The rate is the one thing that differs between this path and `playVideo`,
- * which draws from the same hidden element in the same way and works. The
- * element being hidden is constant across both, so it cannot be what
- * separates them.
+ * It used to rebuild its own cache by playing the clip at an elevated rate
+ * and drawing each animation frame. That was wrong twice over.
  *
- * So this is 1 until the observation says otherwise. The cost is that
- * caching takes as long as the loop lasts rather than a third of it, which
- * is a few seconds of visible progress rather than a stall.
+ * It duplicated `autoCacheFrames`, which already holds every frame of the
+ * clip at full fidelity, so the preview kept a second cache of its own at
+ * roughly a gigabyte for a three hundred frame clip and sampled it at
+ * arbitrary moments rather than at exact frames.
+ *
+ * And it depended on the hidden video element presenting frames during
+ * playback, which WebKit declines to do at an elevated rate. That produced a
+ * preview frozen on one image while its counter advanced, and the diagnosis
+ * cost three wrong hypotheses.
+ *
+ * Reading the cache removes both problems and a third: a loop crossing the
+ * seam cannot be expressed by playing from a start time to an end time,
+ * because the end time is earlier.
  */
-const CAPTURE_PLAYBACK_RATE = 1;
+function previewLoop(): void {
+    const status = VideoPrepCore.describeLoop(
+        state.loopMode, state.loopStart, state.loopPoint, state.totalFrames,
+    );
+    if (status.kind !== 'ok') return;
 
-/**
- * A cheap fingerprint of one captured frame.
- *
- * Samples a small central block rather than the whole frame, which is enough
- * to tell two different moments apart and costs nothing per frame. It exists
- * only to count distinct images, so collisions between genuinely different
- * frames would under-report variety and never invent it.
- */
-function frameSignature(ctx: CanvasRenderingContext2D, width: number, height: number): number {
-    const size = 16;
-    const x = Math.max(0, Math.floor((width - size) / 2));
-    const y = Math.max(0, Math.floor((height - size) / 2));
-    const { data } = ctx.getImageData(x, y, Math.min(size, width), Math.min(size, height));
-    let sum = 0;
-    for (let i = 0; i < data.length; i += 4) {
-        sum = (sum + (data[i] ?? 0) * 3 + (data[i + 1] ?? 0) * 5 + (data[i + 2] ?? 0) * 7) | 0;
+    const cache = state.frameCache;
+    if (cache === null || !state.frameCacheComplete) {
+        showToast('Frames are still caching. Try the preview again in a moment.', 'warning');
+        return;
     }
-    return sum;
-}
 
-async function previewLoop(): Promise<void> {
-    if (state.loopPoint - state.loopStart < VideoPrepCore.MIN_LOOP_SPAN) return;
+    // The loop's own frames, in playback order, wrapping at the seam.
+    const loopFrames = VideoPrepCore.loopFrameIndices(
+        state.loopStart, state.loopPoint, state.totalFrames,
+    );
+    // Then the mode's ordering over those, which indexes into the list above
+    // rather than into the clip.
+    const order = VideoPrepCore.buildLoopSequence(loopFrames.length, state.loopMode);
+    if (order.length === 0) return;
+
     state.previewPlaying = true;
     pauseVideo();
     requireEl('vpPreviewLoopBtn', HTMLElement).textContent = '⏸ Stop Preview';
 
-    const video = state.video;
-    if (video === null) return;
     const canvas = requireEl('vpCanvas', HTMLCanvasElement);
     const ctx = require2d(canvas);
-    const loopPoint = state.loopPoint;
-    const loopStart = state.loopStart;
-    // The preview plays the loop, so it begins where the loop begins. It
-    // always began at zero before the control could express a start.
-    const startTime = frameTime(loopStart, state.fps, state.duration);
-    const loopTime = loopPoint / state.fps;
-    const loopSeconds = loopTime - startTime;
-    const cw = canvas.width, ch = canvas.height;
-    const minGap = 0.8 / state.fps;
-
-    // ── Phase 1: Cache frames at 3× speed ──
-    requireEl('vpFrameInfo', HTMLElement).textContent = 'Caching frames...';
-    state.cachedFrames = [];
-    let lastCaptureTime = -1;
-
-    await seekVideoAsync(video, startTime, state.duration);
-    video.playbackRate = CAPTURE_PLAYBACK_RATE;
-    playOrWarn(video);
-
-    // The cache is rebuilt for this preview run; bind it locally so the
-    // capture callback does not have to re-narrow it on every frame.
-    const cachedFrames: HTMLCanvasElement[] = [];
-    state.cachedFrames = cachedFrames;
-
-    // How many DISTINCT images the capture actually saw. A preview that
-    // captures the right number of frames and finds one image among them is
-    // frozen, and used to present that as a working loop showing one frame.
-    const signatures = new Set<number>();
-
-    await new Promise<void>((resolve) => {
-        const captureFrame = (): void => {
-            if (!stillPreviewing()) {
-                video.pause(); video.playbackRate = 1; resolve(); return;
-            }
-            if (video.currentTime >= loopTime || video.ended || video.paused) {
-                video.pause(); video.playbackRate = 1; resolve(); return;
-            }
-
-            // Only capture if enough video time has passed
-            if (video.currentTime - lastCaptureTime >= minGap) {
-                lastCaptureTime = video.currentTime;
-                const fc = document.createElement('canvas');
-                fc.width = cw; fc.height = ch;
-                const fctx = require2d(fc);
-                fctx.drawImage(video, 0, 0, cw, ch);
-                signatures.add(frameSignature(fctx, cw, ch));
-                cachedFrames.push(fc);
-                // Show live preview during caching
-                ctx.drawImage(video, 0, 0, cw, ch);
-                requireEl('vpFrameInfo', HTMLElement).textContent =
-                    `Caching frame ${cachedFrames.length.toString()}...`;
-            }
-            requestAnimationFrame(captureFrame);
-        };
-        requestAnimationFrame(captureFrame);
-    });
-
-    video.playbackRate = 1;
-    const frames = state.cachedFrames;
-
-    if (!stillPreviewing() || frames.length < 3) {
-        if (stillPreviewing()) {
-            showToast(
-                `Preview needs at least 3 frames and captured ${frames.length.toString()}. `
-                + 'Try a longer loop.',
-                'warning',
-            );
-        }
-        stopPreview();
-        return;
-    }
-
-    // A frozen capture is the failure this reports. Everything downstream
-    // works on identical images, so the loop plays, the counter advances and
-    // the picture never changes, which reads as a bug in the loop rather than
-    // in the capture.
-    if (signatures.size <= 1) {
-        console.warn(
-            `[VideoPrep] Preview capture froze: ${frames.length.toString()} frames captured, `
-            + `${signatures.size.toString()} distinct image(s). `
-            + `rate=${CAPTURE_PLAYBACK_RATE.toString()} readyState=${video.readyState.toString()} `
-            + `start=${startTime.toFixed(3)} end=${loopTime.toFixed(3)} `
-            + `last=${lastCaptureTime.toFixed(3)}`,
-        );
-        showToast('Preview could not capture motion from the clip', 'error');
-        stopPreview();
-        return;
-    }
-
-    // ── Phase 2: Build playback sequence based on mode ──
-    const sequence = VideoPrepCore.buildLoopSequence(frames.length, state.loopMode);
+    // Real time, because the cache holds exact frames rather than samples.
+    const frameDelay = 1000 / (state.fps > 0 ? state.fps : 30);
 
     let idx = 0;
-    const frameDelay = (loopSeconds * 1000) / frames.length;
     let lastFrameTime = performance.now();
 
     const playSequence = (now: number): void => {
@@ -717,27 +624,19 @@ async function previewLoop(): Promise<void> {
         if (elapsed >= frameDelay) {
             lastFrameTime = now - (elapsed % frameDelay);
 
-            // buildLoopSequence only emits in-range indices, but the compiler
-            // cannot know that; skip defensively rather than drawing undefined.
-            const frameIndex = sequence[idx];
-            const frame = frameIndex === undefined ? undefined : frames[frameIndex];
-            if (frameIndex === undefined || frame === undefined) {
-                idx = (idx + 1) % sequence.length;
-                requestAnimationFrame(playSequence);
-                return;
+            const position = order[idx];
+            const frameIndex = position === undefined ? undefined : loopFrames[position];
+            const frame = frameIndex === undefined ? undefined : cache[frameIndex];
+            if (frame !== undefined && frameIndex !== undefined) {
+                ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+                const dirLabel = state.loopMode === 'reverse' ? '←'
+                    : (state.loopMode === 'pingpong' && idx >= loopFrames.length) ? '←' : '→';
+                requireEl('vpFrameInfo', HTMLElement).textContent =
+                    `Preview ${dirLabel} frame ${frameIndex.toString()} `
+                    + `/ ${state.loopPoint.toString()}`;
+                requireEl('vpScrubber', HTMLInputElement).value = String(frameIndex);
             }
-            ctx.drawImage(frame, 0, 0);
-
-            // Map index back to video frame for UI
-            const videoFrame = loopStart
-                + Math.round((frameIndex / (frames.length - 1)) * (loopPoint - loopStart));
-            const dirLabel = state.loopMode === 'reverse' ? '←' :
-                (state.loopMode === 'pingpong' && idx >= frames.length) ? '←' : '→';
-            requireEl('vpFrameInfo', HTMLElement).textContent =
-                `Preview ${dirLabel} frame ${videoFrame.toString()} / ${loopPoint.toString()}`;
-            requireEl('vpScrubber', HTMLInputElement).value = String(videoFrame);
-
-            idx = (idx + 1) % sequence.length;
+            idx = (idx + 1) % order.length;
         }
 
         state.previewRAF = requestAnimationFrame(playSequence);
@@ -752,7 +651,6 @@ function stopPreview(): void {
         state.previewRAF = null;
     }
     // Clean up cached canvases
-    state.cachedFrames = null;
     if (state.video !== null && !state.video.paused) state.video.pause();
     requireEl('vpPreviewLoopBtn', HTMLButtonElement).textContent = '▶ Preview Loop';
 }
@@ -950,7 +848,7 @@ function init(): void {
     requireEl('vpClearLoopBtn', HTMLElement).addEventListener('click', clearLoop);
     requireEl('vpPreviewLoopBtn', HTMLElement).addEventListener('click', () => {
         if (state.previewPlaying) stopPreview();
-        else void previewLoop();
+        else previewLoop();
     });
 
     // Disable loop buttons initially

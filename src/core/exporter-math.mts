@@ -39,12 +39,15 @@ export const getOutputFrameCount = (
   end: number,
   skip: number,
   pingPong: boolean,
+  totalFrames?: number,
 ): number =>
   // Counted by building the list rather than by a parallel loop. This had its
   // own copy of the selection, which made it the fourth, and a count that can
   // disagree with the export it describes is worse than no count: it is shown
   // to the user as an estimate before an export they then wait for.
-  buildExportFrameList(start, end, strideFromSkip(skip), pingPong ? "pingpong" : "forward").length;
+  buildExportFrameList(
+    start, end, strideFromSkip(skip), pingPong ? "pingpong" : "forward", totalFrames,
+  ).length;
 
 /**
  * NOTE ON TWO CONVENTIONS. This takes a SKIP, as the field holds it, while
@@ -551,10 +554,9 @@ export const buildExportFrameList = (
     endFrame: number,
     stride: number,
     mode: PlaybackMode,
+    totalFrames?: number,
 ): readonly number[] => {
-    const frames: number[] = [];
-    const step = Math.max(1, stride);
-    for (let f = startFrame; f <= endFrame; f += step) frames.push(f);
+    const frames: number[] = [...selectExportFrames(startFrame, endFrame, stride, totalFrames)];
 
     if (mode === "pingpong" && frames.length > 2) {
         for (let i = frames.length - 2; i >= 1; i--) {
@@ -578,4 +580,24 @@ export const selectExportFrames = (
     startFrame: number,
     endFrame: number,
     stride: number,
-): readonly number[] => buildExportFrameList(startFrame, endFrame, stride, "forward");
+    totalFrames?: number,
+): readonly number[] => {
+    const step = Math.max(1, stride);
+    const frames: number[] = [];
+
+    if (endFrame >= startFrame) {
+        for (let f = startFrame; f <= endFrame; f += step) frames.push(f);
+        return frames;
+    }
+
+    // An end before a start crosses the seam. Playback is circular, so that
+    // selects the tail of the clip followed by its head, and it is how a loop
+    // passes THROUGH frame 0 rather than beginning there.
+    //
+    // Without a clip length the wrap cannot be resolved, so the selection is
+    // empty, which is what this returned before it could wrap at all.
+    if (totalFrames === undefined || totalFrames <= 0) return frames;
+    const count = totalFrames - startFrame + endFrame + 1;
+    for (let i = 0; i < count; i += step) frames.push((startFrame + i) % totalFrames);
+    return frames;
+};

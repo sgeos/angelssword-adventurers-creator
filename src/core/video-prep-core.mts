@@ -4,6 +4,9 @@
 
 export type LoopMode = "none" | "reverse" | "pingpong";
 
+/** Fewest frames a loop can span and still be worth playing. */
+export const MIN_LOOP_SPAN = 2;
+
 export interface FrameCountOptions {
   /**
    * First frame of the loop, inclusive. Defaults to 0, which is where every
@@ -21,14 +24,64 @@ export interface FrameCountOptions {
  *
  * A loop point below 2 means no loop was set, so the whole clip is used.
  */
+/**
+ * How many frames a loop covers, following the clip's circular playback.
+ *
+ * # Playback wraps, so every pair of ends is a loop
+ *
+ * A clip returns to its first frame after its last, so an end BEFORE a start
+ * is not an error. It is a loop that crosses the seam. With 300 frames, 70 to
+ * 250 plays the middle and 250 to 70 plays the tail and then the head.
+ *
+ * That also makes frame 0 reachable from inside a loop rather than only as
+ * its beginning, which matters when frame 0 is the master neutral frame.
+ *
+ * Both ends are inclusive, so a start equal to an end is one frame.
+ */
+export const circularFrameCount = (
+  loopStart: number,
+  loopPoint: number,
+  totalFrames: number,
+): number => {
+  if (totalFrames <= 0) return 0;
+  const span = loopPoint >= loopStart
+    ? loopPoint - loopStart
+    : totalFrames - loopStart + loopPoint;
+  return span + 1;
+};
+
+/**
+ * The frame indices a loop covers, in playback order.
+ *
+ * Walks forward from the start and wraps at the end of the clip, so a loop
+ * crossing the seam yields the tail followed by the head. Indices outside the
+ * clip are brought inside by the wrap rather than refused.
+ */
+export const loopFrameIndices = (
+  loopStart: number,
+  loopPoint: number,
+  totalFrames: number,
+): readonly number[] => {
+  if (totalFrames <= 0) return [];
+  const first = ((loopStart % totalFrames) + totalFrames) % totalFrames;
+  const last = ((loopPoint % totalFrames) + totalFrames) % totalFrames;
+  const count = circularFrameCount(first, last, totalFrames);
+  const frames: number[] = [];
+  for (let i = 0; i < count; i++) frames.push((first + i) % totalFrames);
+  return frames;
+};
+
 export const getOutputFrameCount = (opts: FrameCountOptions): number => {
   const start = opts.loopStart ?? 0;
-  // A span below 2 means no usable loop. With a start of 0 this is the old
-  // `loopPoint < 2` test unchanged, which is what keeps every existing
-  // caller and every existing expectation intact.
-  const span = opts.loopPoint - start;
-  if (span < 2) return opts.totalFrames;
-  const n = span + 1; // frames start..loopPoint, inclusive
+  // A negative end is how the control says no loop is set.
+  if (opts.loopPoint < 0) return opts.totalFrames;
+
+  const n = circularFrameCount(start, opts.loopPoint, opts.totalFrames);
+  // A span below 2 is too short to be worth looping. With a start of 0 and no
+  // wrap this is the old `loopPoint < 2` test unchanged, which is what keeps
+  // every existing expectation intact.
+  if (n - 1 < MIN_LOOP_SPAN) return opts.totalFrames;
+
   // Ping-pong returns through the interior, so neither endpoint repeats.
   // Reverse and none both emit n frames, in opposite directions.
   return opts.loopMode === "pingpong" ? n + Math.max(0, n - 2) : n;
@@ -82,11 +135,15 @@ export const loopSummary = (
   const outputFrames = getOutputFrameCount({ loopStart, loopPoint, loopMode, totalFrames });
   const end = loopPoint.toString();
   const from = loopStart.toString();
+  // A loop whose end precedes its start crosses the seam, playing the tail of
+  // the clip and then the head. Saying so is worth four characters, because
+  // the two ends alone read as a mistake.
+  const wraps = loopPoint < loopStart ? " ↻" : "";
   const label = loopMode === "pingpong"
-    ? `Ping-Pong: ${from} → ${end} → ${from}`
+    ? `Ping-Pong: ${from} → ${end} → ${from}${wraps}`
     : loopMode === "reverse"
-      ? `Reverse: ${end} → ${from}`
-      : `Forward: ${from} → ${end}`;
+      ? `Reverse: ${end} → ${from}${wraps}`
+      : `Forward: ${from} → ${end}${wraps}`;
   const known = loopMode === "none" || loopMode === "reverse" || loopMode === "pingpong"
     ? loopMode
     : undefined;
@@ -267,21 +324,20 @@ export interface ExportRange {
 export const exportRangeFromHandoff = (
   payload: Pick<HandoffPayload, "loopPoint" | "totalFrames"> & { readonly loopStart?: number },
 ): ExportRange | undefined => {
-  const start = Math.max(0, payload.loopStart ?? 0);
-  if (payload.loopPoint - start < 2) return undefined;
-  const lastFrame = Math.max(0, payload.totalFrames - 1);
-  return {
-    start: Math.min(start, lastFrame),
-    end: Math.min(payload.loopPoint, lastFrame),
-  };
+  if (payload.loopPoint < 0 || payload.totalFrames <= 0) return undefined;
+  const lastFrame = payload.totalFrames - 1;
+  const start = Math.max(0, Math.min(payload.loopStart ?? 0, lastFrame));
+  const end = Math.max(0, Math.min(payload.loopPoint, lastFrame));
+
+  // A range whose end precedes its start is not refused. It crosses the seam,
+  // and the exporter reads the pair the same circular way this stage does.
+  if (circularFrameCount(start, end, payload.totalFrames) - 1 < MIN_LOOP_SPAN) return undefined;
+  return { start, end };
 };
 
 /* ────────────────────────────────────────────────────────────────────────
  * Whether a loop is usable, and why not when it is not.
  * ──────────────────────────────────────────────────────────────────────── */
-
-/** Fewest frames a loop can span and still be worth playing. */
-export const MIN_LOOP_SPAN = 2;
 
 /** What the loop controls should say about the current pair of ends. */
 export type LoopStatus =
@@ -321,20 +377,16 @@ export const describeLoop = (
 ): LoopStatus => {
   if (loopPoint < 0) return { kind: "unset" };
 
-  if (loopPoint < loopStart) {
-    return {
-      kind: "unusable",
-      reason: `Loop end ${loopPoint.toString()} is before its start `
-        + `${loopStart.toString()}. Move the end after the start.`,
-    };
-  }
-
-  const span = loopPoint - loopStart;
+  // An end before a start is NOT an error. Playback is circular, so that is a
+  // loop crossing the seam: the tail of the clip followed by its head. This
+  // used to be refused, which also made frame 0 unreachable from inside a
+  // loop, and frame 0 is the master neutral frame.
+  const span = circularFrameCount(loopStart, loopPoint, totalFrames) - 1;
   if (span < MIN_LOOP_SPAN) {
     return {
       kind: "unusable",
-      reason: `Loop spans ${span.toString()} frame(s); at least `
-        + `${MIN_LOOP_SPAN.toString()} are needed.`,
+      reason: `Loop spans ${Math.max(0, span + 1).toString()} frame(s); at least `
+        + `${(MIN_LOOP_SPAN + 1).toString()} are needed.`,
     };
   }
 
