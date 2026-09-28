@@ -14,6 +14,7 @@
  */
 
 import type { KeyValueStore } from "./ports/storage.mts";
+import { DEFAULT_FRAMING, asFraming, type Framing } from "./sprite-prep-core.mts";
 
 /** Storage key holding the character name shared by two stages. */
 export const CHARACTER_NAME_KEY = "as_char_name";
@@ -93,4 +94,23 @@ export const loadSpriteZoom = (store: KeyValueStore): number =>
 /** Remember the sprite's zoom. */
 export const saveSpriteZoom = (store: KeyValueStore, zoom: number): void => {
     store.write(SPRITE_ZOOM_KEY, zoom.toString());
+};
+
+/** Storage key holding how much of the character a sprite shows. */
+export const FRAMING_KEY = "sprite_framing";
+
+/**
+ * The framing the user last chose, or the default.
+ *
+ * Remembered because it describes the character rather than the request. A
+ * user with a full-body reference wants full body every time, and re-picking
+ * it per generation would be a chore that silently produces the wrong sprite
+ * when forgotten.
+ */
+export const loadFraming = (store: KeyValueStore): Framing =>
+    asFraming(store.read(FRAMING_KEY) ?? "") ?? DEFAULT_FRAMING;
+
+/** Remember the framing. */
+export const saveFraming = (store: KeyValueStore, framing: Framing): void => {
+    store.write(FRAMING_KEY, framing);
 };

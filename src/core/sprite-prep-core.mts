@@ -146,6 +146,8 @@ export interface PromptOptions {
   readonly action?: string;
   readonly keyHex: string;
   readonly raceMode?: string;
+  /** How much of the character to show. Absent means the shipped default. */
+  readonly framing?: Framing;
   readonly colorNameFn?: (hex: string) => string;
 }
 
@@ -155,12 +157,69 @@ const KANOLITH_DIRECTIVE =
 const ZOALITH_DIRECTIVE =
   "\nCRITICAL - FULL ANTHROPOMORPHIC STYLE:\nThis character is a full anthropomorphic beastfolk (furry/kemono style). They should have pronounced animal facial features: a visible snout or muzzle, fur covering the face and body, animal nose, whiskers if applicable, digitigrade legs if applicable. The body structure is humanoid but the head and skin are distinctly animal. Think classic RPG beastfolk like Breath of Fire or Final Fantasy Bangaa/Moogle.\n";
 
+/**
+ * How much of the character the sprite shows.
+ *
+ * # Why this is a choice rather than a constant
+ *
+ * The product brief specifies "Full body visible from head to toe". The
+ * shipped prompt has always asked for the opposite, and said so in the
+ * upstream JavaScript before this fork existed, so the brief describes a
+ * workflow that was abandoned before the code shipped.
+ *
+ * Meanwhile the video half still expects full body. The Wan negative prompt
+ * guards against "cropped head, cropped feet" because Wan reframes a
+ * full-body still, and the letterboxing exists for the same reason.
+ *
+ * So the two halves disagreed about what a sprite is, and neither answer was
+ * wrong for every user. A bust reads better as a talking head and wastes no
+ * pixels on legs; a full body is what the video half was built for and what
+ * a reference image of a whole character wants. The choice belongs to
+ * whoever has the reference image.
+ */
+export type Framing = "bust" | "fullBody";
+
+/**
+ * Narrow an untrusted string to a framing.
+ *
+ * The value arrives from a data attribute or from the store, so neither
+ * source constrains it.
+ */
+export const asFraming = (value: string): Framing | undefined =>
+  value === "bust" || value === "fullBody" ? value : undefined;
+
+/** The framing used when nothing has been chosen. */
+export const DEFAULT_FRAMING: Framing = "bust";
+
+/**
+ * The two prompt lines that decide framing.
+ *
+ * Two rather than one because they do different jobs and the model needs
+ * both. The first places the character in the canvas; the second states the
+ * composition and, crucially, what must NOT appear. Asking for a waist-up
+ * shot without saying "no feet" reliably produces feet.
+ *
+ * The bust pair is the shipped wording, unchanged, so choosing bust
+ * reproduces every sprite this tool has generated to date.
+ */
+export const FRAMING_DIRECTIVES: Readonly<Record<Framing, readonly [string, string]>> = {
+  bust: [
+    `Character shown from the waist up (upper body, chest, shoulders, head). The character is positioned in the lower portion of the canvas, centered horizontally, with plenty of solid background space above the character's head.`,
+    `Waist-up portrait composition with flat studio lighting. The character's lower body is cut off at approximately the waist or hip level by the bottom edge of the canvas. No ground, no floor, no feet visible.`,
+  ],
+  fullBody: [
+    `Full body visible from head to toe, including both feet. The character is centered horizontally and positioned in the lower portion of the canvas, with solid background space above the character's head.`,
+    `Full-body composition with flat studio lighting. The entire character fits inside the canvas with clear margin above the head and below the feet. No part of the character is cut off by any edge. No ground, no floor, no shadow beneath the character.`,
+  ],
+};
+
 /** Compose the generation prompt. */
 export const buildPrompt = (opts: PromptOptions): string => {
   const name = opts.name?.trim() !== undefined && opts.name.trim() !== "" ? opts.name.trim() : "Character";
   const desc = opts.desc?.trim() ?? "";
   const action = opts.action?.trim() ?? "";
   const raceMode = opts.raceMode ?? "normal";
+  const framing = opts.framing ?? DEFAULT_FRAMING;
   const colorNameFn = opts.colorNameFn ?? defaultColorName;
 
   const keyName = colorNameFn(opts.keyHex);
@@ -172,13 +231,13 @@ export const buildPrompt = (opts: PromptOptions): string => {
   return [
     `A single ${name}${desc !== "" ? `, ${desc}` : ""}, ${actionText}.`,
     raceDirective,
-    `Character shown from the waist up (upper body, chest, shoulders, head). The character is positioned in the lower portion of the canvas, centered horizontally, with plenty of solid background space above the character's head.`,
+    FRAMING_DIRECTIVES[framing][0],
     `The entire background must be a solid, uniform ${keyName.toUpperCase()} (${opts.keyHex}) with absolutely no gradients, shadows, or variations.`,
     `Every pixel of background must be the exact same shade of ${keyName.toLowerCase()} — a single uniform matte color.`,
     `The character should be drawn in a high-quality anime/JRPG art style with clean linework and cel-shading.`,
     `The image must be exactly 1280×720 pixels.`,
     `The character has crisp, clean edges with bold dark outlines and a well-defined silhouette against the flat colored background.`,
-    `Waist-up portrait composition with flat studio lighting. The character's lower body is cut off at approximately the waist or hip level by the bottom edge of the canvas. No ground, no floor, no feet visible.`,
+    FRAMING_DIRECTIVES[framing][1],
   ]
     .filter((line) => line !== "")
     .join("\n");

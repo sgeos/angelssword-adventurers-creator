@@ -29,6 +29,8 @@ import {
     type Provider,
 } from "../core/providers.mts";
 import {
+    loadFraming,
+    saveFraming,
     loadSpriteOffset,
     loadSpriteZoom,
     saveCharacterName,
@@ -86,6 +88,7 @@ let selectedResult: GenResult | null = null;
 let charRefBase64: string | null = null;
 let styleRefBase64: string | null = null;
 let raceMode = 'normal'; // 'normal', 'kanolith', or 'zoalith'
+let framing: Core.Framing = loadFraming(browserStore);
 
 // ============================================
 // MANUAL MODE — CANVAS SYSTEM
@@ -348,6 +351,7 @@ function buildPrompt(): string {
         action,
         keyHex: selectedKeyColor,
         raceMode,
+        framing,
         colorNameFn: colorName
     });
 }
@@ -828,6 +832,21 @@ function initSpritePrep(): void {
     initModeSelector('sgRaceMode', (mode) => {
         raceMode = mode;
     });
+
+    // Framing. Anything unrecognised is ignored rather than stored, which is
+    // the same treatment the provider selector gives a stray data attribute.
+    initModeSelector('sgFraming', (mode) => {
+        const chosen = Core.asFraming(mode);
+        if (chosen === undefined) return;
+        framing = chosen;
+        saveFraming(browserStore, chosen);
+    });
+
+    // Reflect the remembered choice, so the active button matches what a
+    // generation would actually ask for.
+    for (const btn of queryAll(requireEl('sgFraming', HTMLElement), '.mode-btn', HTMLElement)) {
+        btn.classList.toggle('active', btn.dataset['mode'] === framing);
+    }
 
     // Generate button
     requireEl('sgGenerateBtn', HTMLButtonElement).addEventListener('click', () => { void generate(); });

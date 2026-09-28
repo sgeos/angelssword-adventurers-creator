@@ -63,12 +63,19 @@ So the sprite stage asks for an image with no feet and the video stage spends
 effort protecting feet that were never generated. Nothing breaks, and the
 letterboxing remains correct for preserving whatever framing does arrive.
 
-Three ways to resolve it, and the choice is a product decision rather than a
-technical one. Correct the brief to describe waist-up and drop the full-body
-terms from the video prompts. Restore full body in the sprite prompt, which is
-what the brief and the video half both already assume. Or make the framing a
-user choice, which is the largest of the three and the only one that serves
-both.
+**Partly resolved on 2026-09-28.** The third option was taken for the sprite
+stage: framing is a user choice, remembered, defaulting to the shipped bust
+wording so nothing changes for anyone who does not touch it.
+
+**The video half is not yet told.** The Wan negative prompt still guards
+against cropped feet and the ComfyUI video prompt still ends "full body in
+frame", whatever the sprite actually shows. That is harmless for a full-body
+sprite and slightly wrong for a bust, where the model is asked to preserve
+feet that are not there. Resolving it means carrying the framing across the
+handoff, which the handoff does not do today.
+
+The brief still describes full body as though it were the only option, and
+should be corrected to describe the choice.
 
 ## Transitions between animations are the consuming application's problem
 
