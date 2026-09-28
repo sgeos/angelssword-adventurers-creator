@@ -3,11 +3,14 @@ import assert from 'node:assert/strict';
 import {
     PROVIDERS,
     PROVIDER_ORDER,
+    VIDEO_PROVIDER_ORDER,
     asProviderId,
     buildImageRequest,
     credentialFrom,
+    describeVideoOutput,
     providerFrom,
 } from '../../src/core/providers.mts';
+import { buildGrokVideoRequest } from '../../src/core/grok-video-core.mts';
 
 describe('asProviderId', () => {
     it('accepts the known providers', () => {
@@ -107,5 +110,70 @@ describe('credentialFrom', () => {
         assert.equal(credentialFrom(''), undefined);
         assert.equal(credentialFrom('   '), undefined);
         assert.equal(credentialFrom('\t\n'), undefined);
+    });
+});
+
+describe('describeVideoOutput says what each provider actually produces', () => {
+    /**
+     * The interface carried one static line, "Aspect ratio: 16:9 (locked) ·
+     * ~$0.10/sec", shown for every provider beside a button naming Gemini.
+     * Three assertions, and the ratio was true of exactly one provider, which
+     * was not the one named.
+     */
+    it('tells Gemini users the shape follows their reference, because nothing is sent', () => {
+        const note = describeVideoOutput('google');
+        assert.match(note, /Follows your reference image/);
+        assert.doesNotMatch(note, /16:9/, 'no aspect ratio is sent to Gemini');
+    });
+
+    /**
+     * The lock is real for Grok and it is OURS. `buildGrokVideoRequest` sets
+     * it, so a user who wants another shape changes the tool rather than
+     * arguing with the service, and the wording has to say which.
+     */
+    it('tells Grok users the lock is this tool doing it', () => {
+        const note = describeVideoOutput('xai');
+        assert.match(note, /16:9 at 720p/);
+        assert.match(note, /set by this tool/);
+    });
+
+    it('agrees with the request Grok is actually sent', () => {
+        const request = buildGrokVideoRequest({
+            prompt: 'idle', imageDataUri: 'data:image/png;base64,AA',
+            durationSeconds: 6, mode: 'reference',
+        });
+        assert.equal(request.aspect_ratio, '16:9');
+        assert.match(describeVideoOutput('xai'), new RegExp(request.aspect_ratio));
+    });
+
+    it('reports the ComfyUI canvas it is given, that being a default not a lock', () => {
+        assert.match(describeVideoOutput('comfyui', { width: 480, height: 832 }), /480×832 from Settings/);
+        assert.match(describeVideoOutput('comfyui'), /canvas from Settings/);
+    });
+
+    /**
+     * The old label charged per second for a provider that runs on the user's
+     * own machine.
+     */
+    it('charges nothing per second for the local provider', () => {
+        const note = describeVideoOutput('comfyui', { width: 832, height: 480 });
+        assert.match(note, /no per-second cost/);
+        assert.doesNotMatch(note, /\$/);
+    });
+
+    /**
+     * The figure predates this fork and nobody has verified it, so it is
+     * marked rather than asserted, and it is not invented for the provider it
+     * was never measured on.
+     */
+    it('marks the only price it carries as an estimate', () => {
+        assert.match(describeVideoOutput('google'), /estimate, unverified/);
+        assert.doesNotMatch(describeVideoOutput('xai'), /\$/, 'no invented price for Grok');
+    });
+
+    it('says something for every provider in the table', () => {
+        for (const id of VIDEO_PROVIDER_ORDER) {
+            assert.ok(describeVideoOutput(id).length > 0, id);
+        }
     });
 });

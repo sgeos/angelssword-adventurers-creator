@@ -30,9 +30,11 @@ import * as VideoGenCore from "../core/video-gen-core.mts";
 import {
     VIDEO_PROVIDERS,
     asVideoProviderId,
+    describeVideoOutput,
     loadCredential,
     loadVideoProvider,
     saveVideoProvider,
+    type VideoProviderId,
 } from "../core/providers.mts";
 import { browserStore } from "../platform-browser/local-storage.mts";
 import { browserHttp } from "../platform-browser/http.mts";
@@ -550,6 +552,20 @@ function handoffToVideoPrep(): void {
 // INITIALIZATION
 // ============================================
 
+/**
+ * Say what the selected provider actually produces.
+ *
+ * The line this replaces was static and asserted 16:9 for every provider,
+ * beside a button naming Gemini. Only Grok is sent an aspect ratio, and that
+ * is this tool's own choice rather than a limit of the service.
+ */
+function refreshOutputNote(provider: VideoProviderId): void {
+    const note = findEl('vgOutputNote', HTMLElement);
+    if (note === undefined) return;
+    const wan = loadWanSettings(browserStore);
+    note.textContent = describeVideoOutput(provider, { width: wan.width, height: wan.height });
+}
+
 function initVideoGen(): void {
     // Mode selector (Reference / Keyframe)
     // Provider selector. Anything unrecognised is ignored rather than stored.
@@ -557,12 +573,14 @@ function initVideoGen(): void {
         const chosen = asVideoProviderId(mode);
         if (chosen === undefined) return;
         saveVideoProvider(browserStore, chosen);
+        refreshOutputNote(chosen);
         showToast(`Generating with ${VIDEO_PROVIDERS[chosen].label}`, 'info');
     });
 
     // Reflect the stored preference, so the active button matches what a
     // generation would actually use.
     const storedVideoProvider = loadVideoProvider(browserStore);
+    refreshOutputNote(storedVideoProvider.id);
     for (const btn of queryAll(requireEl('vgProvider', HTMLElement), '.seg-btn', HTMLElement)) {
         btn.classList.toggle('active', btn.dataset['mode'] === storedVideoProvider.id);
     }

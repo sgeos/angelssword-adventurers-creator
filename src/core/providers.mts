@@ -261,3 +261,55 @@ export const loadVideoProvider = (store: KeyValueStore): VideoProvider =>
 export const saveVideoProvider = (store: KeyValueStore, id: VideoProviderId): void => {
   store.write(VIDEO_PROVIDER_PREFERENCE_KEY, id);
 };
+
+/* ────────────────────────────────────────────────────────────────────────
+ * What a video provider actually produces.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/** A canvas, for the provider that takes one from settings. */
+export interface VideoCanvas {
+  readonly width: number;
+  readonly height: number;
+}
+
+/**
+ * Describe the shape and cost of a provider's output.
+ *
+ * # Why this exists
+ *
+ * The interface carried one static line, "Aspect ratio: 16:9 (locked) ·
+ * ~$0.10/sec", shown for every provider beside a button naming Gemini. Three
+ * assertions, and the ratio was true of exactly one provider, which was not
+ * the one named.
+ *
+ * **Only Grok is sent an aspect ratio.** `buildGrokVideoRequest` sets 16:9 at
+ * 720p, so that lock is this tool's own choice rather than a limit of the
+ * service, and saying which matters: a user who wants portrait can change it
+ * here, not by arguing with the model.
+ *
+ * **Gemini is sent nothing about shape.** The request carries the model, the
+ * image, the text and `image_to_video`, so the result follows the reference.
+ *
+ * **ComfyUI takes a canvas from settings**, which defaults near 16:9 and is
+ * editable, so it is a default rather than a lock.
+ *
+ * # On the cost
+ *
+ * The per-second figure is carried only for Gemini and marked an estimate,
+ * because it predates this fork and nobody here has verified it. Grok carries
+ * none rather than an invented one. ComfyUI runs on the user's own machine
+ * and has no per-second cost at all, which the old label also got wrong.
+ */
+export const describeVideoOutput = (
+  provider: VideoProviderId,
+  canvas?: VideoCanvas,
+): string => {
+  if (provider === "xai") return "16:9 at 720p, set by this tool";
+  if (provider === "comfyui") {
+    const size = canvas === undefined
+      ? "canvas from Settings"
+      : `${canvas.width.toString()}×${canvas.height.toString()} from Settings`;
+    return `${size} · runs locally, no per-second cost`;
+  }
+  return "Follows your reference image · ~$0.10/sec (estimate, unverified)";
+};
