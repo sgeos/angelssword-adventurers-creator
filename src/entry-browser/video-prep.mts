@@ -306,8 +306,6 @@ async function loadVideo(file: File): Promise<void> {
     // for a loop the user had not set.
     state.loopStart = 0;
     state.loopPoint = state.totalFrames - 1;
-    loopEdge = 'start';
-    refreshLoopButton();
     refreshLoopInfo();
     state.currentFrame = 0;
     seekToFrame(0);
@@ -501,23 +499,15 @@ function pauseVideo(): void {
 /** Fewest frames a loop can span and still be worth playing. */
 const MIN_LOOP_SPAN = 2;
 
-/**
- * Which end the button will set next.
+/*
+ * Two buttons rather than one that alternates.
  *
- * The loop was end-only until now, always running from frame 0, which the
- * label "Set Loop Point" described accurately and unhelpfully. One button
- * alternating between the two ends keeps the control count unchanged.
+ * A toggle assumes the two ends are set together, in order, as a pair. They
+ * are not. Frame 0 is the master neutral frame, so a start is a deliberate
+ * choice made independently of an end, and either may be adjusted without
+ * touching the other. A control that made you cycle past one to reach the
+ * other would be wrong about what the user is doing.
  */
-let loopEdge: 'start' | 'end' = 'start';
-
-/** Put the button's label where the next click will act. */
-function refreshLoopButton(): void {
-    const btn = requireEl('vpSetLoopBtn', HTMLElement);
-    btn.textContent = loopEdge === 'start' ? '📍 Set Loop Start' : '📍 Set Loop End';
-    btn.title = loopEdge === 'start'
-        ? 'Set the current frame as the first frame of the loop'
-        : 'Set the current frame as the last frame of the loop';
-}
 
 /**
  * Re-render the loop readouts from the values already held.
@@ -540,49 +530,42 @@ function refreshLoopInfo(): void {
     updateVideoInfo();
 }
 
-/** Set whichever end the button is offering, then offer the other. */
-function setLoopEdge(): void {
+/** Set the first frame of the loop to wherever the scrubber sits. */
+function setLoopStart(): void {
     if (!state.videoLoaded) return;
     const frame = state.currentFrame;
-
-    if (loopEdge === 'start') {
-        if (frame > state.loopPoint - MIN_LOOP_SPAN) {
-            showToast(
-                `A loop start must be at least ${MIN_LOOP_SPAN.toString()} frames before its end`,
-                'error',
-            );
-            return;
-        }
-        state.loopStart = frame;
-        loopEdge = 'end';
-        showToast(`Loop starts at frame ${frame.toString()}. Now set the end.`, 'info');
-    } else {
-        if (frame < state.loopStart + MIN_LOOP_SPAN) {
-            showToast(
-                `A loop end must be at least ${MIN_LOOP_SPAN.toString()} frames after its start`,
-                'error',
-            );
-            return;
-        }
-        state.loopPoint = frame;
-        loopEdge = 'start';
+    if (frame > state.loopPoint - MIN_LOOP_SPAN) {
         showToast(
-            `Loop set, frames ${state.loopStart.toString()} to ${frame.toString()}. `
-            + 'Preview it, then send to Model Exporter.',
-            'success',
+            `A loop start must be at least ${MIN_LOOP_SPAN.toString()} frames before its end`,
+            'error',
         );
+        return;
     }
-
-    refreshLoopButton();
+    state.loopStart = frame;
     refreshLoopInfo();
+    showToast(`Loop starts at frame ${frame.toString()}`, 'success');
+}
+
+/** Set the last frame of the loop to wherever the scrubber sits. */
+function setLoopEnd(): void {
+    if (!state.videoLoaded) return;
+    const frame = state.currentFrame;
+    if (frame < state.loopStart + MIN_LOOP_SPAN) {
+        showToast(
+            `A loop end must be at least ${MIN_LOOP_SPAN.toString()} frames after its start`,
+            'error',
+        );
+        return;
+    }
+    state.loopPoint = frame;
+    refreshLoopInfo();
+    showToast(`Loop ends at frame ${frame.toString()}`, 'success');
 }
 
 function clearLoop(): void {
     stopPreview();
     state.loopStart = 0;
     state.loopPoint = -1;
-    loopEdge = 'start';
-    refreshLoopButton();
     refreshLoopInfo();
     showToast('Loop cleared', 'info');
 }
@@ -590,6 +573,26 @@ function clearLoop(): void {
 // ================================================================
 // CORE: PREVIEW LOOP
 // ================================================================
+
+/**
+ * A cheap fingerprint of one captured frame.
+ *
+ * Samples a small central block rather than the whole frame, which is enough
+ * to tell two different moments apart and costs nothing per frame. It exists
+ * only to count distinct images, so collisions between genuinely different
+ * frames would under-report variety and never invent it.
+ */
+function frameSignature(ctx: CanvasRenderingContext2D, width: number, height: number): number {
+    const size = 16;
+    const x = Math.max(0, Math.floor((width - size) / 2));
+    const y = Math.max(0, Math.floor((height - size) / 2));
+    const { data } = ctx.getImageData(x, y, Math.min(size, width), Math.min(size, height));
+    let sum = 0;
+    for (let i = 0; i < data.length; i += 4) {
+        sum = (sum + (data[i] ?? 0) * 3 + (data[i + 1] ?? 0) * 5 + (data[i + 2] ?? 0) * 7) | 0;
+    }
+    return sum;
+}
 
 async function previewLoop(): Promise<void> {
     if (state.loopPoint - state.loopStart < MIN_LOOP_SPAN) return;
@@ -625,6 +628,11 @@ async function previewLoop(): Promise<void> {
     const cachedFrames: HTMLCanvasElement[] = [];
     state.cachedFrames = cachedFrames;
 
+    // How many DISTINCT images the capture actually saw. A preview that
+    // captures the right number of frames and finds one image among them is
+    // frozen, and used to present that as a working loop showing one frame.
+    const signatures = new Set<number>();
+
     await new Promise<void>((resolve) => {
         const captureFrame = (): void => {
             if (!stillPreviewing()) {
@@ -639,7 +647,9 @@ async function previewLoop(): Promise<void> {
                 lastCaptureTime = video.currentTime;
                 const fc = document.createElement('canvas');
                 fc.width = cw; fc.height = ch;
-                require2d(fc).drawImage(video, 0, 0, cw, ch);
+                const fctx = require2d(fc);
+                fctx.drawImage(video, 0, 0, cw, ch);
+                signatures.add(frameSignature(fctx, cw, ch));
                 cachedFrames.push(fc);
                 // Show live preview during caching
                 ctx.drawImage(video, 0, 0, cw, ch);
@@ -655,6 +665,30 @@ async function previewLoop(): Promise<void> {
     const frames = state.cachedFrames;
 
     if (!stillPreviewing() || frames.length < 3) {
+        if (stillPreviewing()) {
+            showToast(
+                `Preview needs at least 3 frames and captured ${frames.length.toString()}. `
+                + 'Try a longer loop.',
+                'warning',
+            );
+        }
+        stopPreview();
+        return;
+    }
+
+    // A frozen capture is the failure this reports. Everything downstream
+    // works on identical images, so the loop plays, the counter advances and
+    // the picture never changes, which reads as a bug in the loop rather than
+    // in the capture.
+    if (signatures.size <= 1) {
+        console.warn(
+            `[VideoPrep] Preview capture froze: ${frames.length.toString()} frames captured, `
+            + `${signatures.size.toString()} distinct image(s). `
+            + `rate=${video.playbackRate.toString()} readyState=${video.readyState.toString()} `
+            + `start=${startTime.toFixed(3)} end=${loopTime.toFixed(3)} `
+            + `last=${lastCaptureTime.toFixed(3)}`,
+        );
+        showToast('Preview could not capture motion from the clip', 'error');
         stopPreview();
         return;
     }
@@ -824,7 +858,6 @@ export function clearAll(): void {
     state.videoLoaded = false;
     state.loopStart = 0;
     state.loopPoint = -1;
-    loopEdge = 'start';
     state.currentFrame = 0;
     state.onionSkin = false;
     state.fromVideoGen = false;
@@ -900,7 +933,8 @@ function init(): void {
     });
 
     // ── Loop Point ──
-    requireEl('vpSetLoopBtn', HTMLElement).addEventListener('click', setLoopEdge);
+    requireEl('vpSetLoopStartBtn', HTMLElement).addEventListener('click', setLoopStart);
+    requireEl('vpSetLoopEndBtn', HTMLElement).addEventListener('click', setLoopEnd);
     requireEl('vpClearLoopBtn', HTMLElement).addEventListener('click', clearLoop);
     requireEl('vpPreviewLoopBtn', HTMLElement).addEventListener('click', () => {
         if (state.previewPlaying) stopPreview();
