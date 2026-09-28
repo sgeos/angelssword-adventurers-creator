@@ -497,10 +497,10 @@ function pauseVideo(): void {
  * Two buttons rather than one that alternates.
  *
  * A toggle assumes the two ends are set together, in order, as a pair. They
- * are not. Frame 0 is the master neutral frame, so a start is a deliberate
- * choice made independently of an end, and either may be adjusted without
- * touching the other. A control that made you cycle past one to reach the
- * other would be wrong about what the user is doing.
+ * are not. Finding a loop means scrubbing for two frames that match, and
+ * either end may need adjusting on its own once the other is placed. A
+ * control that made you cycle past one to reach the other would be wrong
+ * about what the user is doing.
  */
 
 /**

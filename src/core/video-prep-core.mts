@@ -34,7 +34,8 @@ export interface FrameCountOptions {
  * 250 plays the middle and 250 to 70 plays the tail and then the head.
  *
  * That also makes frame 0 reachable from inside a loop rather than only as
- * its beginning, which matters when frame 0 is the master neutral frame.
+ * its beginning, which is what a clip whose best matching pair straddles its
+ * own end needs.
  *
  * Both ends are inclusive, so a start equal to an end is one frame.
  */
@@ -379,8 +380,8 @@ export const describeLoop = (
 
   // An end before a start is NOT an error. Playback is circular, so that is a
   // loop crossing the seam: the tail of the clip followed by its head. This
-  // used to be refused, which also made frame 0 unreachable from inside a
-  // loop, and frame 0 is the master neutral frame.
+  // used to be refused, which lost every loop whose best matching pair
+  // straddles the clip's own end.
   const span = circularFrameCount(loopStart, loopPoint, totalFrames) - 1;
   if (span < MIN_LOOP_SPAN) {
     return {

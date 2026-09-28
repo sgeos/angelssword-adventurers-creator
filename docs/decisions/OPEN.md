@@ -46,6 +46,45 @@ Both are pinned by characterisation tests, so correcting them is a visible
 change rather than a silent one. What is undecided is whether to correct them
 at all, which turns on the question below.
 
+## The full body workflow was abandoned, and half the pipeline still expects it
+
+The product brief specifies a sprite with "Full body visible from head to
+toe". The shipped prompt has always asked for the opposite, "waist up ... No
+ground, no floor, no feet visible", and it said so in the upstream JavaScript
+at `3f6e1ff` before this fork existed. The brief was never updated.
+
+**The video half still defends the abandoned framing.** The Wan negative
+prompt lists "cropped head, cropped feet, head cut off", with a comment saying
+those terms exist because Wan would otherwise reframe a full-body still into a
+bust shot. The letterboxing exists for the same stated reason. The ComfyUI
+video prompt ends "full body in frame".
+
+So the sprite stage asks for an image with no feet and the video stage spends
+effort protecting feet that were never generated. Nothing breaks, and the
+letterboxing remains correct for preserving whatever framing does arrive.
+
+Three ways to resolve it, and the choice is a product decision rather than a
+technical one. Correct the brief to describe waist-up and drop the full-body
+terms from the video prompts. Restore full body in the sprite prompt, which is
+what the brief and the video half both already assume. Or make the framing a
+user choice, which is the largest of the three and the only one that serves
+both.
+
+## Transitions between animations are the consuming application's problem
+
+Each run of the pipeline produces one independent clip, exported as its own
+file. The `_intro`, `_outro` and `_speaking` filename presets imply a
+convention for switching between them, and nothing generates, relates or
+validates those files against each other.
+
+Video Prep's concat with crossfade joins two clips inside a SINGLE export, so
+that transition is baked into one file rather than handled between files.
+
+Whether a seam jump when an application switches sources is acceptable depends
+on what that application can do, which is outside this repository. Recorded
+because the question has been asked and the answer is not written down
+anywhere.
+
 ## The Graphics Interchange Format decode path has no production consumer
 
 `GifDecoder`, `DecodedGif`, and `compositeFrames` are reached only by tests.
