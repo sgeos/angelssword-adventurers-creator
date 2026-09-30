@@ -387,3 +387,50 @@ One procedural note. I computed the disagreement across seven realistic
 durations before changing anything, rather than reasoning that floor and round
 must differ somewhere. Two of the seven disagreed. That took a minute and is
 the difference between a defect report and a plausible story.
+
+## 2026-09-30 — The assertion nobody ran, and what it was hiding
+
+The handoff's validity check has seven assertions. Six describe the tree and
+are checked every time the file is refreshed. The seventh said the container
+serves on port 3001, and was marked as last exercised at a commit that fell
+further behind with every refresh. I had carried it forward four times.
+
+It was false. The image built, and the container exited immediately on
+`ERR_MODULE_NOT_FOUND` for `src/core/providers.mts`. The runtime stage copied
+`server.mts` and `public/`, which was right while the server was
+self-contained; the layering work then gave the server an import from the
+portable core, and nothing in the repository related those two facts. The
+compiler never saw the Dockerfile. The tests never ran the image.
+
+**The defect was mine, and the mechanism that hid it was the refresh.** Each
+time I rewrote the handoff I reproduced a claim I had not checked, and
+annotated it with an anchor that made the staleness visible without making it
+actionable. A claim marked "last exercised at an old commit" reads as
+bookkeeping rather than as a warning, and I treated it as bookkeeping.
+
+Two things follow.
+
+The narrow one is a test. `deployment.test.mts` computes the server's runtime
+import closure and asserts the final image stage carries every file in it. I
+confirmed it fails on the real defect by restoring the broken Dockerfile and
+watching it name `src/core/providers.mts`, which matters more than watching it
+pass: a check written against a fix it was derived from will pass either way.
+It reads text, so it does not establish that the image starts, and it says so.
+
+The broad one is that **a rearchitecture invalidates every hand-maintained
+list of files, and those lists live outside the compiler's reach.** I spent
+five increments moving modules and reasoning carefully about which layer may
+import which, with lint rules enforcing the directions. All of that was inside
+the type system's view. The Dockerfile was four lines of text naming paths, and
+it was the only place the reorganisation actually broke.
+
+A smaller finding came out of the same afternoon and has the same shape. When
+loops became circular I updated `describeLoop` and the readout that calls it,
+and missed a second place that judged the same question with a plain
+subtraction. The information panel therefore hid loops that the readout beside
+it called valid, for exactly the seam-crossing case the circular change was
+made to support. Two places deciding one question is the defect; the panel now
+asks `describeLoop` like everything else.
+
+Both are the same error at different scales: I changed a definition and found
+its consumers by the ones I could see.

@@ -244,6 +244,47 @@ So the bust framing reads as engineered against the failure the live runs
 produced. That is a mechanism and a fingerprint rather than a record, and it
 could still be coincidence.
 
+## The frame rate is measured by playing the clip, and under-reports
+
+`loadVideo` does not read the frame rate from the file. It sets
+`playbackRate` to four, plays for five hundred milliseconds, and divides the
+frames `getVideoPlaybackQuality` reports by the elapsed media time. Every
+frame count in the pipeline follows from that number.
+
+**Observed 2026-09-30.** A clip generated at exactly thirty frames per second
+for exactly two seconds, so sixty frames, was reported as nineteen frames per
+second and thirty-eight frames in headless Chromium. That is not a rounding
+error; it is a third of the clip declared not to exist. The last twenty-two
+frames become unreachable, and an export runs at a rate the clip never had.
+
+The mechanism is that the quantity being measured is how fast the host can
+decode, which equals the clip's rate only when the host keeps up. Headless
+software decoding does not, and neither, by assumption, does the modest
+hardware this tool is said to be for. So the failure is expected to be worse
+for the intended audience than for the developer, which is the direction that
+makes a defect hard to notice.
+
+Two consequences are already visible. The count is derived by
+`frameCountFromDuration`, so it is consistent everywhere, which means a wrong
+rate is wrong consistently rather than caught by disagreement. And the value
+is clamped to thirty when it falls below ten or above one hundred and twenty,
+so a severe under-read is silently replaced by a plausible default, while a
+moderate one passes through.
+
+**What would decide it.** `requestVideoFrameCallback` reports each frame's
+`mediaTime`, so the interval between two consecutive frames gives the rate
+without depending on decode speed, and it is available in the browsers this
+targets. The reasons not to take that unilaterally are that it changes the
+frame count for every existing workflow, that the evidence is one synthetic
+clip on one host, and that a clip with a variable frame rate has no single
+answer for either method. Offering the detected rate as an editable field
+would also resolve the practical problem without a detection change, and the
+exporter already exposes a rate the user may set.
+
+Not fixed. `loop-controls.spec.ts` reads the count the stage reports rather
+than asserting sixty, so the specifications neither depend on the defect nor
+conceal it.
+
 ## No release has been cut
 
 The binary is how a non-technical user obtains this tool, and at present the
@@ -255,3 +296,8 @@ above, or an honest statement that only macOS is published.
 It holds a tracked `.gitkeep` and nothing else, the fixture it existed for
 having been removed as unreferenced. Either a fixture returns or the directory
 goes.
+
+**Resolved 2026-09-30.** The directory is gone. Nothing referenced it, and an
+empty directory kept alive by a placeholder invites a reader to assume a
+fixture is missing. `test/fixtures/media` holds the fixtures that are actually
+used, and now also a small generated clip for the loop controls.

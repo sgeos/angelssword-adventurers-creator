@@ -67,6 +67,12 @@ dropped.
 | Attribution, `keyColor`, jsdom, Node single executable | Complete | 182 unit tests, binary runs |
 | Playwright harness converted to TypeScript | Complete | 10 specifications pass |
 | Conversion merged to `main` | Complete | Tagged `initial-typescript-conversion` |
+| Container verified, and found broken | Complete | Runtime stage lacked `src/core`; image now serves |
+| Deployment closure guarded by a test | Complete | Fails on the real defect, naming the omitted module |
+| Loop controls covered in the browser | Complete | 10 specifications, on a generated clip |
+| Framing and art style covered | Complete | Persistence across reload, and the canvas requested |
+| Loop judgement unified in the info panel | Complete | Seam-crossing loops no longer hidden from one of two readouts |
+| Empty `test/fixtures/pixels` removed | Complete | Nothing referenced it |
 
 ## Open Items
 
