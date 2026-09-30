@@ -177,10 +177,16 @@ function updateVideoInfo(): void {
         <div><strong>Frames:</strong> ${state.totalFrames.toString()}</div>
     `;
 
-    if (state.loopPoint - state.loopStart >= VideoPrepCore.MIN_LOOP_SPAN) {
-        const summary = VideoPrepCore.loopSummary(
-            state.loopMode, state.loopPoint, state.totalFrames, state.loopStart,
-        );
+    // The same judgement the loop readout makes, rather than a second one.
+    // This used to test `loopPoint - loopStart`, which predates loops being
+    // circular: a loop crossing the seam gives a negative difference, so this
+    // panel hid the loop while the readout beside it called the same loop
+    // valid. Two places deciding whether a loop is usable is one too many.
+    const loop = VideoPrepCore.describeLoop(
+        state.loopMode, state.loopStart, state.loopPoint, state.totalFrames,
+    );
+    if (loop.kind === 'ok') {
+        const summary = loop.summary;
         html += `
             <hr style="border-color:rgba(255,255,255,0.1);margin:0.4rem 0">
             <div><strong>Loop:</strong> Frames ${state.loopStart.toString()} → ${state.loopPoint.toString()}</div>

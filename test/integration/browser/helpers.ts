@@ -10,6 +10,14 @@ export const FIXTURES: string = path.join(__dirname, '../../fixtures/media');
 export const GREEN_SPRITE: string = path.join(FIXTURES, 'green-sprite.png');
 export const SPRITE_ON_GREEN: string = path.join(FIXTURES, 'sprite-on-green.png');
 
+/**
+ * A real two second clip at thirty frames per second, so sixty frames, whose
+ * frames visibly differ. Generated rather than recorded, and small enough to
+ * commit: the loop controls cannot be exercised at all without a video the
+ * browser will actually decode.
+ */
+export const LOOP_CLIP: string = path.join(FIXTURES, 'loop-clip.webm');
+
 export const TAB_IDS: readonly string[] = [
   'tab-sprite-prep',
   'tab-video-gen',
