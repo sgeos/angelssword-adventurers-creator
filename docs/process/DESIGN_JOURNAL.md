@@ -434,3 +434,51 @@ asks `describeLoop` like everything else.
 
 Both are the same error at different scales: I changed a definition and found
 its consumers by the ones I could see.
+
+## 2026-09-30 — Unifying the arithmetic exposed where the disagreement really was
+
+Earlier today I unified the frame count, so that one duration and one rate give
+one answer everywhere. It worked, and it was worth doing. It also turned out to
+be the wrong layer.
+
+Writing browser coverage for the exporter, an assertion failed with a number I
+had not predicted, and chasing it produced this: the exporter reports sixty
+frames for the clip that Video Preparation reports as thirty-eight. Same clip,
+same file, same machine. The count is derived by one shared routine, and the
+routine is not at fault. The rate handed to it is.
+
+There are three paths and they decide differently. Video Preparation measures,
+by playing the clip and counting decoded frames. A file dropped on the exporter
+is assumed to be thirty frames per second, which the source labels a default
+assumption. A clip arriving by handoff carries Video Preparation's figure. Two
+stages, three answers, and the two failure modes point in opposite directions:
+the assumption is exact for a thirty frame clip and proportionally wrong for
+anything else, while the measurement is exact whenever the host keeps up and
+low when it does not.
+
+**Consolidating the arithmetic is what made this findable.** While two stages
+each computed their own count from their own rate, a disagreement in the count
+could be blamed on either, and I did blame the arithmetic, correctly as far as
+it went. With one routine and one formula, the only remaining place for two
+answers to come from is the input, and the disagreement had nowhere left to
+hide. That is a better argument for consolidation than brevity ever was: **it
+does not merely remove a duplicate, it relocates every remaining disagreement
+to a smaller space.**
+
+Two notes on method.
+
+The failing assertion was mine and wrong. I asserted that an inverted frame
+range selects nothing, and the exporter returned the clip minus nine, which is
+the wrap. The code is right and my expectation was stale: I made loops circular
+myself, and then wrote a test assuming a range is not. Being wrong in the
+direction of the code having been improved is a pleasant way to be wrong, but
+it is the fourth time this session that a belief I brought to a test was the
+thing at fault.
+
+And the aspect lock tests passed before they tested anything. The lock is a
+styled switch whose checkbox is visually hidden, so my `check()` call could not
+have clicked it; the assertions passed because the lock defaults to on. The
+repair was to drive the visible span, which also asserts the switch is wired to
+the input. **A no-op that leaves the system in the state the test wanted is the
+hardest kind of false pass to notice**, because nothing about the result looks
+unusual.

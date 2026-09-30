@@ -244,7 +244,7 @@ So the bust framing reads as engineered against the failure the live runs
 produced. That is a mechanism and a fingerprint rather than a record, and it
 could still be coincidence.
 
-## The frame rate is measured by playing the clip, and under-reports
+## Three paths decide the frame rate differently, and they disagree
 
 `loadVideo` does not read the frame rate from the file. It sets
 `playbackRate` to four, plays for five hundred milliseconds, and divides the
@@ -271,19 +271,87 @@ is clamped to thirty when it falls below ten or above one hundred and twenty,
 so a severe under-read is silently replaced by a plausible default, while a
 moderate one passes through.
 
+**Observed 2026-09-30, second finding.** The exporter does not measure at all.
+A file dropped on it is assumed to be thirty frames per second, marked in the
+source as a default assumption, and a clip arriving from Video Prep by handoff
+carries Video Prep's measured figure instead. So the exporter gives **two
+different frame counts for one clip depending on how it arrived**, and the
+clip above is sixty frames on a direct upload and thirty-eight through the
+handoff.
+
+Neither path is reliable and they fail in opposite directions. The assumption
+is exactly right for a thirty frame clip and wrong in proportion for anything
+else: a two second clip at fifteen frames per second holds thirty frames and
+the exporter reports sixty, so half the frame numbers it offers do not exist.
+The measurement is right for any rate when the host keeps up and low when it
+does not.
+
+That the two disagree is the part that makes this more than a detection
+weakness. `frameCountFromDuration` was unified earlier in this session
+precisely so that one duration and one rate give one count everywhere, and it
+does. The remaining disagreement is upstream of it, in what the stages believe
+the rate to be, and unifying the arithmetic made that the only place left for
+the two to differ.
+
 **What would decide it.** `requestVideoFrameCallback` reports each frame's
 `mediaTime`, so the interval between two consecutive frames gives the rate
 without depending on decode speed, and it is available in the browsers this
 targets. The reasons not to take that unilaterally are that it changes the
-frame count for every existing workflow, that the evidence is one synthetic
-clip on one host, and that a clip with a variable frame rate has no single
+frame count for every existing workflow, that the evidence is two synthetic
+clips on one host, and that a clip with a variable frame rate has no single
 answer for either method. Offering the detected rate as an editable field
 would also resolve the practical problem without a detection change, and the
 exporter already exposes a rate the user may set.
 
+The three paths are Video Preparation, which measures; a file dropped on the
+exporter, which is assumed to be thirty; and a clip reaching the exporter by
+handoff, which carries Video Preparation's figure. Two stages, three answers.
+
+Whatever is chosen, the three paths should agree afterwards, and an assumption
+that happens to be correct for the developer's own clips is the worst of the
+three because it is the least likely to be noticed.
+
 Not fixed. `loop-controls.spec.ts` reads the count the stage reports rather
-than asserting sixty, so the specifications neither depend on the defect nor
-conceal it.
+than asserting sixty, and `exporter.spec.ts` pins the assumption with a clip
+at fifteen frames per second, so the specifications neither depend on the
+defect nor conceal it.
+
+## The page fetches webfonts from a third party, and the README says otherwise
+
+`public/index.html` preconnects to `fonts.googleapis.com` and
+`fonts.gstatic.com` and loads a stylesheet from the first, which pulls four
+font families from the second. Six requests on every page load, measured.
+
+**The README says the later steps work fully offline, and that the internet is
+needed only for the generation steps.** As a statement about function that
+holds, the faces falling back to whatever the host has. As a statement about
+traffic it does not: the requests are unconditional and happen before any
+stage is used.
+
+Two consequences, of different weight.
+
+The smaller one is that the standalone binary and the container both ship a
+page that reaches outside, so a machine with no route out pays a connection
+timeout on every load before the fallback faces appear. Nothing breaks and the
+delay is the whole cost.
+
+The larger one is that every load tells a third party the user's address and
+that this tool is in use. That sits oddly beside the arrangement the rest of
+the application is built around, where a local server proxies every call so
+that keys and prompts reach only the service they are for. The fonts were
+never part of that reasoning because nobody looked at them.
+
+**What would decide it.** Self-hosting the four families removes the requests
+outright. All four are under the SIL Open Font License, so redistribution is
+permitted with the license text carried alongside, and the cost is the weight
+in the repository, in the image and in the binary, plus the subsetting work if
+that weight matters. The alternative is to correct the README rather than the
+page, which is honest and cheaper and leaves the requests in place.
+
+Not decided, because it is a change to what three artefacts carry.
+`settings.spec.ts` asserts the requests happen, so the fact is pinned and a
+later fix will show up as those assertions failing, which is the intended
+behaviour of pinning a defect rather than a feature.
 
 ## No release has been cut
 

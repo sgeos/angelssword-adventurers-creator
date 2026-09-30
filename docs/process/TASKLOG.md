@@ -73,6 +73,10 @@ dropped.
 | Framing and art style covered | Complete | Persistence across reload, and the canvas requested |
 | Loop judgement unified in the info panel | Complete | Seam-crossing loops no longer hidden from one of two readouts |
 | Empty `test/fixtures/pixels` removed | Complete | Nothing referenced it |
+| Exporter controls covered | Complete | Mode limits, estimate, aspect lock, presets |
+| Settings and the trust boundary covered | Complete | Saving a key issues no request, non-vacuously |
+| Frame rate disagreement found | Recorded | Two stages, three paths, three answers |
+| Third party webfont requests found | Recorded | Contradicts the offline claim in the README |
 
 ## Open Items
 
