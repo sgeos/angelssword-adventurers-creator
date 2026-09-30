@@ -15,7 +15,14 @@ import {
 import { findEl, require2d, requireEl } from "../platform-browser/dom.mts";
 import { fetchBlob } from "../platform-browser/binary.mts";
 import * as VideoPrepCore from "../core/video-prep-core.mts";
-import { clampSeekTime, frameTime, isAtTime, seekDuration, stepFrame } from "../core/video-time.mts";
+import {
+    clampSeekTime,
+    frameCountFromDuration,
+    frameTime,
+    isAtTime,
+    seekDuration,
+    stepFrame,
+} from "../core/video-time.mts";
 
 /**
  * Start playback, reporting the rejection the browser raises when an
@@ -244,7 +251,7 @@ async function loadVideo(file: File): Promise<void> {
     // Validate
     if (fps < 10 || fps > 120) fps = 30;
     state.fps = fps;
-    state.totalFrames = Math.round(state.duration * fps);
+    state.totalFrames = frameCountFromDuration(state.duration, fps);
 
     // ── Setup canvas ──
     const canvas = requireEl('vpCanvas', HTMLCanvasElement);

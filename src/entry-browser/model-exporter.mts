@@ -14,7 +14,12 @@ import {
 } from "../platform-browser/shell.mts";
 import { debounce } from "../platform-browser/app-utils.mts";
 import { detectKeyColor, hexToRgb, rgbToHex } from "../core/color.mts";
-import { clampSeekTime, frameTime, isAtTime } from "../core/video-time.mts";
+import {
+    clampSeekTime,
+    frameCountFromDuration,
+    frameTime,
+    isAtTime,
+} from "../core/video-time.mts";
 import { exportRangeFromHandoff, type ExportRange, type HandoffPayload } from "../core/video-prep-core.mts";
 import { ChromaKey } from "../core/chroma-key.mts";
 import { closestFrom, queryAll, require2d, requireEl } from "../platform-browser/dom.mts";
@@ -22,6 +27,9 @@ import { channel } from "../core/pixels.mts";
 import {
     MODE_LIMITS,
     asCropRatio,
+    gifDelayCentiseconds,
+    paletteSampling,
+    paletteSlots,
     buildExportFrameList,
     selectExportFrames,
     strideFromSkip,
@@ -209,7 +217,7 @@ export class ModelExporter {
             this.videoHeight = this.video.videoHeight;
             this.duration = this.video.duration;
             this.fps = 30; // default assumption
-            this.totalFrames = Math.floor(this.duration * this.fps);
+            this.totalFrames = frameCountFromDuration(this.duration, this.fps);
             this.currentFrame = 0;
 
             // Set canvas size
@@ -260,7 +268,7 @@ export class ModelExporter {
             this.videoHeight = this.video.videoHeight;
             this.duration = this.video.duration;
             this.fps = positiveOr(this.detectedFps ?? 0, 30);
-            this.totalFrames = Math.floor(this.duration * this.fps);
+            this.totalFrames = frameCountFromDuration(this.duration, this.fps);
             this.currentFrame = 0;
 
             this.previewCanvas.width = this.videoWidth;
@@ -1351,7 +1359,7 @@ export class ModelExporter {
         const height = Math.min(intFromField('exHeight', this.videoHeight), limits.maxHeight);
         const maxColors = 128;
         const exportFps = intFromField('exFPS', this.fps);
-        const delayCentiseconds = Math.max(2, Math.round(100 / exportFps));
+        const delayCentiseconds = gifDelayCentiseconds(exportFps);
         const startFrame = intFromField('exStartFrame', 0);
         const endFrame = intFromField('exEndFrame', 0);
         const skip = strideFromSkip(intFromField('exFrameSkip', 0));
@@ -1397,8 +1405,7 @@ export class ModelExporter {
 
             // ── Phase 1: Build global palette from sampled frames ──
             progressText.textContent = 'Building palette...';
-            const sampleCount = Math.min(6, totalFrames);
-            const sampleStep = Math.max(1, Math.floor(totalFrames / sampleCount));
+            const { stride: sampleStep } = paletteSampling(totalFrames);
             const sampledPixels = [];
             let paletteSourceData = null;
 
@@ -1415,10 +1422,10 @@ export class ModelExporter {
                 if (si === 0) { paletteSourceData = sd.data; }
             }
 
-            const paletteSlots = Math.max(2, maxColors - 1);
+            const slots = paletteSlots(maxColors);
             const allSampledColors = sampledPixels.length > 0 ? sampledPixels : [0];
             const globalPalette = ColorQuantizer.medianCut(
-                paletteSourceData ?? new Uint8Array(4), allSampledColors, paletteSlots);
+                paletteSourceData ?? new Uint8Array(4), allSampledColors, slots);
             const transparentIndex = globalPalette.length;
             globalPalette.push([0, 0, 0]);
 

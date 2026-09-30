@@ -101,3 +101,33 @@ export const stepFrame = (current: number, delta: number, totalFrames: number): 
     if (next < 0 || next > totalFrames - 1) return current;
     return next;
 };
+
+/**
+ * How many frames a clip of this duration holds at this rate.
+ *
+ * # The two stages disagreed
+ *
+ * The video preparation stage rounded and the exporter floored, in two
+ * places. Those differ whenever the product's fractional part reaches one
+ * half, which real durations do: 9.99 seconds at 30 gives 299 floored and
+ * 300 rounded.
+ *
+ * That was not cosmetic. The handoff carries a frame count from the video
+ * stage, the exporter recomputed its own, and the loop range is clamped to
+ * the exporter's figure, so a count one lower silently clipped the loop end.
+ * The exporter also sets its last-frame field to the count minus one, so
+ * flooring made the final real frame unreachable.
+ *
+ * **Rounding is kept, and flooring is the behaviour change.** A clip of
+ * exactly N frames has duration `N / fps`, which floating point can render a
+ * hair under, and flooring then discards a frame for no reason. Rounding is
+ * also what the handoff's producer already used, so unifying on it leaves the
+ * value that crosses the handoff unchanged and moves only the exporter.
+ *
+ * A half-open interval would want flooring. Nothing here treats the clip as
+ * half-open: the count is used to address frames 0 to count minus one.
+ */
+export const frameCountFromDuration = (duration: number, fps: number): number => {
+    if (!Number.isFinite(duration) || !Number.isFinite(fps) || duration <= 0 || fps <= 0) return 0;
+    return Math.round(duration * fps);
+};

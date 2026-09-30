@@ -601,3 +601,93 @@ export const selectExportFrames = (
     for (let i = 0; i < count; i += step) frames.push((startFrame + i) % totalFrames);
     return frames;
 };
+
+/* ────────────────────────────────────────────────────────────────────────
+ * Graphics Interchange Format encoding decisions.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Shortest frame delay the format is written with, in centiseconds.
+ *
+ * The format stores a delay in hundredths of a second, so two is the
+ * smallest value that players honour in practice. A delay of one, and
+ * especially of zero, is widely reinterpreted as a default near ten, which
+ * would run an animation far slower than asked rather than faster.
+ *
+ * The consequence is a ceiling: two centiseconds is fifty frames per second,
+ * and a request above that is silently met at fifty. That ceiling was
+ * previously implicit in a `Math.max(2, ...)` with no comment, which is
+ * exactly the shape of thing a user reports as a bug.
+ */
+export const MIN_GIF_DELAY_CENTISECONDS = 2;
+
+/** Frames per second above which the format cannot go. */
+export const MAX_GIF_FPS: number = 100 / MIN_GIF_DELAY_CENTISECONDS;
+
+/**
+ * The per-frame delay to write for a requested frame rate.
+ *
+ * Rounded, because the stored unit is coarse: 24 frames per second is 4.17
+ * centiseconds and becomes 4, which plays at 25. That drift is inherent to
+ * the format rather than a choice made here.
+ */
+export const gifDelayCentiseconds = (fps: number): number => {
+    if (!Number.isFinite(fps) || fps <= 0) return MIN_GIF_DELAY_CENTISECONDS;
+    return Math.max(MIN_GIF_DELAY_CENTISECONDS, Math.round(100 / fps));
+};
+
+/**
+ * How many frames are sampled to build the shared palette.
+ *
+ * Six, because a palette is built once for the whole animation and sampling
+ * every frame of a long export would read hundreds of full frames to answer
+ * a question that a handful answers nearly as well. It is a speed decision
+ * and it costs colour accuracy on an animation whose palette drifts.
+ */
+export const PALETTE_SAMPLE_TARGET = 6;
+
+/** Which frames to sample, and how far apart. */
+export interface PaletteSampling {
+    /**
+     * How many frames will actually be read.
+     *
+     * Derived from the stride rather than from the target, because the
+     * caller walks the export by the stride and the two do not agree. My
+     * first version of this returned the target and was wrong for a short
+     * export: at eleven frames the stride floors to one and eleven frames
+     * are read against a target of six.
+     */
+    readonly count: number;
+    /** Step between sampled positions. */
+    readonly stride: number;
+}
+
+/**
+ * Choose the palette sample positions for an export of this length.
+ *
+ * The target is an upper bound only for exports long enough that the stride
+ * exceeds one. **Between seven and eleven frames the stride floors to one
+ * and every frame is sampled**, which reads up to eleven frames rather than
+ * six. That is benign, a short export being cheap to sample exhaustively,
+ * and it is stated because the target otherwise reads as a guarantee.
+ *
+ * The stride is never zero, which would not terminate.
+ */
+export const paletteSampling = (totalFrames: number): PaletteSampling => {
+    if (!Number.isFinite(totalFrames) || totalFrames <= 0) return { count: 0, stride: 1 };
+    const stride = Math.max(1, Math.floor(totalFrames / Math.min(PALETTE_SAMPLE_TARGET, totalFrames)));
+    return { count: Math.ceil(totalFrames / stride), stride };
+};
+
+/**
+ * Palette entries available for the image, once transparency is reserved.
+ *
+ * One entry is spent on the transparent colour, which is why a palette is
+ * always one smaller than the limit asked for. Two is the floor because the
+ * format cannot encode fewer, and it is what a caller asking for one or zero
+ * gets rather than an empty palette.
+ */
+export const paletteSlots = (maxColors: number): number => {
+    if (!Number.isFinite(maxColors)) return 2;
+    return Math.max(2, Math.trunc(maxColors) - 1);
+};

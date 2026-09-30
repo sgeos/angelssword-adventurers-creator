@@ -30,6 +30,41 @@ stop and accept that the five hold presentation and nothing else. Supplying a
 canvas implementation, the other route once considered, would now reach only
 what has been deliberately left as presentation.
 
+## The exporter's frame count changed, and one clip length now exports differently
+
+**Corrected 2026-09-30, and it is a behaviour change rather than a refactor.**
+The video preparation stage computed a clip's frame count by rounding
+`duration * fps` and the exporter computed it by flooring, in two places.
+Those differ whenever the fractional part reaches one half, which real
+durations reach: 9.99 seconds at 30 gave 299 against 300.
+
+It mattered because the handoff carries the video stage's count, the exporter
+recomputed its own, and the loop range is clamped to the exporter's figure. A
+count one lower silently clipped the loop end, and the exporter also sets its
+last-frame field to the count minus one, so flooring made the final real frame
+unreachable.
+
+Both now use one routine and it rounds. A clip of exactly N frames has
+duration `N / fps`, which floating point can render a hair under, and flooring
+then discards a frame for nothing. Rounding is also what the handoff's
+producer already used, so the value crossing the handoff is unchanged and only
+the exporter moved.
+
+**The consequence is that some clips now export one frame more than before.**
+That frame is real and was previously dropped, so this is a correction, but
+anyone comparing an export against an older one will see the difference.
+
+## The palette sample target is not an upper bound
+
+`paletteSampling` aims at six sampled frames, and between seven and eleven
+frames the stride floors to one and every frame is read, so up to eleven are
+sampled. Benign, a short export being cheap to sample, and recorded because
+the target reads as a guarantee and is not one.
+
+Found on 2026-09-30 by checking an assertion that had passed. The first
+version of that routine reported the target as the sample count, which was
+simply untrue for those lengths.
+
 ## The sprite zoom is anchored to the image edge, not to the character
 
 `computeSpriteDrawRect` sets `zoomY = spriteY + (sh - drawH)`, which holds the
