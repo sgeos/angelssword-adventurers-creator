@@ -15,6 +15,12 @@ import {
     framingCanvas,
 } from '../../src/core/sprite-prep-core.mts';
 import {
+    WAN_DEFAULTS,
+    WAN_NEGATIVE_PROMPT,
+    buildWanI2VWorkflow,
+    wanNegativePrompt,
+} from '../../src/core/comfyui-core.mts';
+import {
     FRAMING_KEY,
     SPRITE_STYLE_KEY,
     loadFraming,
@@ -291,5 +297,61 @@ describe('the art style is a choice too', () => {
         assert.match(bare, /A single Character, standing in a neutral idle position\./);
         assert.doesNotMatch(bare, /anime/i);
         assert.match(bare, /head to toe/i);
+    });
+});
+
+describe('the framing reaches the video stage', () => {
+    /**
+     * The Wan negative prompt guarded "cropped feet" and the ComfyUI video
+     * prompt asked for a full body in frame, whatever the sprite contained.
+     * On a bust sprite there are no feet to preserve, "upper body only" is
+     * exactly what was asked for, and the model was being told to avoid the
+     * framing it had been handed.
+     */
+    it('refuses cropped feet only when there are feet to lose', () => {
+        const full = wanNegativePrompt(true);
+        const bust = wanNegativePrompt(false);
+        assert.match(full, /cropped feet/);
+        assert.doesNotMatch(bust, /cropped feet/);
+        assert.doesNotMatch(bust, /feet cut off/);
+    });
+
+    it('does not tell a bust to avoid being an upper body', () => {
+        assert.match(wanNegativePrompt(true), /upper body only/);
+        assert.doesNotMatch(wanNegativePrompt(false), /upper body only/);
+        assert.doesNotMatch(wanNegativePrompt(false), /close-up/);
+    });
+
+    it('keeps what every framing refuses', () => {
+        for (const full of [true, false]) {
+            const prompt = wanNegativePrompt(full);
+            for (const term of ['blurry', 'watermark', 'camera move', 'zoom', 'pan', 'cropped head']) {
+                assert.ok(prompt.includes(term), `${String(full)} lost ${term}`);
+            }
+        }
+    });
+
+    it('preserves the shipped constant as the full-body case', () => {
+        assert.equal(WAN_NEGATIVE_PROMPT, wanNegativePrompt(true));
+    });
+
+    it('builds a Wan graph whose negative prompt follows the framing', () => {
+        const settings = { ...WAN_DEFAULTS };
+        const opts = { imageName: 'ref.png', positiveText: 'idle', seed: 1 };
+        const full = JSON.stringify(buildWanI2VWorkflow(settings, { ...opts, fullBody: true }).workflow);
+        const bust = JSON.stringify(buildWanI2VWorkflow(settings, { ...opts, fullBody: false }).workflow);
+        assert.ok(full.includes('cropped feet'));
+        assert.ok(!bust.includes('cropped feet'));
+    });
+
+    it('defaults a graph to full body, which is what the constant always asked for', () => {
+        const settings = { ...WAN_DEFAULTS };
+        const stated = buildWanI2VWorkflow(settings, {
+            imageName: 'r.png', positiveText: 'x', seed: 1, fullBody: true,
+        });
+        const absent = buildWanI2VWorkflow(settings, {
+            imageName: 'r.png', positiveText: 'x', seed: 1,
+        });
+        assert.deepEqual(absent.workflow, stated.workflow);
     });
 });

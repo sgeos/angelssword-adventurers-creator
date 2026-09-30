@@ -10,6 +10,7 @@ import express, { type Express, type Request, type RequestHandler, type Response
 import nodeFetch from "node-fetch";
 
 import type { HttpClient, HttpRequest, HttpResponse } from "./src/core/ports/http.mts";
+import { OPENAI_SPRITE_MODEL } from "./src/core/providers.mts";
 import FormData from "form-data";
 import path from "node:path";
 import { execFile } from "node:child_process";
@@ -327,7 +328,7 @@ app.post(
       }
 
       const form = new FormData();
-      form.append("model", singleString(model) ?? "gpt-image-2");
+      form.append("model", singleString(model) ?? OPENAI_SPRITE_MODEL);
       form.append("prompt", promptText);
       // Only a string or a finite number is forwarded. `String(unknown)`
       // would happily send "[object Object]" upstream.

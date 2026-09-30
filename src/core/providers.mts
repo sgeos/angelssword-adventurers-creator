@@ -15,6 +15,21 @@
 /** Providers the sprite stage can generate through. */
 import type { KeyValueStore } from "./ports/storage.mts";
 
+/**
+ * The model OpenAI sprite generation asks for.
+ *
+ * Three places named a sprite model and two of them disagreed. This file's
+ * provider table said `gpt-image-1`, which the OpenAI path cannot reach: that
+ * path goes through `buildGenerateRequest`, which named `gpt-image-2`, and
+ * the server's multipart fallback named `gpt-image-2` again. So the table
+ * carried a dead default that was also wrong, which is the fourth instance in
+ * this codebase of something written and never read.
+ *
+ * `gpt-image-2` is the one that works, established by a live generation
+ * rather than by reading.
+ */
+export const OPENAI_SPRITE_MODEL = "gpt-image-2";
+
 export type ProviderId = "openai" | "xai" | "comfyui";
 
 /** How a provider authenticates, which decides what the settings pane asks for. */
@@ -49,7 +64,7 @@ export const PROVIDERS: Readonly<Record<ProviderId, Provider>> = {
     imageRoute: "/api/generate",
     storageKey: "openai_api_key",
     authKind: "bearer-key",
-    defaultModel: "gpt-image-1",
+    defaultModel: OPENAI_SPRITE_MODEL,
     supportsReferenceImages: true,
   },
   comfyui: {

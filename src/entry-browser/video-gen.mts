@@ -422,9 +422,13 @@ async function generateOneWanVideo(prompt: string): Promise<GeneratedVideo | nul
     if (imageName === undefined) throw new Error('ComfyUI did not accept the reference image');
 
     const built = buildWanI2VWorkflow(wan, {
+        fullBody: ASAdventurer.handoff.framing === 'fullBody',
         imageName,
         positiveText: prompt === ''
-            ? 'Gentle breathing idle animation with slight body sway, seamless loop, static camera, full body in frame'
+            ? 'Gentle breathing idle animation with slight body sway, seamless loop, static camera, '
+                + (ASAdventurer.handoff.framing === 'fullBody'
+                    ? 'full body in frame'
+                    : 'waist-up framing held steady')
             : prompt,
         seed: drawSeed(),
     });

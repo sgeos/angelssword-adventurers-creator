@@ -121,12 +121,22 @@ Uses **GPT Image 2** (`gpt-image-2` model) via OpenAI API:
 - **Key Color Selector** — same 5 swatches + auto-detect
 - **Simultaneous Generations** — selector for 1-4 parallel generations
 
-**Output**: Single 1280×720 image (NOT a grid — see reference image below). Character on solid chroma key background, bottom-anchored.
+**Output**: Single image, sized by the framing chosen. Character on solid chroma key background, bottom-anchored.
+
+> **Corrected 2026-09-30.** This section described a full-body sprite at
+> 1280×720. Neither held. The shipped prompt has always asked for waist up,
+> and said so in the upstream JavaScript before this fork existed; the request
+> asked for 1536×1024, which the prompt contradicted. Framing is now a user
+> choice of bust or full body, and the canvas follows it, 1536×1024 landscape
+> for a bust and 1024×1536 portrait for a full body. The prompt states
+> whichever size is actually requested. See
+> [`../decisions/OPEN.md`](../decisions/OPEN.md) for why full body appears to
+> have been abandoned and what live running has since shown.
 
 **Prompt Construction** (based on ASArtTool patterns):
 ```
 A single [character name], [character description], [character action OR "standing in a neutral idle position"]. 
-Full body visible from head to toe, centered in frame, positioned in the lower portion of the canvas.
+[Framing directive — see the note below. The shipped default is waist up, not full body.]
 The entire background must be a solid, uniform [key color name] (#hex) with absolutely no gradients, shadows, or variations.
 The character should be drawn in a [style description from reference OR "high-quality anime/JRPG art style"].
 The image must be exactly 1280×720 pixels.

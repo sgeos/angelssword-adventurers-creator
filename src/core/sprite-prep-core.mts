@@ -3,6 +3,7 @@
  */
 import { channel, type RgbaBuffer, type RgbaImage } from "./pixels.mts";
 import { colorName } from "./color.mts";
+import { OPENAI_SPRITE_MODEL } from "./providers.mts";
 
 export interface KeyColor {
   readonly hex: string;
@@ -403,7 +404,7 @@ export const buildGenerateRequest = (opts: {
   const images = opts.images ?? [];
   const hasImages = images.length > 0;
   const base = {
-    model: "gpt-image-2",
+    model: OPENAI_SPRITE_MODEL,
     prompt: opts.prompt,
     n: 1,
     size: FRAMING_SIZES[opts.framing ?? DEFAULT_FRAMING],

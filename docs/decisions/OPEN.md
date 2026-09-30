@@ -30,6 +30,27 @@ stop and accept that the five hold presentation and nothing else. Supplying a
 canvas implementation, the other route once considered, would now reach only
 what has been deliberately left as presentation.
 
+## The sprite zoom is anchored to the image edge, not to the character
+
+`computeSpriteDrawRect` sets `zoomY = spriteY + (sh - drawH)`, which holds the
+source image's bottom edge in place while the image shrinks. The character's
+feet sit above that edge by whatever transparent margin the generation left
+below them, so zooming out pulls the feet **toward** the edge, which is
+downward, and can push them off the bottom of the canvas.
+
+The shift is that padding times the amount zoomed out, so it is worst for a
+generation that left a lot of empty space beneath the character. It is
+pinned by a characterisation test, and the vertical offset slider compensates
+for it.
+
+Found while testing the anchoring property on 2026-09-30. I expected the feet
+to rise and asserted that; they descend. Predates the fork.
+
+What would decide it is whether a zoom that moves the character vertically is
+ever wanted. If not, the anchor should be the feet rather than the image edge,
+which is a small change to one expression and would move every existing
+zoomed sprite.
+
 ## The disposal handling in `gif-composite` does not match the format
 
 Writing that module's first tests established two divergences from the
@@ -67,18 +88,20 @@ letterboxing remains correct for preserving whatever framing does arrive.
 stage: framing is a user choice, remembered, defaulting to the shipped bust
 wording so nothing changes for anyone who does not touch it.
 
-**Gemini returns landscape whatever the reference, observed 2026-09-28.** A
-1024 by 1536 portrait sprite produced a landscape clip. Nothing about shape is
-sent, and the reasoning that the result would therefore follow the reference
-was wrong. Whether the Interactions API accepts an aspect ratio hint is
-unknown, and no field has been added on speculation.
+**Gemini's output shape is not yet understood**, and the entry that stood
+here on 2026-09-28 claiming it always returns landscape was contradicted the
+next day by a portrait result. What is actually observed is recorded under
+live running below: landscape from two reference images, portrait from one.
 
-**That makes the portrait sprite canvas counterproductive on the Gemini
-path**, since the character is fitted into a landscape frame anyway and ends
-up smaller than a landscape sprite would have been. It remains right for
-ComfyUI, whose canvas the user sets, and untested on Grok, which is sent 16:9
-explicitly. Whether framing should therefore influence the sprite canvas only
-for some providers is a question this has raised and not answered.
+Nothing about shape is sent to Gemini in either case. Whether the Interactions
+API accepts an aspect ratio hint is unknown, and no field has been added on
+speculation.
+
+**So whether a portrait sprite canvas helps or hurts on the Gemini path
+depends on the unresolved question below.** It remains right for ComfyUI,
+whose canvas the user sets, and untested on Grok, which is sent 16:9
+explicitly. Whether framing should influence the sprite canvas only for some
+providers is raised and not answered.
 
 **A portrait sprite reaches a landscape video canvas.** Wan defaults to 832
 by 480, and the letterboxing fits whatever arrives inside it. A full-body
@@ -88,12 +111,10 @@ are user-editable, so the workaround exists, but nothing suggests it. Making
 the video canvas follow the framing the way the sprite canvas now does would
 resolve it, and needs the framing to cross the handoff.
 
-**The video half is not yet told.** The Wan negative prompt still guards
-against cropped feet and the ComfyUI video prompt still ends "full body in
-frame", whatever the sprite actually shows. That is harmless for a full-body
-sprite and slightly wrong for a bust, where the model is asked to preserve
-feet that are not there. Resolving it means carrying the framing across the
-handoff, which the handoff does not do today.
+**Resolved 2026-09-30.** The framing is carried on the handoff, the Wan
+negative prompt derives its feet and upper-body terms from it, and the
+ComfyUI video prompt states waist-up framing for a bust. Tests assert that a
+bust produces no prompt text asking for feet.
 
 The brief still describes full body as though it were the only option, and
 should be corrected to describe the choice.
@@ -130,11 +151,63 @@ from an implementation that worked before the conversion, but neither has been
 run since. Resolving this needs access to those platforms, or continuous
 integration runners that build rather than merely test.
 
-## No stage has been exercised against live keys
+## What live running has established, and what it has not
 
-The account available had no remaining credit, so the generation stages were
-tested only against mocked responses. The proxy is covered by the application
-programming interface tests, but the round trip against a real service is not.
+**OpenAI sprites and Gemini video have now been run against live keys**, on
+2026-09-27 and 2026-09-28. That replaces the previous entry here, which said
+no stage had been, and which had become the sort of staleness that makes a
+whole document untrusted.
+
+Grok and ComfyUI remain unexercised against a real service, as does the
+binary, so mocked coverage is still all that stands behind those.
+
+### Gemini disregards explicit camera instructions
+
+The prompt template states `Locked-off Position Static Camera` and then, under
+a constraints heading, `Do NOT Camera Zoom, Absolute static camera. Zero
+Camera movement, no panning, no drifting, and no zooming`. Gemini cropped the
+frame and then zoomed within it anyway. The prompt is wired correctly and does
+reach the request, so this is the service and not the plumbing.
+
+This bears on whether the pipeline can target Gemini for looping assets at
+all. A continuous zoom means the character's scale changes across the clip,
+and Video Prep's loop matching looks for two frames that agree while the
+exporter applies one scale uniformly. A drifting crop defeats both.
+
+### Gemini returned landscape from two reference images and portrait from one
+
+A 1024 by 1536 portrait sprite with **two** reference images produced a
+landscape clip, cropped at the shins and the hat brim, which then zoomed in to
+the thighs and the eyes. The same sprite with **one** reference image produced
+a portrait clip with no pan or zoom.
+
+**The number of images is the identified difference and it is confounded.**
+The two images also had the character at different heights, because the
+generated-result handoff forwarded the raw image rather than the
+bottom-anchored one. So the cause may be multiplicity or it may be
+misalignment, and the discriminating test is two properly anchored images.
+The anchoring is fixed as of 2026-09-30; the test has not been run.
+
+If multiplicity turns out to be the cause, sending every reference image is a
+regression and should become a choice or be reverted. That change was made on
+the reasoning that silently discarding user input is worse than sending it,
+which is an argument about conduct rather than evidence about results.
+
+### The retreat from full body has corroborating evidence
+
+**Still a hypothesis.** Nobody recorded a reason, so this is inference from
+what the code does.
+
+The operator suggested that full body was abandoned because of exactly the
+cropping above. The bust directive reserves "plenty of solid background space
+above the character's head" and accepts a bottom crop by design, stating the
+lower body is cut off by the bottom edge. Headroom is precisely a defence
+against a top crop and a zoom, and accepting a bottom crop leaves nothing
+below to lose.
+
+So the bust framing reads as engineered against the failure the live runs
+produced. That is a mechanism and a fingerprint rather than a record, and it
+could still be coincidence.
 
 ## No release has been cut
 

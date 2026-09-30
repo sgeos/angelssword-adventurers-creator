@@ -5,6 +5,7 @@
  * shortcuts, and the shared handoff state passed between stages.
  */
 import type { HandoffPayload } from "../core/video-prep-core.mts";
+import { DEFAULT_FRAMING, type Framing } from "../core/sprite-prep-core.mts";
 import { closestFrom, findEl, queryAll, requireEl } from "./dom.mts";
 import { browserStore } from "./local-storage.mts";
 import { browserHttp } from "./http.mts";
@@ -71,6 +72,16 @@ export interface Handoff {
     videoPrepData: HandoffPayload | null;
     /** Key colour, which flows the length of the pipeline. */
     keyColor: string;
+    /**
+     * How much of the character the sprite shows.
+     *
+     * Carried because the video stage was asserting full-body framing
+     * whatever the sprite contained: the Wan negative prompt guarded cropped
+     * feet and the ComfyUI prompt asked for a full body in frame. A bust
+     * sprite has no feet to preserve, so those terms told the model to avoid
+     * the framing it had been handed.
+     */
+    framing: Framing;
 }
 
 export interface AppState {
@@ -88,6 +99,7 @@ export const ASAdventurer: AppState = {
         videoUrl: null,
         videoPrepData: null,
         keyColor: '#00FF00',
+        framing: DEFAULT_FRAMING,
     },
 };
 

@@ -50,7 +50,7 @@ import { isOk, readJson } from "../core/ports/http.mts";
 const COMFY_POLL_INTERVAL_MS = 2_000;
 const COMFY_MAX_POLLS = 150;
 import { channel } from "../core/pixels.mts";
-import { responseErrorMessage } from "../core/api.mts";
+import { reasonText, responseErrorMessage } from "../core/api.mts";
 
 
 // ============================================
@@ -97,32 +97,80 @@ let spriteStyle: Core.SpriteStyle = loadSpriteStyle(browserStore);
 // MANUAL MODE — CANVAS SYSTEM
 // ============================================
 
-function renderCanvas(): void {
-    if (spriteImage === null) return;
+/** The canvas every sprite is composed onto, whatever its own size. */
+const COMPOSE_WIDTH = 1280;
+const COMPOSE_HEIGHT = 720;
 
-    const canvas = requireEl('spCanvas', HTMLCanvasElement);
-    const ctx = require2d(canvas);
-    const CW = 1280, CH = 720;
+/**
+ * Compose one sprite onto a canvas: key colour, bottom anchor, offset, zoom.
+ *
+ * # Why this is a routine rather than two copies
+ *
+ * It was only ever applied on the upload path. A generated result was
+ * previewed by a plain centred scale-to-fit onto a different canvas, and
+ * `genHandoffToVideoGen` then forwarded the RAW api image. So two buttons
+ * both labelled "send to Generate Video" sent different things: one
+ * bottom-anchored, keyed, with the user's offset and zoom applied, and one
+ * untouched.
+ *
+ * That is the likely cause of a reported pair of reference images with the
+ * character at different heights, which in turn is the leading explanation
+ * for a Gemini clip that cropped to landscape and zoomed.
+ *
+ * # What it does NOT do
+ *
+ * It does not remove the background. The key colour is painted behind the
+ * sprite so the downstream chroma key has something uniform to work with,
+ * which is what the upload path always did.
+ */
+function composeSprite(target: HTMLCanvasElement, img: HTMLImageElement): void {
+    const ctx = require2d(target);
+    target.width = COMPOSE_WIDTH;
+    target.height = COMPOSE_HEIGHT;
 
-    // Fill with key color
     ctx.fillStyle = selectedKeyColor;
-    ctx.fillRect(0, 0, CW, CH);
+    ctx.fillRect(0, 0, COMPOSE_WIDTH, COMPOSE_HEIGHT);
 
-    const img = spriteImage;
     const sw = img.naturalWidth, sh = img.naturalHeight;
+    if (sw === 0 || sh === 0) return;
 
-    // Find bottom-most visible row
-    const tc = document.createElement('canvas');
-    tc.width = sw; tc.height = sh;
-    const tctx = require2d(tc, { willReadFrequently: true });
-    tctx.drawImage(img, 0, 0);
-    const data = tctx.getImageData(0, 0, sw, sh).data;
+    // The character's lowest opaque row is the anchor, so a model that
+    // placed her higher or lower in its own canvas lands in the same place.
+    const measure = document.createElement('canvas');
+    measure.width = sw; measure.height = sh;
+    const mctx = require2d(measure, { willReadFrequently: true });
+    mctx.drawImage(img, 0, 0);
+    const bottomRow = Core.findBottomOpaqueRow(
+        mctx.getImageData(0, 0, sw, sh).data, sw, sh, 30,
+    );
 
-    const bottomRow = Core.findBottomOpaqueRow(data, sw, sh, 30);
     const { zoomX, zoomY, drawW, drawH } = Core.computeSpriteDrawRect({
-        sw, sh, bottomRow, offset, zoom, CW, CH
+        sw, sh, bottomRow, offset, zoom, CW: COMPOSE_WIDTH, CH: COMPOSE_HEIGHT,
     });
     ctx.drawImage(img, zoomX, zoomY, drawW, drawH);
+}
+
+function renderCanvas(): void {
+    if (spriteImage === null) return;
+    composeSprite(requireEl('spCanvas', HTMLCanvasElement), spriteImage);
+}
+
+/**
+ * Compose a data URI the same way, for the generated-result handoff.
+ *
+ * Offscreen, because the generated result has its own preview and this is
+ * only about what leaves the stage.
+ */
+async function composeDataUrl(dataUrl: string): Promise<HTMLCanvasElement> {
+    const img = new Image();
+    await new Promise<void>((resolve, reject) => {
+        img.onload = (): void => { resolve(); };
+        img.onerror = (): void => { reject(new Error('Could not decode the generated sprite')); };
+        img.src = dataUrl;
+    });
+    const canvas = document.createElement('canvas');
+    composeSprite(canvas, img);
+    return canvas;
 }
 
 const debouncedRender = debounce(renderCanvas, 50);
@@ -332,6 +380,7 @@ function handoffToVideoGen(): void {
             ASAdventurer.handoff.spriteBlob = blob;
             ASAdventurer.handoff.spriteCanvas = canvas;
             ASAdventurer.handoff.spriteBase64 = await blobToBase64(blob);
+            ASAdventurer.handoff.framing = framing;
             saveCharacterName(browserStore, ASAdventurer.characterName);
             showToast('Sprite sent to Generate Video', 'success');
             switchTab('tab-video-gen');
@@ -629,6 +678,20 @@ function updateGenPreview(dataUrl: string): void {
     img.src = dataUrl;
 }
 
+/**
+ * Send a generated result on, composed the same way an upload is.
+ *
+ * THIS USED TO FORWARD THE RAW API IMAGE. The upload path forwards a
+ * bottom-anchored, keyed canvas, so the two buttons bearing the same label
+ * sent different things and only one of them honoured the stage's own offset
+ * and zoom. Two generations that placed the character at different heights
+ * therefore arrived at different heights.
+ *
+ * The consequence of the change is worth stating: the image a model is asked
+ * to match is no longer the raw generation. That is the point, since the
+ * alternative is two sprites that disagree about where the ground is, but it
+ * does alter what the video stage receives.
+ */
 function genHandoffToVideoGen(): void {
     const chosen = selectedResult;
     if (chosen === null) {
@@ -636,11 +699,23 @@ function genHandoffToVideoGen(): void {
         return;
     }
 
-    ASAdventurer.handoff.spriteBlob = base64ToBlob(chosen.dataUrl);
-    ASAdventurer.handoff.spriteBase64 = chosen.dataUrl;
-    saveCharacterName(browserStore, ASAdventurer.characterName);
-    showToast('Sprite sent to Generate Video', 'success');
-    switchTab('tab-video-gen');
+    void (async (): Promise<void> => {
+        let composed: HTMLCanvasElement;
+        try {
+            composed = await composeDataUrl(chosen.dataUrl);
+        } catch (err) {
+            showToast(`Could not prepare the sprite: ${reasonText(err)}`, 'error');
+            return;
+        }
+        const dataUrl = composed.toDataURL('image/png');
+        ASAdventurer.handoff.spriteCanvas = composed;
+        ASAdventurer.handoff.spriteBlob = base64ToBlob(dataUrl);
+        ASAdventurer.handoff.spriteBase64 = dataUrl;
+        ASAdventurer.handoff.framing = framing;
+        saveCharacterName(browserStore, ASAdventurer.characterName);
+        showToast('Sprite sent to Generate Video', 'success');
+        switchTab('tab-video-gen');
+    })();
 }
 
 function genHandoffToManual(): void {

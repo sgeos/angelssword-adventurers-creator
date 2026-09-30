@@ -595,10 +595,38 @@ export const WAN_DEFAULTS: WanSettings = {
  * camera terms hold the shot still, since the output is a looping idle
  * animation rather than a scene.
  */
-export const WAN_NEGATIVE_PROMPT: string =
+/** What every framing refuses, regardless of how much of the character shows. */
+const WAN_NEGATIVE_COMMON =
   "blurry, low quality, distorted face, extra limbs, text, watermark, "
-  + "camera move, zoom, pan, cropped head, cropped feet, head cut off, "
-  + "feet cut off, close-up, upper body only, out of frame";
+  + "camera move, zoom, pan, cropped head, head cut off, out of frame";
+
+/**
+ * What a full-body clip additionally refuses.
+ *
+ * These terms exist because Wan reframes a full-body still into a bust shot
+ * and loses the feet. On a BUST sprite they are worse than useless: there
+ * are no feet to preserve, "upper body only" is exactly what was asked for,
+ * and the model is being told to avoid the framing it was given.
+ */
+const WAN_NEGATIVE_FULL_BODY = ", cropped feet, feet cut off, close-up, upper body only";
+
+/**
+ * The negative prompt, which depends on the framing.
+ *
+ * It was one constant asserting full-body framing whatever the sprite
+ * actually showed, which is half of the disagreement recorded in
+ * `docs/decisions/OPEN.md` between a brief describing full body and a
+ * prompt asking for waist up.
+ */
+export const wanNegativePrompt = (fullBody: boolean): string =>
+  fullBody ? WAN_NEGATIVE_COMMON + WAN_NEGATIVE_FULL_BODY : WAN_NEGATIVE_COMMON;
+
+/**
+ * The shipped negative prompt, preserved for callers that state no framing.
+ *
+ * Full body, which is what the single constant always asked for.
+ */
+export const WAN_NEGATIVE_PROMPT: string = wanNegativePrompt(true);
 
 export const parseWanSettings = (raw: string | undefined): WanSettings => {
   if (raw === undefined || raw === "") return WAN_DEFAULTS;
@@ -640,7 +668,13 @@ export const parseWanSettings = (raw: string | undefined): WanSettings => {
  */
 export const buildWanI2VWorkflow = (
   settings: WanSettings,
-  opts: { readonly imageName: string; readonly positiveText: string; readonly seed: number },
+  opts: {
+    readonly imageName: string;
+    readonly positiveText: string;
+    readonly seed: number;
+    /** Whether the sprite shows a whole figure. Absent means it does. */
+    readonly fullBody?: boolean;
+  },
 ): BuiltWorkflow => {
   const ids = new NodeIds();
   const wf: Record<string, ComfyNode> = {};
@@ -666,7 +700,10 @@ export const buildWanI2VWorkflow = (
   const posId = ids.take();
   wf[posId] = { class_type: "CLIPTextEncode", inputs: { text: opts.positiveText, clip: [clipId, 0] } };
   const negId = ids.take();
-  wf[negId] = { class_type: "CLIPTextEncode", inputs: { text: WAN_NEGATIVE_PROMPT, clip: [clipId, 0] } };
+  wf[negId] = {
+    class_type: "CLIPTextEncode",
+    inputs: { text: wanNegativePrompt(opts.fullBody ?? true), clip: [clipId, 0] },
+  };
 
   const unetId = ids.take();
   wf[unetId] = settings.useGguf
