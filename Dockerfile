@@ -31,6 +31,16 @@ RUN npm ci --omit=dev && npm cache clean --force
 
 # The server runs from source; Node strips the types as it loads.
 COPY server.mts ./
+
+# The server imports from the portable core, so the core has to be present at
+# runtime even though nothing here is compiled. The whole layer is copied
+# rather than the single module the server currently reaches, because the
+# narrow version of this line is what broke: the server gained a core import
+# during the layering work, the image still built, and the container then
+# exited on a missing module at startup. Core has no dependencies of its own,
+# so copying all of it costs a few hundred kilobytes and removes the trap.
+COPY src/core/ ./src/core/
+
 COPY public/ ./public/
 
 # The compiled browser modules, built in the stage above.

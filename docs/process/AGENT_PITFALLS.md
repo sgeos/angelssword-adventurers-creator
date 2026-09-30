@@ -153,6 +153,31 @@ deciding. One said the video shape followed the reference image, reasoned from
 the request carrying no dimensions, and the first live run contradicted it.
 Anything user-facing reports what was observed and marks what was not.
 
+## Things outside the gate
+
+**A deployment file is a dependency list maintained by hand.** Moving code into
+a new module changed what `server.mts` imports, and nothing connected that to
+the Dockerfile's `COPY` lines. The image kept building, the tests kept passing,
+and the container exited at startup on a missing module. The failure was
+months old when it was found, because finding it needed a command nobody runs.
+
+The lesson is not about containers. It is that a rearchitecture invalidates
+every hand-maintained list of the files a thing needs, and those lists live
+outside the compiler's reach. After moving a module, ask what else names files
+by path: packaging, images, bundler configuration, continuous integration.
+
+**Verify a claim before refreshing it forward.** The handoff carried
+"produces a container that serves on port 3001" through several refreshes,
+each time marked as last exercised at a commit further behind. The assertion
+was false for most of that time. An assertion nobody runs teaches the reader
+to skim the ones that matter, so either exercise it or say plainly that it is
+unverified and from when.
+
+**A port in use is not a fault in the artefact.** The first container run
+could not bind 3001 because a development server held it. Bind a different
+host port for a check rather than reading the collision as a defect, and say
+which port was used.
+
 ## Working discipline
 
 **Commit each unit as soon as it is clean.** Recovery from a botched scripted
