@@ -2,7 +2,7 @@
 
 > **Navigation**: [Process](./README.md) | [Documentation Root](../README.md)
 
-**Refreshed 2026-09-30. The anchor is `c90c351`, the last commit before this
+**Refreshed 2026-09-30. The anchor is `dbb4217`, the last commit before this
 refresh.** Read this block, run the validity check, then read the task below.
 
 ---
@@ -16,11 +16,11 @@ itself.
 
 ### Ancestry
 
-`main` should **contain** `c90c351`, the last commit before this refresh. Test
+`main` should **contain** `dbb4217`, the last commit before this refresh. Test
 containment rather than equality.
 
 ```sh
-git merge-base --is-ancestor c90c351 HEAD
+git merge-base --is-ancestor dbb4217 HEAD
 ```
 
 If that fails, this file predates a history rewrite and is stale. If it
@@ -40,7 +40,7 @@ of the list rather than taking the next unused number, and renumber when
 inserting, because a list whose numbers skip reads as though checks are
 missing.
 
-1. `git ls-files` reports **93** TypeScript files and exactly **one**
+1. `git ls-files` reports **97** TypeScript files and exactly **one**
    JavaScript file, `eslint.config.mjs`, which is deliberate.
 2. **Five** `tsconfig.*.json` projects exist at the repository root, and
    `src/` holds exactly four directories, `core`, `platform-browser`,
@@ -48,18 +48,35 @@ missing.
 3. `src/core/ports/` holds **three** capability interfaces, namely
    `storage.mts`, `http.mts`, and `clock.mts`, and `src/core/` holds
    **nineteen** modules.
-4. `npm test` reports **644** unit tests and **44** application programming
+4. `npm test` reports **644** unit tests and **49** application programming
    interface tests, all passing.
-5. `npm run test:browser` reports **31** passing browser specifications. Use
+5. `npm run test:browser` reports **51** passing browser specifications. Use
    that script rather than `npx playwright test`, which reuses a running
    server and therefore skips its own rebuild.
 6. `tsc -p tsconfig.core.json` succeeds, and adding `localStorage` to any file
    under `src/core/` makes it fail.
-7. `docker compose up --build` produces a container that serves on port 3001.
+7. `test/fixtures/media` holds three fixtures, one of them a thirty kilobyte
+   clip the loop specifications require, and `test/fixtures` holds no other
+   directory.
+8. The container builds and serves. Build the image and run it on a host port
+   that is free, per the procedure in
+   [VERIFICATION.md](./VERIFICATION.md); `docker compose up --build` uses port
+   3001, which a development server usually holds.
 
-Assertions 1 through 6 were executed at the anchor. Assertion 7 was last
-exercised at `69addb8`, several refreshes ago, and has not been repeated. It
-is recorded as unverified rather than restated as though it had been run.
+Every assertion above was executed at the anchor, assertion 8 included.
+
+**Assertion 8 was false for several refreshes and nobody noticed, this author
+included.** The runtime image stage did not carry `src/core/`, which the
+server began importing during the layering work, so the container exited at
+startup on a missing module while the image still built and every test still
+passed. It was carried forward four times as a claim annotated with an old
+anchor, which reads as bookkeeping rather than as a warning.
+
+`test/integration/api/deployment.test.mts` now asserts that the image carries
+every file the server's imports reach, so the specific failure cannot return
+silently. It reads text rather than running a container, so it does not
+establish that the image starts. Assertion 8 is the only thing that does, and
+it is the assertion most likely to be stale again by the time this is read.
 
 If an assertion fails, this file is stale. Trust the repository and say so.
 
@@ -111,6 +128,19 @@ art style selector, a portrait canvas for full body, provider-specific output
 labels, every reference image reaching Gemini, a primary-plus-slots reference
 interface, and both sprite handoffs anchoring consistently.
 
+**The most recent work turned outward, to the things the gate does not
+reach.** The container was found broken and fixed, with a test guarding the
+agreement between the server's imports and the image's contents. The loop
+controls and the two sprite selectors gained browser coverage, twenty
+specifications, which found a second place judging whether a loop is usable
+and disagreeing with the first about loops that cross the seam. Browser
+specifications went from 31 to **51**.
+
+That run also surfaced a defect nothing had looked for: the frame rate is
+measured by playing the clip, so it under-reports on a host that cannot decode
+in real time. Recorded, not fixed, and the reasoning for not fixing it
+unilaterally is in `OPEN.md`.
+
 ## The next task
 
 **Run the discriminating test, and it needs the operator.** Gemini returned a
@@ -134,22 +164,33 @@ influence the sprite canvas only for some providers, given Gemini's shape
 behaviour is not understood. Whether this pipeline can target Gemini for
 looping assets at all, since it disregards explicit camera instructions.
 
-**Ordinary work.** The five largest modules still hold their Document Object
-Model work. Measured at the anchor, largest first: `model-exporter` 1,647,
-`sprite-prep` 1,157, `video-prep` 933, `video-gen` 829, `shell` 796. Every
-one of these was guessed wrong on the first attempt at writing an earlier
-version of this block, which is why the entry says measured. `shell` is the
-least examined, and `model-exporter` has now been surveyed for arithmetic
-twice with the remainder being genuine canvas and element work.
+**Ordinary work, and the extraction tail is close to exhausted.** The five
+largest modules still hold their Document Object Model work. Measured at the
+anchor, largest first: `model-exporter` 1,647, `sprite-prep` 1,157,
+`video-prep` 946, `video-gen` 829, `shell` 796. Every one of these was guessed
+wrong on the first attempt at writing an earlier version of this block, which
+is why the entry says measured. `shell` is the least examined;
+`model-exporter` has been surveyed for arithmetic twice and the remainder is
+genuine canvas and element work.
+
+**Coverage of entry-layer behaviour has been the better return, twice
+running.** The reference slots, then the loop controls and the sprite
+selectors. What remains uncovered there is the exporter's own controls and the
+settings panel. A browser specification reaches wiring that a unit test cannot,
+and both defects found this way lived in the wiring rather than the
+arithmetic.
 
 ### What is already true
 
 The core has **zero** references to a platform facility of any kind, which
 `tsconfig.core.json` refuses to compile. Storage and the network are each
 confined by lint to named adapter files. Nineteen core modules carry what the
-application computes; 644 unit tests reach all of it. The reference slot
-interface, the only large piece of entry-layer work with behaviour worth
-asserting, is covered by a browser specification rather than left uncovered.
+application computes; 644 unit tests reach all of it.
+
+The entry-layer behaviour worth asserting is now covered: the reference slots,
+the loop controls, and the framing and art style selectors, together with the
+two workers and the provider toggles that were covered before. The container
+is verified and guarded. Three fixtures exist and all three are used.
 
 ### Traps specific to this task
 

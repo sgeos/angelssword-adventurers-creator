@@ -12,17 +12,142 @@ file is arranged this way rather than being rewritten wholesale.
 
 ## Last Updated
 
+2026-09-30. The container, found broken and fixed. Browser coverage for the
+loop controls and the sprite selectors. One defect nobody had looked for.
+
+## Verification
+
+`npm run check` passes across all five projects. 644 unit tests, 49
+application programming interface tests, 51 browser specifications, all
+passing. 153 documentation links resolve. **The container was built and run
+this time**, on macOS with Docker 29.8.1, and the procedure is recorded in
+[VERIFICATION.md](./VERIFICATION.md).
+
+## Summary
+
+I went after the things the gate does not reach, on the reasoning that the
+extraction tail was thin and that coverage work had returned more than further
+extraction would.
+
+**The container did not work, and the defect was mine.** The image built and
+the container exited at startup on a missing module. The runtime stage copied
+the server and the public files, which was correct while the server was
+self-contained; the layering work gave the server an import from the portable
+core, and nothing in the repository connected those two facts. A test now
+asserts that the image carries every file the server's imports reach, and I
+confirmed it fails on the real defect rather than only passing on the fix.
+
+The loop controls and the framing and art style selectors gained twenty browser
+specifications. That found a second place judging whether a loop is usable,
+using a plain subtraction that predates loops being circular, so the
+information panel hid loops that the readout beside it called valid, in exactly
+the seam-crossing case the circular change was made to support.
+
+## The thing I would most like you to see
+
+**The frame rate is not read from the file.** The stage plays the clip at four
+times speed for half a second and divides the frames the browser reports
+decoding by the elapsed media time, so what it measures is how fast the host
+can decode. A clip of exactly sixty frames was reported as thirty-eight.
+
+That makes the last twenty-two frames unreachable and runs an export at a rate
+the clip never had. It is expected to be worse on modest hardware than on a
+developer's machine, which is the direction that makes a defect hard to notice,
+and this tool's stated audience is streamers on modest hardware.
+
+I did not fix it. `requestVideoFrameCallback` reports each frame's media time
+and would give the rate without depending on decode speed, but changing
+detection alters the frame count for every existing workflow, and my evidence
+is one synthetic clip on one host. Offering the detected rate as an editable
+field would solve the practical problem without touching detection. Recorded in
+[../decisions/OPEN.md](../decisions/OPEN.md) with what would decide it.
+
+## Questions for Human Pilot
+
+**The discriminating test is still yours and still the largest open question.**
+Two properly anchored reference images, on Gemini. Landscape means multiplicity
+is the problem and sending every image is a regression. Portrait means it was
+the misalignment, now fixed.
+
+**New, and the one I would act on next if you want it acted on:** whether to
+change frame rate detection, or to expose the detected rate for editing, or to
+leave it alone.
+
+Four further decisions are recorded in OPEN.md and none is mine: the fate of
+the unreferenced Graphics Interchange Format decode path, whether its format
+divergences matter, whether sprite zoom should anchor to the feet rather than
+the image edge, and whether this pipeline can target Gemini for looping assets
+given that it disregards explicit camera instructions.
+
+## Technical Concerns
+
+**An assertion nobody runs is worse than no assertion.** The handoff carried
+the container claim through four refreshes, each time annotated with an anchor
+further behind. That annotation reads as bookkeeping rather than as a warning,
+and I treated it as bookkeeping while rewriting it. The claim was false for
+most of that time.
+
+**A rearchitecture invalidates every hand-maintained list of files, and those
+lists are outside the compiler's reach.** I spent five increments moving
+modules with lint rules enforcing the import directions, all of it inside the
+type system's view. The Dockerfile was four lines naming paths, and it was the
+only place the reorganisation actually broke.
+
+**A test that passes may be testing nothing.** My first framing specification
+omitted the switch into generation mode, and the default-value assertion passed
+anyway, because reading an attribute works on a hidden element. Two further
+traps: a range input clamps an out-of-range value silently, and a missing
+character name stops generation with a toast that looks exactly like a request
+never made.
+
+**I guessed two module line counts while refreshing the handoff, again**, and
+corrected them by measuring. That pitfall was already written down twice.
+
+Carried forward: Grok, ComfyUI and the binary remain unexercised against
+anything real, and only the macOS binary has been built. The findings from live
+running, including that Gemini disregards explicit camera instructions, are in
+the history block below and still hold.
+
+## Intended Next Step
+
+Nothing self-directed of comparable value remains, which is why I stopped
+rather than scheduling another iteration. The extraction tail is exhausted for
+practical purposes. Uncovered entry-layer behaviour is down to the exporter's
+controls and the settings panel, a real but small return.
+
+What is left is yours: the Gemini experiment, the frame rate decision, and the
+four recorded decisions.
+
+## Session Context
+
+`main` at `dbb4217` before this refresh. Upstream carries two open pull
+requests and one open issue, all from this fork.
+
+---
+
+## Superseded history
+
+Nothing below this line describes the present.
+
+### Superseded 2026-09-30 — live running, and the frame count two stages disagreed about
+
+Same day as the current block, and kept rather than consolidated into it, the
+two describing different work. This one is the first live running against
+OpenAI and Gemini, and what it drove.
+
+#### Last Updated
+
 2026-09-30. Live running against OpenAI and Gemini, the work it drove, and
 one frame count that two stages disagreed about.
 
-## Verification
+#### Verification
 
 `npm run check` passes across all five projects. 644 unit tests, 44
 application programming interface tests, 31 browser specifications, all
 passing. 152 documentation links resolve. The container has still not been
 rebuilt and is marked unverified in [HANDOFF.md](./HANDOFF.md).
 
-## Summary
+#### Summary
 
 The operator ran OpenAI sprites and Gemini video against live keys for the
 first time in this fork's history. Two days of live running produced more
@@ -38,7 +163,7 @@ The reference images now all reach Gemini, are all previewed, keep the order
 supplied, and sit in three replaceable slots. Both sprite handoffs now
 compose identically, where one previously forwarded the raw generation.
 
-## Questions for Human Pilot
+#### Questions for Human Pilot
 
 **One experiment would settle the largest open question.** Two properly
 anchored reference images, on Gemini. Landscape means multiplicity is the
@@ -52,7 +177,7 @@ should anchor to the feet rather than the image edge, and whether this
 pipeline can target Gemini for looping assets given that it disregards
 explicit camera instructions.
 
-## A defect worth naming separately
+#### A defect worth naming separately
 
 **The two stages disagreed about how many frames a clip has.** Video Prep
 rounded `duration * fps` and the exporter floored it, so the exporter could
@@ -63,7 +188,7 @@ exporter's last-frame field made the final real frame unreachable.
 Unified on rounding, which is a behaviour change: some clips now export one
 frame more than before. That frame is real and was being dropped.
 
-## Technical Concerns
+#### Technical Concerns
 
 **I was wrong in the interface, and that is the worst place to be wrong.** I
 wrote "Follows your reference image" from reasoning rather than observation,
@@ -84,7 +209,7 @@ since a drifting scale defeats both the loop matching and the exporter.
 Carried forward: Grok, ComfyUI and the binary remain unexercised against
 anything real.
 
-## Intended Next Step
+#### Intended Next Step
 
 Await the discriminating test. `model-exporter` has now been surveyed for
 arithmetic twice and the remainder is genuine canvas and element work, so the
@@ -92,16 +217,10 @@ extraction tail is close to exhausted. `shell` at 796 lines is the least
 examined and is the settings panel and page chrome, which is unlikely to yield
 much.
 
-## Session Context
+#### Session Context
 
 `main` at `754e78d` before this refresh. Upstream carries two open pull
 requests and one open issue, all from this fork.
-
----
-
-## Superseded history
-
-Nothing below this line describes the present.
 
 ### Superseded 2026-09-30 — extraction, before live running
 
