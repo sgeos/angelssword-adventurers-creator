@@ -110,13 +110,20 @@ the history block below and still hold.
 
 ## Intended Next Step
 
-Nothing self-directed of comparable value remains, which is why I stopped
-rather than scheduling another iteration. The extraction tail is exhausted for
-practical purposes. Uncovered entry-layer behaviour is down to the exporter's
-controls and the settings panel, a real but small return.
+The extraction tail is exhausted for practical purposes. What remains
+uncovered in the entry layer is the exporter's controls and the settings panel.
 
-What is left is yours: the Gemini experiment, the frame rate decision, and the
-four recorded decisions.
+I judged that a smaller return than the two rounds before it and nearly stopped
+on that basis, then changed my mind on the evidence rather than the estimate.
+**Both rounds of coverage work found a genuine defect, two for two**, and
+neither was in the behaviour the specifications were written to assert: the
+first surfaced an ordering dependency in a loader, the second a second
+judgement of loop usability and, through it, the container. A third round is
+therefore worth running, and the estimate that it is a small return is the
+same kind of estimate that was wrong twice.
+
+What is still yours regardless: the Gemini experiment, the frame rate decision,
+and the four recorded decisions. None of those is blocked by the above.
 
 ## Session Context
 
