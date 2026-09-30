@@ -40,9 +40,22 @@ against live keys. A report that omits these overstates its evidence.
 
 ## Continuous integration
 
-`.github/workflows/verify.yml` runs the same three commands as three jobs on
-push and pull request. Nothing in it is unique to continuous integration, so a
-failure there reproduces locally with one command.
+`.github/workflows/verify.yml` runs five jobs on push and pull request.
+
+The first three run the same commands as the gate above, so a failure in them
+reproduces locally with one command and nothing in them is unique to continuous
+integration.
+
+The other two build the artefacts nobody builds by hand often enough. `container`
+builds the image and fetches from a running container. `binary` builds the
+standalone executable on Linux and on Windows and fetches from each, which is
+also the only way those two platforms get built at all, Node's single executable
+feature not cross-compiling.
+
+Their reason for existing is the history: the image stopped starting when the
+server gained an import the Dockerfile did not copy, and the failure survived
+months and four handoff refreshes because building it was something a person had
+to remember.
 
 ## Verifying the binary
 
@@ -53,12 +66,19 @@ hand.
 node build-exe.mts
 (cd dist/ASAdventurer && PORT=3999 AS_NO_OPEN=1 ./ASAdventurer)
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3999/
-curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3999/js/app.mjs
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3999/js/entry-browser/app.mjs
 ```
 
 Both requests should report 200. The second matters more than the first,
 because it proves the compiled browser modules were built and packaged rather
 than merely that the server started.
+
+That second path used to read `js/app.mjs`, which the layering work moved. The
+instruction therefore returned 404 on a perfectly good binary for as long as it
+stood, which is the same failure as the Dockerfile's copy list and the handoff's
+container assertion: a path written by hand, outside the reach of anything that
+runs it. The `binary` job in continuous integration now fetches this path on
+Linux and on Windows, so the next time it moves, something says so.
 
 ## Verifying the container
 
@@ -97,6 +117,13 @@ register, which is the shape the missing-module failure took. Probing a route
 name that does not exist also returns 404, so check the path against
 `server.mts` before concluding anything from one.
 
-Last exercised on 2026-09-30, on macOS with Docker 29.8.1: built, served the
-page and the compiled modules, refused the proxy routes with 401 and 400, and
-reported healthy. Not exercised on any other host platform.
+Last exercised by hand on 2026-09-30, on macOS with Docker 29.8.1: built,
+served the page and the compiled modules, refused the proxy routes with 401 and
+400, and reported healthy.
+
+**This is now also a continuous integration job**, which is the point. The
+manual procedure above stays useful for a local diagnosis, but it is no longer
+the only thing standing between a broken image and nobody knowing. The `container`
+job builds the image, runs it, fetches the page and a compiled module, and
+requires the proxy route to answer 401 rather than 404, that being the shape the
+missing-module failure took.

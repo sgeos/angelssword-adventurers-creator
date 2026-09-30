@@ -1,6 +1,18 @@
-# Runs exactly what `npm run check`, `npm test` and `npx playwright test` run
-# locally. Nothing here is CI-only: a green run means the same commands pass on
-# a clean checkout, and a red one is reproducible with a single local command.
+# The first three jobs run exactly what `npm run check`, `npm test` and
+# `npx playwright test` run locally. Nothing in them is CI-only: a green run
+# means the same commands pass on a clean checkout, and a red one is
+# reproducible with a single local command.
+#
+# The last two exist for a different reason. The container and the standalone
+# binary are built by hand or not at all, and both went unbuilt long enough to
+# break: the image stopped starting when the server gained an import the
+# Dockerfile did not copy, and nobody noticed for months because building it is
+# something a person has to remember. A validity assertion that only a human
+# executes is an assertion that rots. These make the machine do it.
+#
+# They also close a recorded open item. Neither the Linux nor the Windows
+# binary had ever been built, which was treated as blocked on hardware nobody
+# had. The runners are that hardware.
 name: verify
 
 on:
@@ -80,3 +92,106 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 7
+
+  container:
+    name: container builds and serves
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # No setup-node: the image builds its own toolchain, and using the
+      # runner's Node here would test something the image does not contain.
+      - run: docker build -t as-adventurer-ci .
+
+      # Port 3001 is free on a runner. A development machine usually has it
+      # occupied, which is why the documented manual procedure uses another
+      # port; that is a local inconvenience and not a property of the image.
+      - name: Serve from the container and fetch from it
+        run: |
+          set -euo pipefail
+          docker run -d --name as-ci -p 3001:3001 as-adventurer-ci
+          for _ in $(seq 1 30); do
+            if [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3001/)" = "200" ]; then
+              break
+            fi
+            sleep 1
+          done
+
+          # The page alone would pass even if nothing were compiled, so fetch a
+          # module built in the first stage and require it to be non-empty.
+          curl -sf http://127.0.0.1:3001/ -o /dev/null
+          curl -sf http://127.0.0.1:3001/js/entry-browser/app.mjs -o module.mjs
+          test -s module.mjs
+
+          # 401 rather than 404: the proxy routes registered. A missing module
+          # at startup used to leave the server dead, and a wrong route name
+          # answers 404, so this distinguishes the two.
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            -H 'Content-Type: application/json' -d '{}' \
+            http://127.0.0.1:3001/api/generate)
+          test "$code" = "401"
+
+      - name: What the container said, if any of that failed
+        if: failure()
+        run: docker logs as-ci || true
+
+      - name: Stop it
+        if: always()
+        run: docker rm -f as-ci || true
+
+  binary:
+    name: binary builds and serves (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # A Windows failure must not hide the Linux result, nor the reverse.
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            exe: ./ASAdventurer
+          - os: windows-latest
+            exe: ./ASAdventurer.exe
+    defaults:
+      run:
+        # Git Bash on the Windows runner, so one script serves both hosts.
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.18.0'
+          cache: npm
+
+      - run: npm ci
+
+      # Node's single executable feature does not cross-compile: the binary is
+      # for the host that built it, which is the whole reason this runs on two.
+      - run: node build-exe.mts
+
+      - name: Serve from the binary and fetch from it
+        run: |
+          set -euo pipefail
+          cd dist/ASAdventurer
+          PORT=3999 AS_NO_OPEN=1 ${{ matrix.exe }} > server.log 2>&1 &
+          for _ in $(seq 1 30); do
+            if [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3999/)" = "200" ]; then
+              break
+            fi
+            sleep 1
+          done
+
+          curl -sf http://127.0.0.1:3999/ -o /dev/null
+          # Matters more than the page: it proves the compiled modules were
+          # built and packaged rather than only that the server started.
+          curl -sf http://127.0.0.1:3999/js/entry-browser/app.mjs -o module.mjs
+          test -s module.mjs
+
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            -H 'Content-Type: application/json' -d '{}' \
+            http://127.0.0.1:3999/api/generate)
+          test "$code" = "401"
+
+      - name: What the binary said, if any of that failed
+        if: failure()
+        run: cat dist/ASAdventurer/server.log || true
