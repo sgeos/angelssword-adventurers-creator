@@ -12,17 +12,98 @@ file is arranged this way rather than being rewritten wholesale.
 
 ## Last Updated
 
+2026-09-30. Live running against OpenAI and Gemini, and the work it drove.
+
+## Verification
+
+`npm run check` passes across all five projects. 623 unit tests, 44
+application programming interface tests, 31 browser specifications, all
+passing. 152 documentation links resolve. The container has still not been
+rebuilt and is marked unverified in [HANDOFF.md](./HANDOFF.md).
+
+## Summary
+
+The operator ran OpenAI sprites and Gemini video against live keys for the
+first time in this fork's history. Two days of live running produced more
+information than all the mocked testing before it, and most of this period's
+work is downstream of it.
+
+Framing and art style became user choices, because the pipeline disagreed
+with itself about what a sprite is: the brief specified full body, the prompt
+asked for waist up, and the video half defended full-body framing. The art
+style was hardcoded and beat the operator's claymation reference outright.
+
+The reference images now all reach Gemini, are all previewed, keep the order
+supplied, and sit in three replaceable slots. Both sprite handoffs now
+compose identically, where one previously forwarded the raw generation.
+
+## Questions for Human Pilot
+
+**One experiment would settle the largest open question.** Two properly
+anchored reference images, on Gemini. Landscape means multiplicity is the
+problem and sending every image is a regression. Portrait means it was the
+misalignment, now fixed.
+
+Four decisions are recorded in [../decisions/OPEN.md](../decisions/OPEN.md)
+and none is mine: the fate of the unreferenced Graphics Interchange Format
+decode path, whether its format divergences matter, whether sprite zoom
+should anchor to the feet rather than the image edge, and whether this
+pipeline can target Gemini for looping assets given that it disregards
+explicit camera instructions.
+
+## Technical Concerns
+
+**I was wrong in the interface, and that is the worst place to be wrong.** I
+wrote "Follows your reference image" from reasoning rather than observation,
+and the first live run contradicted it. Anything user-facing should report
+what was seen.
+
+**Two limitations I called omissions look like undocumented retreats.** The
+waist-up prompt and the single-image reference. Both were removed on the
+reasoning that they were oversights. The first has corroborating evidence
+that it was deliberate; the second is under suspicion from one live run.
+Removing a limitation deserves the question of whether it was load-bearing.
+
+**Gemini disregards explicit camera instructions.** A prompt stating "Zero
+Camera movement, no panning, no drifting, and no zooming" produced a crop and
+a zoom. That bears on whether looping assets are achievable there at all,
+since a drifting scale defeats both the loop matching and the exporter.
+
+Carried forward: Grok, ComfyUI and the binary remain unexercised against
+anything real.
+
+## Intended Next Step
+
+Await the discriminating test. In the meantime the remaining work is ordinary
+extraction from the five largest modules, which has diminishing returns, and
+`shell` at 796 lines is the least examined of them.
+
+## Session Context
+
+`main` at `754e78d` before this refresh. Upstream carries two open pull
+requests and one open issue, all from this fork.
+
+---
+
+## Superseded history
+
+Nothing below this line describes the present.
+
+### Superseded 2026-09-30 — extraction, before live running
+
+#### Last Updated
+
 2026-09-19. Four extraction increments on top of the five architectural ones.
 Unit tests 276 to 520.
 
-## Verification
+#### Verification
 
 `npm run check` passes across all five projects. 520 unit tests, 44
 application programming interface tests, 24 browser specifications, all
 passing. The container was not rebuilt and is marked unverified at the anchor
 in [HANDOFF.md](./HANDOFF.md).
 
-## Summary
+#### Summary
 
 The architecture made the extraction possible; the extraction is what it was
 for. Nine increments in total, and the last four moved arithmetic out from
@@ -44,7 +125,7 @@ constants. Both are now named, documented and tested.
 
 Two booleans that could both be true, meaning nothing, became one field.
 
-## Questions for Human Pilot
+#### Questions for Human Pilot
 
 **Whether to keep extracting.** What remains in the five largest modules is
 increasingly element wiring, canvas drawing and event binding, which is what
@@ -58,7 +139,7 @@ Two matters from earlier remain open and are recorded in
 decode path has no production consumer, and its two divergences from the
 format are worth correcting only if it is kept.
 
-## Technical Concerns
+#### Technical Concerns
 
 **Several of the extracted behaviours are preserved rather than correct**, and
 each says so where it is defined. A histogram bucket is identified by its
@@ -80,21 +161,15 @@ magnitude. Both are recorded in [AGENT_PITFALLS.md](./AGENT_PITFALLS.md).
 
 Carried forward: neither extracted exchange has run against a live service.
 
-## Intended Next Step
+#### Intended Next Step
 
 Await the decision above. If the answer is to continue, `shell` at 784 lines
 is the least examined of the five.
 
-## Session Context
+#### Session Context
 
 `main` at `2a78864` before this refresh. Upstream carries two open pull
 requests and one open issue, all from this fork.
-
----
-
-## Superseded history
-
-Nothing below this line describes the present.
 
 ### Superseded 2026-09-19 — rearchitecture complete, extraction begun
 

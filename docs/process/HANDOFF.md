@@ -2,7 +2,7 @@
 
 > **Navigation**: [Process](./README.md) | [Documentation Root](../README.md)
 
-**Refreshed 2026-09-19. The anchor is `2a78864`, the last commit before this
+**Refreshed 2026-09-30. The anchor is `754e78d`, the last commit before this
 refresh.** Read this block, run the validity check, then read the task below.
 
 ---
@@ -16,11 +16,11 @@ itself.
 
 ### Ancestry
 
-`main` should **contain** `2a78864`, the last commit before this refresh. Test
+`main` should **contain** `754e78d`, the last commit before this refresh. Test
 containment rather than equality.
 
 ```sh
-git merge-base --is-ancestor 2a78864 HEAD
+git merge-base --is-ancestor 754e78d HEAD
 ```
 
 If that fails, this file predates a history rewrite and is stale. If it
@@ -40,7 +40,7 @@ of the list rather than taking the next unused number, and renumber when
 inserting, because a list whose numbers skip reads as though checks are
 missing.
 
-1. `git ls-files` reports **89** TypeScript files and exactly **one**
+1. `git ls-files` reports **93** TypeScript files and exactly **one**
    JavaScript file, `eslint.config.mjs`, which is deliberate.
 2. **Five** `tsconfig.*.json` projects exist at the repository root, and
    `src/` holds exactly four directories, `core`, `platform-browser`,
@@ -48,9 +48,11 @@ missing.
 3. `src/core/ports/` holds **three** capability interfaces, namely
    `storage.mts`, `http.mts`, and `clock.mts`, and `src/core/` holds
    **nineteen** modules.
-4. `npm test` reports **520** unit tests and **44** application programming
+4. `npm test` reports **623** unit tests and **44** application programming
    interface tests, all passing.
-5. `npx playwright test` reports **24** passing browser specifications.
+5. `npm run test:browser` reports **31** passing browser specifications. Use
+   that script rather than `npx playwright test`, which reuses a running
+   server and therefore skips its own rebuild.
 6. `tsc -p tsconfig.core.json` succeeds, and adding `localStorage` to any file
    under `src/core/` makes it fail.
 7. `docker compose up --build` produces a container that serves on port 3001.
@@ -100,38 +102,52 @@ that existed twice; `c7d070b` took the advanced key scoring, the crop, and the
 size estimate; `f260334` gave the seek arithmetic one home and two names;
 `2a78864` collapsed a frame selection that existed four times.
 
-Unit tests went from 276 before this work to **520**.
+Unit tests went from 276 before this work to **623**.
+
+**Since then the operator has run OpenAI sprites and Gemini video against
+live keys**, which produced more information than all the mocked testing
+before it, and drove a further run of work: a Bust and Full Body toggle, an
+art style selector, a portrait canvas for full body, provider-specific output
+labels, every reference image reaching Gemini, a primary-plus-slots reference
+interface, and both sprite handoffs anchoring consistently.
 
 ## The next task
 
-**A decision first, and it belongs to the operator.** The extraction has
-reached diminishing returns and the question in
-[../decisions/OPEN.md](../decisions/OPEN.md) is whether to continue.
+**Run the discriminating test, and it needs the operator.** Gemini returned a
+landscape clip from two reference images and a portrait clip from one. The two
+images were also misaligned, because the generated-result handoff forwarded
+the raw image; that is fixed, so two properly anchored images now settle
+whether the cause was multiplicity or misalignment.
 
-What is left in the five largest modules is increasingly element wiring,
-canvas drawing and event binding, which is what a stage module is for. The
-arithmetic that was tangled with it has largely come out. Continuing means
-extracting progressively thinner slices; stopping means accepting that those
-five hold presentation and that the core holds what is worth testing.
+If multiplicity, sending every reference image is a regression and should
+become a choice or be reverted. That change rests on an argument about conduct
+rather than evidence about results, which is stated in `OPEN.md`.
 
-Sizes at the anchor, largest first. `model-exporter` 1,599, `sprite-prep`
-1,047, `video-prep` 912, `shell` 784, `video-gen` 671.
+Everything else outstanding is either a decision for the operator or ordinary
+work with diminishing returns.
 
-`shell` is the one least examined, its 784 lines being the settings panel and
-the page chrome. `video-gen` was found to be already well factored, its pure
-parts having been extracted during the earlier provider work.
+**Decisions**, none taken. Whether the Graphics Interchange Format decode path
+should exist when nothing imports it, and whether its two divergences from the
+format are worth correcting if it does. Whether the sprite zoom should anchor
+to the character's feet rather than the image edge. Whether framing should
+influence the sprite canvas only for some providers, given Gemini's shape
+behaviour is not understood. Whether this pipeline can target Gemini for
+looping assets at all, since it disregards explicit camera instructions.
 
-Two other matters in `OPEN.md` are decisions rather than work, and neither has
-been taken: whether the Graphics Interchange Format decode path should keep
-existing when nothing imports it, and whether its two divergences from the
-format are worth correcting if it does.
+**Ordinary work.** The five largest modules still hold their Document Object
+Model work. Measured at the anchor, largest first: `model-exporter` 1,640,
+`sprite-prep` 1,157, `video-prep` 933, `video-gen` 829, `shell` 796. Every
+one of these was guessed wrong on the first attempt at writing this block,
+which is why the entry says measured. `shell` is the least examined.
 
 ### What is already true
 
 The core has **zero** references to a platform facility of any kind, which
 `tsconfig.core.json` refuses to compile. Storage and the network are each
 confined by lint to named adapter files. Nineteen core modules carry what the
-application computes; 520 unit tests reach all of it.
+application computes; 623 unit tests reach all of it. The reference slot
+interface, the only large piece of entry-layer work with behaviour worth
+asserting, is covered by a browser specification rather than left uncovered.
 
 ### Traps specific to this task
 
@@ -156,6 +172,22 @@ preserved and pinned, and the decision recorded in
 
 **Check that a new rule fires.** Every gate added so far was exercised against
 a deliberately failing file before being believed.
+
+**`npm run test:browser`, never the bare Playwright command.** The suite
+reuses a running server outside continuous integration and so skips its own
+rebuild, testing the previous bundle. Two specifications appeared to regress
+this way against markup that had been updated and code that had not.
+
+**A limitation may be load-bearing.** Two things called an omission in this
+repository's own commit messages look like undocumented retreats from real
+failures: the waist-up prompt, and the single-image reference. Before removing
+a limitation, ask whether it was a retreat, and say in the commit which it is
+and on what evidence.
+
+**An indentation-sensitive literal substitution matches at every depth.**
+Replacing a four-space-indented line also rewrites the eight-space copy,
+because the shorter string is a substring of the longer one. This produced
+duplicated statements once. Anchor on surrounding lines instead.
 
 **Check that two formulas agree before unifying them.** The loop count was
 computed two ways and they turned out to agree, which was established rather
@@ -183,8 +215,8 @@ Recorded in [../decisions/OPEN.md](../decisions/OPEN.md).
 - `gif-composite` diverges from the Graphics Interchange Format in two ways.
 - The format's decode path has no production consumer at all.
 - The Windows and Linux binary builds have never been run.
-- Nothing has been exercised against live keys, a real ComfyUI, or a real Grok
-  subscription. Both extracted exchanges are covered by unit tests against a
+- OpenAI sprites and Gemini video have been run against live keys. Grok,
+  ComfyUI and the binary have not. Both extracted exchanges are covered by unit tests against a
   scripted client and by a browser specification against mocked routes, which
   is not the same as having run against the service.
 - No release has been cut.

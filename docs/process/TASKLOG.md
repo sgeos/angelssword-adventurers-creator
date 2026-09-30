@@ -11,15 +11,16 @@ bound.
 
 ## Active
 
-**A decision for the operator: whether to keep extracting.** Recorded in
-[../decisions/OPEN.md](../decisions/OPEN.md) and argued in
-[HANDOFF.md](./HANDOFF.md).
+**Awaiting one experiment the operator must run.** Gemini returned a landscape
+clip from two reference images and a portrait clip from one. Those two images
+were also misaligned; that is fixed, so two properly anchored images now
+settle whether the cause was multiplicity or misalignment.
 
-The arithmetic tangled with the Document Object Model has largely come out of
-the five largest modules, and what remains in them is increasingly element
-wiring and canvas drawing. Continuing means progressively thinner slices.
-Stopping means accepting that those five hold presentation and that the core
-holds what is worth testing.
+If multiplicity, sending every reference image is a regression and should
+become a choice or be reverted.
+
+Everything else outstanding is a decision for the operator or ordinary work
+with diminishing returns. Both are enumerated in [HANDOFF.md](./HANDOFF.md).
 
 ## Completed: the three-layer rearchitecture
 
@@ -40,6 +41,11 @@ dropped.
 
 | Task | Status | Verification |
 |---|---|---|
+| Both sprite handoffs anchor; framing reaches video | Complete | 17 new unit tests, 7 new browser specs |
+| Reference slots, previews, ordering, multi-image | Complete | Order and clear asserted in a browser spec |
+| Framing and art style are user choices | Complete | Defaults asserted byte-identical to shipped |
+| Live findings recorded; stale live-keys claim removed | Complete | 152 links resolve; no contradiction in OPEN.md |
+| Loop made circular; preview reads the frame cache | Complete | Panel promise and export asserted to agree |
 | Frame selection collapsed from four copies to one | Complete | 20 new tests; count and list asserted to agree |
 | Seek arithmetic unified, one number split into two names | Complete | 16 new tests; no `0.001` left in either stage |
 | Key scoring, crop and size estimate extracted | Complete | 43 new tests; six constants named and pinned |

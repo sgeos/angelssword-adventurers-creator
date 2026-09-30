@@ -279,3 +279,65 @@ Two of them are genuinely unreachable, the negative seek time and the
 malformed hex, and the temptation there was strongest: nothing could break.
 But an unreachable case fixed silently still teaches the next reader that this
 codebase changes behaviour in refactoring commits.
+
+## 2026-09-30 — What two days of live running taught, and what it cost me
+
+The operator put credit on an account and ran the pipeline against real
+services. Two days of that produced more information than every mocked test
+before it, and most of it was unflattering.
+
+**Four claims I had written down turned out to be wrong**, and the pattern
+across them is worth more than any one.
+
+I asserted that frame 0 is a master neutral frame. That was the operator's
+hypothesis, offered while correcting a button design, and it reached a commit
+message and two code comments within one exchange as though established.
+
+I wrote "Follows your reference image" into the interface, reasoning that
+since nothing about shape is sent to Gemini the result must follow the
+reference. The first live run returned landscape from a portrait sprite.
+
+I called the waist-up prompt an abandoned workflow and the single-image
+reference "an omission rather than a finding". Both now look like
+undocumented retreats from real failures. The bust directive reserves
+headroom above the character and accepts a bottom crop, which is precisely a
+defence against the crop-and-zoom the live runs produced. Somebody met this
+and retreated, and wrote the retreat into the prompt without writing down
+why.
+
+**The common failure is treating the absence of a recorded reason as the
+absence of a reason.** A limitation with no comment beside it is not thereby
+an oversight. Before removing one, ask what it would have been defending, and
+say in the commit which answer you reached and on what evidence. I have added
+that to the pitfalls, because I did it twice in two days.
+
+**The second lesson is about where a wrong claim lives.** A wrong comment
+misleads the next reader. A wrong label in the interface misleads the operator
+while they are making decisions, and mine told them the output shape was under
+their control through the reference when it was not. Anything user-facing
+should report what was observed and mark what was not.
+
+## 2026-09-30 — Tests that were wrong, and what they were worth anyway
+
+Five of my own tests failed on changes this period, and not one was a
+regression in the code.
+
+Two encoded a non-circular playback model that the operator then corrected:
+playback wraps, so an end before a start is a loop crossing the seam rather
+than an error. Refusing it had also made frame 0 unreachable from inside a
+loop.
+
+One asserted a clamp that `clampSeekTime` does not perform. One asserted a
+tolerance boundary at a magnitude where floating point makes the boundary
+unassertable. And one asserted that sprite zoom keeps the character's feet
+anchored; it does not, and it fails in the opposite direction from my guess,
+pushing the feet down toward the image edge rather than lifting them.
+
+**Every one of those failures produced something worth keeping.** The
+circular model, an accurate doc comment, a boundary test at a magnitude where
+it means something, and a recorded finding about zoom drift. A test written
+from a wrong premise still interrogates the code, and the interrogation is
+most of the value.
+
+What it does not do is validate the premise. So a test that passes first time
+against a belief I brought to it deserves more suspicion than one that fails.

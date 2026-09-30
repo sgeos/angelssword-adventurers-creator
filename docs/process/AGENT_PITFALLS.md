@@ -44,6 +44,14 @@ involving word boundaries.
 `sed 's/^/  /'` carries two extra spaces. Pasting it into a replacement makes
 the pattern match nothing, silently.
 
+**An indented literal matches at every depth.** Replacing a four-space line
+also rewrites the eight-space copy, the shorter string being a substring of
+the longer. This duplicated a statement once. Anchor on surrounding lines.
+
+**Rewire call sites BEFORE inserting a table that repeats their wording.**
+Otherwise the substitution matches inside the table just added. Hit twice; the
+third time was avoided by ordering rather than by care.
+
 ## Reading tool output
 
 **Multi-range `sed` output has no separators.** Output from
@@ -122,6 +130,21 @@ computed two different ways in two places. Both times they agreed, and both
 times that was established by testing across the whole permitted range rather
 than by reading. One of the pairs produced an estimate shown to a user before
 a long wait.
+
+## Removing things
+
+**A limitation may be load-bearing.** Two things this repository's own commit
+messages called an omission look like undocumented retreats from real
+failures: the waist-up sprite prompt, and sending only the first reference
+image. Absence of a recorded reason is not absence of a reason. Before
+removing a limitation, ask what it would have been defending, and say in the
+commit which answer you reached and on what evidence.
+
+**A wrong claim in the interface is worse than a wrong comment.** A comment
+misleads the next reader; a label misleads the operator while they are
+deciding. One said the video shape followed the reference image, reasoned from
+the request carrying no dimensions, and the first live run contradicted it.
+Anything user-facing reports what was observed and marks what was not.
 
 ## Working discipline
 
