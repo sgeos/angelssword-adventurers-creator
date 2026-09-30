@@ -2,7 +2,7 @@
 
 > **Navigation**: [Process](./README.md) | [Documentation Root](../README.md)
 
-**Refreshed 2026-09-30. The anchor is `754e78d`, the last commit before this
+**Refreshed 2026-09-30. The anchor is `c90c351`, the last commit before this
 refresh.** Read this block, run the validity check, then read the task below.
 
 ---
@@ -16,11 +16,11 @@ itself.
 
 ### Ancestry
 
-`main` should **contain** `754e78d`, the last commit before this refresh. Test
+`main` should **contain** `c90c351`, the last commit before this refresh. Test
 containment rather than equality.
 
 ```sh
-git merge-base --is-ancestor 754e78d HEAD
+git merge-base --is-ancestor c90c351 HEAD
 ```
 
 If that fails, this file predates a history rewrite and is stale. If it
@@ -48,7 +48,7 @@ missing.
 3. `src/core/ports/` holds **three** capability interfaces, namely
    `storage.mts`, `http.mts`, and `clock.mts`, and `src/core/` holds
    **nineteen** modules.
-4. `npm test` reports **623** unit tests and **44** application programming
+4. `npm test` reports **644** unit tests and **44** application programming
    interface tests, all passing.
 5. `npm run test:browser` reports **31** passing browser specifications. Use
    that script rather than `npx playwright test`, which reuses a running
@@ -135,17 +135,19 @@ behaviour is not understood. Whether this pipeline can target Gemini for
 looping assets at all, since it disregards explicit camera instructions.
 
 **Ordinary work.** The five largest modules still hold their Document Object
-Model work. Measured at the anchor, largest first: `model-exporter` 1,640,
+Model work. Measured at the anchor, largest first: `model-exporter` 1,647,
 `sprite-prep` 1,157, `video-prep` 933, `video-gen` 829, `shell` 796. Every
-one of these was guessed wrong on the first attempt at writing this block,
-which is why the entry says measured. `shell` is the least examined.
+one of these was guessed wrong on the first attempt at writing an earlier
+version of this block, which is why the entry says measured. `shell` is the
+least examined, and `model-exporter` has now been surveyed for arithmetic
+twice with the remainder being genuine canvas and element work.
 
 ### What is already true
 
 The core has **zero** references to a platform facility of any kind, which
 `tsconfig.core.json` refuses to compile. Storage and the network are each
 confined by lint to named adapter files. Nineteen core modules carry what the
-application computes; 623 unit tests reach all of it. The reference slot
+application computes; 644 unit tests reach all of it. The reference slot
 interface, the only large piece of entry-layer work with behaviour worth
 asserting, is covered by a browser specification rather than left uncovered.
 
@@ -172,6 +174,11 @@ preserved and pinned, and the decision recorded in
 
 **Check that a new rule fires.** Every gate added so far was exercised against
 a deliberately failing file before being believed.
+
+**A test that passes may still be false.** One asserted that a palette sample
+target bounds the sample count. It passed on the lengths chosen and was untrue
+for lengths between seven and eleven. A test which passes first time against
+a belief brought to it deserves more suspicion than one that fails.
 
 **`npm run test:browser`, never the bare Playwright command.** The suite
 reuses a running server outside continuous integration and so skips its own

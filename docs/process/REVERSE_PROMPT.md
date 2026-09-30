@@ -12,11 +12,12 @@ file is arranged this way rather than being rewritten wholesale.
 
 ## Last Updated
 
-2026-09-30. Live running against OpenAI and Gemini, and the work it drove.
+2026-09-30. Live running against OpenAI and Gemini, the work it drove, and
+one frame count that two stages disagreed about.
 
 ## Verification
 
-`npm run check` passes across all five projects. 623 unit tests, 44
+`npm run check` passes across all five projects. 644 unit tests, 44
 application programming interface tests, 31 browser specifications, all
 passing. 152 documentation links resolve. The container has still not been
 rebuilt and is marked unverified in [HANDOFF.md](./HANDOFF.md).
@@ -51,6 +52,17 @@ should anchor to the feet rather than the image edge, and whether this
 pipeline can target Gemini for looping assets given that it disregards
 explicit camera instructions.
 
+## A defect worth naming separately
+
+**The two stages disagreed about how many frames a clip has.** Video Prep
+rounded `duration * fps` and the exporter floored it, so the exporter could
+count one fewer. The handoff carries Video Prep's figure while the loop range
+is clamped to the exporter's, so a loop end was silently clipped, and the
+exporter's last-frame field made the final real frame unreachable.
+
+Unified on rounding, which is a behaviour change: some clips now export one
+frame more than before. That frame is real and was being dropped.
+
 ## Technical Concerns
 
 **I was wrong in the interface, and that is the worst place to be wrong.** I
@@ -74,9 +86,11 @@ anything real.
 
 ## Intended Next Step
 
-Await the discriminating test. In the meantime the remaining work is ordinary
-extraction from the five largest modules, which has diminishing returns, and
-`shell` at 796 lines is the least examined of them.
+Await the discriminating test. `model-exporter` has now been surveyed for
+arithmetic twice and the remainder is genuine canvas and element work, so the
+extraction tail is close to exhausted. `shell` at 796 lines is the least
+examined and is the settings panel and page chrome, which is unlikely to yield
+much.
 
 ## Session Context
 

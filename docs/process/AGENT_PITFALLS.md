@@ -125,6 +125,13 @@ clamp the function does not perform, the other the boundary above. Read the
 function before assuming the code is wrong, and if the behaviour is merely
 surprising rather than wrong, pin it as characterisation and say so.
 
+**A test that PASSES may still be false.** One asserted that a palette sample
+target bounds the sample count; it passed on the five lengths chosen and was
+untrue for lengths between seven and eleven. Choosing the inputs is where the
+author's belief re-enters, so loop over a range rather than over examples.
+A test that passes first time against a belief brought to it deserves more
+suspicion than one that fails.
+
 **Check two formulas agree before unifying them.** Twice a quantity was
 computed two different ways in two places. Both times they agreed, and both
 times that was established by testing across the whole permitted range rather

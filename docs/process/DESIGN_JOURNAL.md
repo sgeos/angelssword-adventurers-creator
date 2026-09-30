@@ -341,3 +341,49 @@ most of the value.
 
 What it does not do is validate the premise. So a test that passes first time
 against a belief I brought to it deserves more suspicion than one that fails.
+
+## 2026-09-30 — A passing test that was false, and why it was checked
+
+The previous entry ends by saying that a test which passes first time against
+a belief brought to it deserves more suspicion than one that fails. That
+advice paid within the hour.
+
+While naming the exporter's palette sampling, I asserted that its six-frame
+target bounds how many frames are read. The test passed. It was false: the
+stride is `floor(total / min(6, total))`, which reaches one for any length up
+to eleven, and the loop then walks every frame. Eleven frames are read against
+a target of six. The test had passed only because the lengths I happened to
+choose did not include eight through eleven.
+
+Worse, the routine I had just written reported the target as the sample count,
+which was untrue at those lengths. I had invented a field and filled it with a
+number that did not describe what happens.
+
+Both are corrected, the count now being derived from the stride, and the test
+now walks forty lengths rather than five chosen ones. **Choosing the inputs is
+where the belief re-enters.** A loop over a range is not merely more thorough;
+it removes the author's hand from the selection, which is the part that was
+doing the damage.
+
+## 2026-09-30 — Two formulas for the same quantity, and this time they disagreed
+
+Earlier in this session two pairs of duplicated formulas turned out to agree,
+and I recorded that agreement is not a reason to leave a duplication alone.
+This is the case that argument was anticipating.
+
+The video stage rounded a duration into a frame count and the exporter floored
+it. They differ whenever the fractional part reaches a half, which real
+durations reach: 9.99 seconds at thirty frames gave 299 against 300. Because
+the handoff carries one figure and the clamp uses the other, a loop end was
+being clipped and the last real frame of some clips was unreachable.
+
+The thing that made it findable was not suspicion of either formula. It was
+looking at the two together, which only happened because both had been pulled
+toward the same module by earlier extraction. **A duplication that spans two
+files is invisible; one that spans two lines is not.** That is an argument for
+consolidation that has nothing to do with brevity.
+
+One procedural note. I computed the disagreement across seven realistic
+durations before changing anything, rather than reasoning that floor and round
+must differ somewhere. Two of the seven disagreed. That took a minute and is
+the difference between a defect report and a plausible story.

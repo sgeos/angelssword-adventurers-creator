@@ -41,6 +41,7 @@ dropped.
 
 | Task | Status | Verification |
 |---|---|---|
+| Frame count unified; encoding decisions named | Complete | 21 new tests; the two stages asserted to agree |
 | Both sprite handoffs anchor; framing reaches video | Complete | 17 new unit tests, 7 new browser specs |
 | Reference slots, previews, ordering, multi-image | Complete | Order and clear asserted in a browser spec |
 | Framing and art style are user choices | Complete | Defaults asserted byte-identical to shipped |
