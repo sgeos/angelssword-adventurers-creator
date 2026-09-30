@@ -178,6 +178,22 @@ could not bind 3001 because a development server held it. Bind a different
 host port for a check rather than reading the collision as a defect, and say
 which port was used.
 
+**A no-op can leave the system in the state the test wanted.** Assertions on
+the aspect lock passed before they tested anything: the control is a styled
+switch whose checkbox is hidden, so `check()` could not click it, and the lock
+defaults to on. Nothing about a passing result looked unusual. Where a control
+is not the element that holds the state, drive the control and confirm the state
+followed.
+
+**An assertion that observes nothing happening needs a companion.** A rule that
+matched nothing would pass a "no request was made" test perfectly. Pair it with
+a case that the same rule does catch.
+
+**Restoring a superseded block into the history drops its first line.** Done
+twice, the second time immediately after the first, by splitting the block on
+its first newline to remove a heading that was not there. Compare section counts
+before and after, and check a distinctive phrase from the old block survives.
+
 ## Working discipline
 
 **Commit each unit as soon as it is clean.** Recovery from a botched scripted

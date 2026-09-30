@@ -12,10 +12,137 @@ file is arranged this way rather than being rewritten wholesale.
 
 ## Last Updated
 
+2026-09-30. The exporter's controls and the settings panel covered, the trust
+boundary asserted, and two findings recorded rather than fixed.
+
+## Verification
+
+`npm run check` passes across all five projects. 644 unit tests, 49
+application programming interface tests, 75 browser specifications, all
+passing. 158 documentation links resolve. The container was built and run
+today; the procedure is in [VERIFICATION.md](./VERIFICATION.md).
+
+## Summary
+
+The exporter's specifications had held two tests. One listed controls and
+asserted they were present, which would pass against a page whose every control
+was inert. The other checked whether a class was on the global object, found it
+was not, and asserted that it was not. Neither established that the exporter
+does anything. They are replaced by seventeen that fail if the control they
+exercise is disconnected.
+
+The settings panel had one test, covering two of four credentials. It now has
+nine, and among them the property the documentation promises and nothing
+checked: that saving a key reaches neither a proxy route nor another origin.
+
+**Three rounds of browser coverage, three defects nobody had looked for.** That
+is now a pattern rather than luck, and it is the reason I kept going after
+saying I would stop.
+
+## The two findings, neither of them fixed
+
+**Three paths decide the frame rate, and they disagree.** The exporter reported
+sixty frames for the clip Video Preparation reported as thirty-eight, same clip,
+same machine. Video Preparation measures by playing it. A file dropped on the
+exporter is assumed to be thirty frames per second. A clip arriving by handoff
+carries Video Preparation's figure. The two failure modes point opposite ways:
+the assumption is exact at thirty and wrong in proportion elsewhere, so a two
+second clip at fifteen frames per second is reported as sixty frames and half
+the frame numbers the exporter offers do not exist.
+
+Unifying the frame count earlier today is what made this findable, and it is
+the better argument for consolidation than brevity ever was. While each stage
+computed its own count from its own rate, a disagreement could be blamed on the
+arithmetic, and I did blame it. With one formula the only place two answers can
+come from is the input.
+
+**The page fetches webfonts from a third party on every load.** Six requests,
+measured, for four families. The README says the later stages work fully
+offline and that the internet is needed only for generation. That holds as a
+statement about function, the faces falling back, and fails as one about
+traffic. Every load also tells a third party the user's address, which sits
+oddly beside a proxy arrangement built so that keys and prompts reach only the
+service they are for.
+
+## Questions for Human Pilot
+
+**How should the frame rate be established?** The widest-reaching of these.
+`requestVideoFrameCallback` is accurate and changes frame counts for every
+existing workflow. Exposing the detected rate for editing solves the practical
+problem without touching detection. Whichever is chosen, the three paths should
+agree afterwards.
+
+**Should the webfonts be self-hosted, or the README corrected?** Self-hosting
+removes the requests and adds weight to the repository, the container and the
+binary; the faces are all under the SIL Open Font License, so redistribution is
+permitted. Correcting the prose instead is honest and free.
+
+**The discriminating test is still yours.** Two properly anchored reference
+images on Gemini. Landscape means multiplicity is the problem and sending every
+image is a regression; portrait means it was the misalignment, now fixed.
+
+Four further decisions are in [../decisions/OPEN.md](../decisions/OPEN.md) and
+none is mine.
+
+## Technical Concerns
+
+**A no-op that leaves the system in the state the test wanted is the hardest
+false pass to notice.** The aspect lock assertions passed before they tested
+anything: the lock is a styled switch whose checkbox is hidden, so my `check()`
+could not have clicked it, and the lock defaults to on. Nothing about the result
+looked unusual. Five such switches exist and the flip is now a shared helper
+that drives the visible span and confirms the input followed.
+
+**My expectation was stale in the direction of my own earlier work.** I asserted
+that an inverted frame range selects nothing. It wraps, because I made the
+playback space circular myself and then wrote a test assuming it was not. Fourth
+time this session that a belief I brought to a test was the thing at fault.
+
+**An assertion that observes nothing happening needs a companion.** The trust
+boundary test passes by seeing no request of two kinds, and a classifier
+matching nothing would pass it equally well. It is paired with a test that the
+same rule notices a deliberate proxy call.
+
+**It took two tries to state the boundary checkably.** Asserting no request at
+all failed on the webfonts, then again on the success toast fetching its
+notification sound. Neither says anything about a key. The assertion is about
+where requests go, which is what is actually checkable.
+
+Carried forward: Grok, ComfyUI and the binary remain unexercised against
+anything real, and only the macOS binary has been built.
+
+## Intended Next Step
+
+Coverage of the entry layer is largely spent. What is left uncovered is the
+canvas work, and that is where a browser specification stops being cheap:
+asserting a keyed sprite looks right means comparing pixels, which is a
+maintenance burden rather than a check. I would not start that unasked.
+
+The two new findings are decisions, not work, and both are pinned by
+specifications that will fail when they are fixed.
+
+## Session Context
+
+`main` at `7dc69a8` before this refresh. Upstream carries two open pull
+requests and one open issue, all from this fork.
+
+---
+
+## Superseded history
+
+Nothing below this line describes the present.
+
+### Superseded 2026-09-30 — the container, and the coverage that found it
+
+Same day as the current block. Kept rather than consolidated: this one is the
+container defect and the loop and sprite selector coverage.
+
+#### Last Updated
+
 2026-09-30. The container, found broken and fixed. Browser coverage for the
 loop controls and the sprite selectors. One defect nobody had looked for.
 
-## Verification
+#### Verification
 
 `npm run check` passes across all five projects. 644 unit tests, 49
 application programming interface tests, 51 browser specifications, all
@@ -23,7 +150,7 @@ passing. 153 documentation links resolve. **The container was built and run
 this time**, on macOS with Docker 29.8.1, and the procedure is recorded in
 [VERIFICATION.md](./VERIFICATION.md).
 
-## Summary
+#### Summary
 
 I went after the things the gate does not reach, on the reasoning that the
 extraction tail was thin and that coverage work had returned more than further
@@ -43,7 +170,7 @@ using a plain subtraction that predates loops being circular, so the
 information panel hid loops that the readout beside it called valid, in exactly
 the seam-crossing case the circular change was made to support.
 
-## The thing I would most like you to see
+#### The thing I would most like you to see
 
 **The frame rate is not read from the file.** The stage plays the clip at four
 times speed for half a second and divides the frames the browser reports
@@ -62,7 +189,7 @@ is one synthetic clip on one host. Offering the detected rate as an editable
 field would solve the practical problem without touching detection. Recorded in
 [../decisions/OPEN.md](../decisions/OPEN.md) with what would decide it.
 
-## Questions for Human Pilot
+#### Questions for Human Pilot
 
 **The discriminating test is still yours and still the largest open question.**
 Two properly anchored reference images, on Gemini. Landscape means multiplicity
@@ -79,7 +206,7 @@ divergences matter, whether sprite zoom should anchor to the feet rather than
 the image edge, and whether this pipeline can target Gemini for looping assets
 given that it disregards explicit camera instructions.
 
-## Technical Concerns
+#### Technical Concerns
 
 **An assertion nobody runs is worse than no assertion.** The handoff carried
 the container claim through four refreshes, each time annotated with an anchor
@@ -108,7 +235,7 @@ anything real, and only the macOS binary has been built. The findings from live
 running, including that Gemini disregards explicit camera instructions, are in
 the history block below and still hold.
 
-## Intended Next Step
+#### Intended Next Step
 
 The extraction tail is exhausted for practical purposes. What remains
 uncovered in the entry layer is the exporter's controls and the settings panel.
@@ -125,16 +252,10 @@ same kind of estimate that was wrong twice.
 What is still yours regardless: the Gemini experiment, the frame rate decision,
 and the four recorded decisions. None of those is blocked by the above.
 
-## Session Context
+#### Session Context
 
 `main` at `dbb4217` before this refresh. Upstream carries two open pull
 requests and one open issue, all from this fork.
-
----
-
-## Superseded history
-
-Nothing below this line describes the present.
 
 ### Superseded 2026-09-30 — live running, and the frame count two stages disagreed about
 

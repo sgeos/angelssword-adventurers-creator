@@ -2,7 +2,7 @@
 
 > **Navigation**: [Process](./README.md) | [Documentation Root](../README.md)
 
-**Refreshed 2026-09-30. The anchor is `dbb4217`, the last commit before this
+**Refreshed 2026-09-30. The anchor is `7dc69a8`, the last commit before this
 refresh.** Read this block, run the validity check, then read the task below.
 
 ---
@@ -16,11 +16,11 @@ itself.
 
 ### Ancestry
 
-`main` should **contain** `dbb4217`, the last commit before this refresh. Test
+`main` should **contain** `7dc69a8`, the last commit before this refresh. Test
 containment rather than equality.
 
 ```sh
-git merge-base --is-ancestor dbb4217 HEAD
+git merge-base --is-ancestor 7dc69a8 HEAD
 ```
 
 If that fails, this file predates a history rewrite and is stale. If it
@@ -50,14 +50,14 @@ missing.
    **nineteen** modules.
 4. `npm test` reports **644** unit tests and **49** application programming
    interface tests, all passing.
-5. `npm run test:browser` reports **51** passing browser specifications. Use
+5. `npm run test:browser` reports **75** passing browser specifications. Use
    that script rather than `npx playwright test`, which reuses a running
    server and therefore skips its own rebuild.
 6. `tsc -p tsconfig.core.json` succeeds, and adding `localStorage` to any file
    under `src/core/` makes it fail.
-7. `test/fixtures/media` holds three fixtures, one of them a thirty kilobyte
-   clip the loop specifications require, and `test/fixtures` holds no other
-   directory.
+7. `test/fixtures/media` holds **four** fixtures, two of them small generated
+   clips at different frame rates which the loop and exporter specifications
+   require, and `test/fixtures` holds no other directory.
 8. The container builds and serves. Build the image and run it on a host port
    that is free, per the procedure in
    [VERIFICATION.md](./VERIFICATION.md); `docker compose up --build` uses port
@@ -129,17 +129,22 @@ labels, every reference image reaching Gemini, a primary-plus-slots reference
 interface, and both sprite handoffs anchoring consistently.
 
 **The most recent work turned outward, to the things the gate does not
-reach.** The container was found broken and fixed, with a test guarding the
-agreement between the server's imports and the image's contents. The loop
-controls and the two sprite selectors gained browser coverage, twenty
-specifications, which found a second place judging whether a loop is usable
-and disagreeing with the first about loops that cross the seam. Browser
-specifications went from 31 to **51**.
+reach, and it has paid every time.** The container was found broken and fixed,
+with a test guarding the agreement between the server's imports and the image's
+contents. Browser coverage went from 31 specifications to **75**: the loop
+controls, the two sprite selectors, the exporter's controls, and the settings
+panel including the boundary that keys are not to cross.
 
-That run also surfaced a defect nothing had looked for: the frame rate is
-measured by playing the clip, so it under-reports on a host that cannot decode
-in real time. Recorded, not fixed, and the reasoning for not fixing it
-unilaterally is in `OPEN.md`.
+**Three rounds of coverage, three defects nobody had looked for.** A loader
+whose output order depended on which file decoded first. A second place judging
+whether a loop is usable, disagreeing with the first about loops that cross the
+seam. And two recorded but unfixed: three paths deciding the frame rate
+differently, so the same clip is sixty frames in one stage and thirty-eight in
+another; and webfonts fetched from a third party on every page load, against a
+README that says the later stages work fully offline.
+
+The reasoning for leaving those two to the operator is in `OPEN.md`. Both are
+pinned by specifications written to fail when they are fixed.
 
 ## The next task
 
@@ -156,12 +161,28 @@ rather than evidence about results, which is stated in `OPEN.md`.
 Everything else outstanding is either a decision for the operator or ordinary
 work with diminishing returns.
 
-**Decisions**, none taken. Whether the Graphics Interchange Format decode path
-should exist when nothing imports it, and whether its two divergences from the
-format are worth correcting if it does. Whether the sprite zoom should anchor
-to the character's feet rather than the image edge. Whether framing should
-influence the sprite canvas only for some providers, given Gemini's shape
-behaviour is not understood. Whether this pipeline can target Gemini for
+**Decisions**, none taken. Two of them now have evidence behind them rather
+than only a question.
+
+**How the frame rate should be established**, which is the one with the widest
+reach. Three paths decide it differently and give different counts for one clip.
+Measuring by playback under-reports on a slow host; assuming thirty is exact
+for a thirty frame clip and wrong in proportion for any other. Whichever is
+chosen, the paths should agree afterwards. `requestVideoFrameCallback` is the
+accurate option; exposing the rate for editing solves the practical problem
+without touching detection.
+
+**Whether the webfonts should be self-hosted.** Six requests leave on every page
+load, the README says the later stages work fully offline, and the two cannot
+both stand. Self-hosting removes the requests and adds weight to the repository,
+the image and the binary. Correcting the README instead is honest and free.
+
+And the four already recorded: whether the Graphics Interchange Format decode
+path should exist when nothing imports it, and whether its two divergences from
+the format are worth correcting if it does; whether the sprite zoom should
+anchor to the character's feet rather than the image edge; whether framing
+should influence the sprite canvas only for some providers, given Gemini's shape
+behaviour is not understood; and whether this pipeline can target Gemini for
 looping assets at all, since it disregards explicit camera instructions.
 
 **Ordinary work, and the extraction tail is close to exhausted.** The five
@@ -173,12 +194,16 @@ is why the entry says measured. `shell` is the least examined;
 `model-exporter` has been surveyed for arithmetic twice and the remainder is
 genuine canvas and element work.
 
-**Coverage of entry-layer behaviour has been the better return, twice
-running.** The reference slots, then the loop controls and the sprite
-selectors. What remains uncovered there is the exporter's own controls and the
-settings panel. A browser specification reaches wiring that a unit test cannot,
-and both defects found this way lived in the wiring rather than the
-arithmetic.
+**Coverage of entry-layer behaviour has been the better return three times
+running, and it is now largely spent.** The reference slots, then the loop
+controls and the sprite selectors, then the exporter's controls and the settings
+panel. What is left uncovered is the canvas work itself, which is where a
+browser specification stops being cheap: asserting that a keyed sprite looks
+right means comparing pixels, and a pixel comparison is a maintenance burden
+rather than a check.
+
+A browser specification reaches wiring that a unit test cannot, and every defect
+found this way lived in the wiring rather than the arithmetic.
 
 ### What is already true
 
@@ -187,10 +212,16 @@ The core has **zero** references to a platform facility of any kind, which
 confined by lint to named adapter files. Nineteen core modules carry what the
 application computes; 644 unit tests reach all of it.
 
-The entry-layer behaviour worth asserting is now covered: the reference slots,
-the loop controls, and the framing and art style selectors, together with the
-two workers and the provider toggles that were covered before. The container
-is verified and guarded. Three fixtures exist and all three are used.
+The entry-layer behaviour worth asserting is covered: the reference slots, the
+loop controls, the framing and art style selectors, the exporter's mode limits,
+estimate, aspect lock and filename presets, and the settings panel, together
+with the two workers and the provider toggles that were covered before. The
+container is verified and guarded. Four fixtures exist and all four are used.
+
+**The trust boundary is asserted rather than only documented.** Saving a
+credential reaches neither a proxy route nor another origin, and that assertion
+is paired with one proving the same rule would notice a proxy call, so it cannot
+pass by matching nothing.
 
 ### Traps specific to this task
 
