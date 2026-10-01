@@ -12,17 +12,141 @@ file is arranged this way rather than being rewritten wholesale.
 
 ## Last Updated
 
+2026-09-30. Continuous integration now builds the container and the binaries.
+Three more findings, all of them instructions nothing executed.
+
+## Verification
+
+`npm run check` passes across all five projects. 644 unit tests, 49 application
+programming interface tests, 75 browser specifications, all passing. 158
+documentation links resolve.
+
+**Continuous integration has five jobs and the latest run on `main` passed all
+of them**, which now includes the container and a binary on two platforms. That
+is stronger than my local runs, being a clean checkout on hardware I do not
+have.
+
+## Summary
+
+Entry-layer coverage was spent, so this went after the artefacts that are built
+by hand or not at all. Two jobs: one builds the image, runs it, and fetches the
+page, a compiled module and a proxy route; the other builds the standalone
+binary on Linux and on Windows and fetches the same from each.
+
+They found three things within an hour of existing, and all three are the same
+kind of defect.
+
+**The documented binary check was wrong.** `VERIFICATION.md` told the reader to
+fetch `js/app.mjs`. The layering work moved it to `js/entry-browser/app.mjs`, so
+following the documented procedure on a perfectly good binary returns 404. I
+confirmed that by building one.
+
+**The open item was wrong about why it was open.** It said building the Windows
+and Linux binaries needed access to those platforms. Its own second clause named
+continuous integration runners as the alternative, and I had read that item
+several times without reaching the second clause. Both built the same afternoon
+somebody tried.
+
+**The Windows build could not have worked.** It failed at the first npx call with
+`spawnSync npx.cmd EINVAL`. Since Node 20.12 a batch file cannot be spawned
+without a shell, under the hardening added for CVE-2024-27980, and three call
+sites chose `npx.cmd` without one. The platform branch had been written and then
+not followed through. It is fixed, and Windows now builds and serves.
+
+## What I think the real lesson of today is
+
+Six defects today, and five share a category that is not "untested code". They
+were **instructions about the code, held where nothing executes them**: a
+Dockerfile copy list, a validity assertion only a human ran, a documented curl
+path, a recorded blocker that had stopped being true, and a platform branch no
+supported platform exercised. A compiler cannot see any of them and a unit test
+cannot reach them. They are observable only by performing the act they describe.
+
+This morning I would have proposed better documentation discipline. That would
+not have worked, because every one of these was written carefully by someone
+paying attention, including me. What worked was arranging for a machine to
+perform the act.
+
+## Questions for Human Pilot
+
+Unchanged from the previous block, and all still yours.
+
+**How should the frame rate be established?** Three paths decide it differently
+and give different counts for one clip. `requestVideoFrameCallback` is accurate
+and changes frame counts for every existing workflow; exposing the detected rate
+for editing solves the practical problem without touching detection.
+
+**Self-host the webfonts, or correct the README?** Six requests leave on every
+page load against a claim that the later stages work fully offline.
+
+**The discriminating test on Gemini**, with two properly anchored reference
+images.
+
+**New, and small:** whether to publish a release now that three platform
+binaries exist. What the jobs establish is that each starts and serves on a
+runner. Nobody has double-clicked one, no Windows machine has been asked about
+an unsigned executable, and the macOS binary is ad-hoc signed rather than
+notarized.
+
+Four further decisions are in [../decisions/OPEN.md](../decisions/OPEN.md).
+
+## Technical Concerns
+
+**An empty result from a convenience wrapper is a fact about the wrapper.**
+`gh run list` returned an empty array and I formed the hypothesis that continuous
+integration had never run. There were 43 runs. I verified before writing it down,
+which cost one command; had I not, `OPEN.md` would now contain a confident
+falsehood.
+
+**I have added jobs I can only verify through the jobs themselves.** Windows is
+not testable here. I pushed, read the failure, fixed it, pushed again and read
+the pass. That is a complete loop, but it is worth being explicit that my
+knowledge of the Windows build is entirely second hand.
+
+**What the binaries do not establish.** They start and serve on a runner. That is
+not the same as being usable by the audience this tool is for, and I would not
+describe the platform support as finished.
+
+Carried forward: Grok and ComfyUI remain unexercised against anything real.
+
+## Intended Next Step
+
+I do not have a next item of comparable value, and I would rather say so than
+invent one. Entry-layer coverage is spent, the extraction tail is exhausted, and
+the artefacts now build themselves.
+
+What remains is the canvas work, where a specification means comparing pixels and
+becomes a maintenance burden; and the decisions above, which are yours.
+
+## Session Context
+
+`main` at `9a5f904` before this refresh. Upstream carries two open pull requests
+and one open issue, all from this fork.
+
+---
+
+## Superseded history
+
+Nothing below this line describes the present.
+
+### Superseded 2026-09-30 — the exporter, the settings panel, and the trust boundary
+
+Same day as the current block, and kept rather than consolidated: this one is the
+exporter and settings coverage and the two findings it produced.
+
+#### Last Updated
+
 2026-09-30. The exporter's controls and the settings panel covered, the trust
 boundary asserted, and two findings recorded rather than fixed.
 
-## Verification
+#### Verification
 
 `npm run check` passes across all five projects. 644 unit tests, 49
 application programming interface tests, 75 browser specifications, all
 passing. 158 documentation links resolve. The container was built and run
 today; the procedure is in [VERIFICATION.md](./VERIFICATION.md).
 
-## Summary
+#### Summary
 
 The exporter's specifications had held two tests. One listed controls and
 asserted they were present, which would pass against a page whose every control
@@ -39,7 +163,7 @@ checked: that saving a key reaches neither a proxy route nor another origin.
 is now a pattern rather than luck, and it is the reason I kept going after
 saying I would stop.
 
-## The two findings, neither of them fixed
+#### The two findings, neither of them fixed
 
 **Three paths decide the frame rate, and they disagree.** The exporter reported
 sixty frames for the clip Video Preparation reported as thirty-eight, same clip,
@@ -64,7 +188,7 @@ traffic. Every load also tells a third party the user's address, which sits
 oddly beside a proxy arrangement built so that keys and prompts reach only the
 service they are for.
 
-## Questions for Human Pilot
+#### Questions for Human Pilot
 
 **How should the frame rate be established?** The widest-reaching of these.
 `requestVideoFrameCallback` is accurate and changes frame counts for every
@@ -84,7 +208,7 @@ image is a regression; portrait means it was the misalignment, now fixed.
 Four further decisions are in [../decisions/OPEN.md](../decisions/OPEN.md) and
 none is mine.
 
-## Technical Concerns
+#### Technical Concerns
 
 **A no-op that leaves the system in the state the test wanted is the hardest
 false pass to notice.** The aspect lock assertions passed before they tested
@@ -111,7 +235,7 @@ where requests go, which is what is actually checkable.
 Carried forward: Grok, ComfyUI and the binary remain unexercised against
 anything real, and only the macOS binary has been built.
 
-## Intended Next Step
+#### Intended Next Step
 
 Coverage of the entry layer is largely spent. What is left uncovered is the
 canvas work, and that is where a browser specification stops being cheap:
@@ -121,16 +245,10 @@ maintenance burden rather than a check. I would not start that unasked.
 The two new findings are decisions, not work, and both are pinned by
 specifications that will fail when they are fixed.
 
-## Session Context
+#### Session Context
 
 `main` at `7dc69a8` before this refresh. Upstream carries two open pull
 requests and one open issue, all from this fork.
-
----
-
-## Superseded history
-
-Nothing below this line describes the present.
 
 ### Superseded 2026-09-30 — the container, and the coverage that found it
 

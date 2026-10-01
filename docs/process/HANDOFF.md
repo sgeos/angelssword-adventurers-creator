@@ -2,7 +2,7 @@
 
 > **Navigation**: [Process](./README.md) | [Documentation Root](../README.md)
 
-**Refreshed 2026-09-30. The anchor is `7dc69a8`, the last commit before this
+**Refreshed 2026-09-30. The anchor is `9a5f904`, the last commit before this
 refresh.** Read this block, run the validity check, then read the task below.
 
 ---
@@ -16,11 +16,11 @@ itself.
 
 ### Ancestry
 
-`main` should **contain** `7dc69a8`, the last commit before this refresh. Test
+`main` should **contain** `9a5f904`, the last commit before this refresh. Test
 containment rather than equality.
 
 ```sh
-git merge-base --is-ancestor 7dc69a8 HEAD
+git merge-base --is-ancestor 9a5f904 HEAD
 ```
 
 If that fails, this file predates a history rewrite and is stale. If it
@@ -58,25 +58,32 @@ missing.
 7. `test/fixtures/media` holds **four** fixtures, two of them small generated
    clips at different frame rates which the loop and exporter specifications
    require, and `test/fixtures` holds no other directory.
-8. The container builds and serves. Build the image and run it on a host port
-   that is free, per the procedure in
-   [VERIFICATION.md](./VERIFICATION.md); `docker compose up --build` uses port
-   3001, which a development server usually holds.
+8. `.github/workflows/verify.yml` declares **five** jobs, and the most recent
+   run on `main` passed all of them. Read it rather than taking this on trust:
 
-Every assertion above was executed at the anchor, assertion 8 included.
+   ```sh
+   gh run list --workflow verify.yml --limit 1
+   ```
 
-**Assertion 8 was false for several refreshes and nobody noticed, this author
-included.** The runtime image stage did not carry `src/core/`, which the
-server began importing during the layering work, so the container exited at
-startup on a missing module while the image still built and every test still
-passed. It was carried forward four times as a claim annotated with an old
-anchor, which reads as bookkeeping rather than as a warning.
+   The two beyond the gate are `container`, which builds the image and fetches
+   from a running container, and `binary`, which builds the standalone
+   executable on Linux and on Windows and fetches from each.
 
-`test/integration/api/deployment.test.mts` now asserts that the image carries
-every file the server's imports reach, so the specific failure cannot return
-silently. It reads text rather than running a container, so it does not
-establish that the image starts. Assertion 8 is the only thing that does, and
-it is the assertion most likely to be stale again by the time this is read.
+Every assertion above was executed at the anchor.
+
+**Assertion 8 used to read "the container builds and serves" and was false for
+several refreshes, this author included among those who did not notice.** The
+runtime image stage did not carry `src/core/`, which the server began importing
+during the layering work, so the container exited at startup on a missing module
+while the image still built and every test passed. It was carried forward four
+times as a claim annotated with an old anchor, which reads as bookkeeping rather
+than as a warning.
+
+**It is now an assertion about a machine having done it, which is the point.**
+`deployment.test.mts` asserts the image carries every file the server's imports
+reach, and the `container` job runs the image and fetches from it. Neither
+depends on a person remembering. A claim only a human executes is a claim that
+rots, and this one did.
 
 If an assertion fails, this file is stale. Trust the repository and say so.
 
@@ -145,6 +152,23 @@ README that says the later stages work fully offline.
 
 The reasoning for leaving those two to the operator is in `OPEN.md`. Both are
 pinned by specifications written to fail when they are fixed.
+
+**Then the same attention went to the artefacts nobody builds, and found more.**
+Continuous integration now has five jobs: the three that run the gate, plus one
+that builds the container and fetches from it and one that builds the standalone
+binary on Linux and on Windows and fetches from each. All pass.
+
+Writing them produced three further findings, all of the same kind and none
+reachable by a compiler or a unit test. The documented binary smoke test told the
+reader to fetch `js/app.mjs`, which the layering work had moved, so following it
+returned 404 on a working binary. The open item recording that neither platform
+binary had been built said resolving it needed access to those platforms, while
+its own second clause named the runners. And the Windows build **could not have
+worked**: three call sites chose `npx.cmd` without a shell, which Node has
+required for a batch file since 20.12.
+
+The category is instructions about the code, held where nothing executes them.
+The remedy is a machine performing the act, not more careful prose.
 
 ## The next task
 
@@ -223,7 +247,10 @@ The entry-layer behaviour worth asserting is covered: the reference slots, the
 loop controls, the framing and art style selectors, the exporter's mode limits,
 estimate, aspect lock and filename presets, and the settings panel, together
 with the two workers and the provider toggles that were covered before. The
-container is verified and guarded. Four fixtures exist and all four are used.
+container is verified and guarded by a job rather than by a person remembering.
+Four fixtures exist and all four are used. **A binary exists for macOS, Linux and
+Windows**, the latter two built and served by continuous integration, which is
+the first time either has been built at all.
 
 **The trust boundary is asserted rather than only documented.** Saving a
 credential reaches neither a proxy route nor another origin, and that assertion
