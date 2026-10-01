@@ -186,6 +186,28 @@ from an implementation that worked before the conversion, but neither has been
 run since. Resolving this needs access to those platforms, or continuous
 integration runners that build rather than merely test.
 
+**Resolved 2026-09-30, and the Windows half was worse than recorded.** The
+`binary` job builds the executable on `ubuntu-latest` and on `windows-latest`
+and fetches the page, a compiled browser module and a proxy route from each.
+Both pass. The phrase "needs access to those platforms" was the error: the
+runners were always that access, and treating the item as blocked on hardware
+is why it sat for as long as it did.
+
+The Windows build did not merely go unbuilt. **It could not have worked.** Three
+call sites chose `npx.cmd` on Windows and none passed a shell, and since Node
+20.12 a batch file cannot be spawned without one, the call failing with `EINVAL`
+under the hardening added for CVE-2024-27980. The build died at the first npx
+call on every Node the project supports. The platform condition had been written
+and not followed through, and no amount of reading it would have shown that;
+running it took one job.
+
+**What this does not establish.** The binaries start and serve on a runner.
+Nobody has double-clicked one on a real desktop, no Windows machine has been
+asked whether it will run an unsigned executable, and SmartScreen has never seen
+it. The macOS binary carries an ad-hoc signature and is not notarized, so another
+Mac will still quarantine it. Those are distribution questions and they remain
+open under "No release has been cut".
+
 ## What live running has established, and what it has not
 
 **OpenAI sprites and Gemini video have now been run against live keys**, on

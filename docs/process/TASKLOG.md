@@ -77,6 +77,11 @@ dropped.
 | Settings and the trust boundary covered | Complete | Saving a key issues no request, non-vacuously |
 | Frame rate disagreement found | Recorded | Two stages, three paths, three answers |
 | Third party webfont requests found | Recorded | Contradicts the offline claim in the README |
+| Container built and served by CI | Complete | Fetches page, module and a proxy route |
+| Linux and Windows binaries built | Complete | First time ever; both serve in CI |
+| Windows binary made buildable | Complete | `npx.cmd` needs a shell since Node 20.12 |
+| Stale path in the binary procedure fixed | Complete | Documented check returned 404 on a good binary |
+| `shell.mts` surveyed | Complete | Nothing extractable; claim now verified |
 
 ## Open Items
 

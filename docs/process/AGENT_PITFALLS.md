@@ -173,6 +173,22 @@ was false for most of that time. An assertion nobody runs teaches the reader
 to skim the ones that matter, so either exercise it or say plainly that it is
 unverified and from when.
 
+**An empty result from a convenience wrapper is a fact about the wrapper.**
+`gh run list` returned an empty array and the hypothesis followed that
+continuous integration had never run. The API reported 43 runs. Query the thing
+itself before recording an absence as a finding.
+
+**"Needs access to those platforms" deserves one minute of doubt.** An open item
+said the Windows and Linux binaries could not be built without those platforms,
+and its own second clause named continuous integration runners as the
+alternative. Both built the same afternoon somebody tried. A recorded blocker is
+a claim like any other and ages like one.
+
+**A platform branch nobody runs is not tested by being read.** Three call sites
+chose `npx.cmd` on Windows and none passed a shell, which Node has required for a
+batch file since 20.12. The branch was correct about the filename and wrong about
+the call, and only running it on Windows could show that.
+
 **A port in use is not a fault in the artefact.** The first container run
 could not bind 3001 because a development server held it. Bind a different
 host port for a check rather than reading the collision as a defect, and say

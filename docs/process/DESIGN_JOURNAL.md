@@ -482,3 +482,48 @@ repair was to drive the visible span, which also asserts the switch is wired to
 the input. **A no-op that leaves the system in the state the test wanted is the
 hardest kind of false pass to notice**, because nothing about the result looks
 unusual.
+
+## 2026-09-30 — "Needs access to those platforms" was the error
+
+`OPEN.md` had carried this for weeks: neither the Windows nor the Linux binary
+has been built, and resolving it needs access to those platforms. I had read
+that item several times and accepted it. Continuous integration runners are
+those platforms, and the item even said so in its second clause, which I had
+evidently stopped reading before reaching.
+
+Both now build and serve on every push. The Linux one worked first time. The
+Windows one failed immediately, with `spawnSync npx.cmd EINVAL`, and that is the
+part worth recording.
+
+**The Windows build could not have worked.** Three call sites selected `npx.cmd`
+on Windows, and since Node 20.12 a batch file cannot be spawned without a shell,
+the call failing under the hardening added for CVE-2024-27980. So the platform
+branch had been written and then not followed through. The item said the path was
+"structurally unchanged from an implementation that worked before the
+conversion", which was true and irrelevant: what changed was Node.
+
+No amount of reading that file would have found it. It is not a logic error you
+can see; it is an interaction between a conditional and a runtime's security
+posture two minor versions after the code was written. **Running it took one
+job, and reading it had already failed several times.**
+
+That makes three distinct defects today in the same category, and the category
+is worth naming precisely. It is not "untested code". All three were in
+instructions *about* the code, held outside anything that executes: a Dockerfile
+copy list, a documented curl path, and a platform branch in a build script that
+no supported platform exercised. The compiler cannot see any of them. A unit test
+cannot reach them. They are only observable by performing the act they describe.
+
+The remedy is not more documentation discipline, which is what I would have
+proposed this morning. It is to arrange for a machine to perform the act. Five
+jobs now do: three that run the gate, and two that build the artefacts and fetch
+from them. The two new ones found a months-old failure and an impossibility
+within an hour of existing.
+
+One method note, against myself. Earlier in the same iteration `gh run list`
+returned an empty array and I formed the hypothesis that continuous integration
+had never run. There were 43 runs; the wrapper was looking somewhere I did not
+expect. I verified before writing it down, which cost one command and avoided a
+false entry in `OPEN.md`. **An empty result from a convenience wrapper is a fact
+about the wrapper**, and the session has now produced two findings that began as
+exactly that kind of absence.
