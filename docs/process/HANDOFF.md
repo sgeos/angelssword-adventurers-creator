@@ -190,9 +190,16 @@ largest modules still hold their Document Object Model work. Measured at the
 anchor, largest first: `model-exporter` 1,647, `sprite-prep` 1,157,
 `video-prep` 946, `video-gen` 829, `shell` 796. Every one of these was guessed
 wrong on the first attempt at writing an earlier version of this block, which
-is why the entry says measured. `shell` is the least examined;
+is why the entry says measured.
+
 `model-exporter` has been surveyed for arithmetic twice and the remainder is
-genuine canvas and element work.
+genuine canvas and element work. **`shell` has now been surveyed too**, having
+been described as the least examined and unlikely to yield much in three
+successive refreshes without anyone looking. It holds the handoff object, the
+notification sound, tab switching, the toast, the settings panel, the keyboard
+bindings, and the element helpers the other layers call. There is no arithmetic
+in it worth moving, so the conclusion carried forward on faith happens to have
+been right, which is not the same as having been known.
 
 **Coverage of entry-layer behaviour has been the better return three times
 running, and it is now largely spent.** The reference slots, then the loop

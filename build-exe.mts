@@ -65,6 +65,31 @@ if (HOST === undefined) {
 }
 
 const ROOT = import.meta.dirname;
+
+/**
+ * Run a tool through npx.
+ *
+ * **Why this is not a bare `execFileSync`.** On Windows `npx` is `npx.cmd`, and
+ * since Node 20.12 a batch file cannot be spawned without a shell: the call
+ * fails with `EINVAL`, which is the hardening added for CVE-2024-27980. So
+ * Windows goes through a shell, and every argument that a shell could split or
+ * interpret is quoted first, because a shell re-parses a command line that
+ * `execFileSync` would otherwise have passed through untouched.
+ *
+ * **This is why no Windows binary had ever been built.** The build died at the
+ * first npx call on any Node the project supports, so the platform was recorded
+ * as unbuilt when it was in fact unbuildable. Nothing ran it until continuous
+ * integration did, which is the argument for the `binary` job existing.
+ */
+const runNpx = (args: readonly string[], quiet = false): void => {
+  const stdio = quiet ? "pipe" : "inherit";
+  if (process.platform !== "win32") {
+    execFileSync("npx", [...args], { stdio, cwd: ROOT });
+    return;
+  }
+  const quoted = args.map((arg) => (/[\s&|<>^"]/.test(arg) ? `"${arg}"` : arg));
+  execFileSync("npx.cmd", quoted, { stdio, cwd: ROOT, shell: true });
+};
 const DIST = path.join(ROOT, "dist", "ASAdventurer");
 const PUBLIC_SRC = path.join(ROOT, "public");
 const PUBLIC_DEST = path.join(DIST, "public");
@@ -111,21 +136,17 @@ fs.mkdirSync(DIST, { recursive: true });
 
 // 3. Bundle the server to CommonJS for pkg. See the note at the top.
 log("Bundling server.mts → CommonJS...");
-execFileSync(
-  process.platform === "win32" ? "npx.cmd" : "npx",
-  [
-    "--yes", "esbuild", "server.mts",
-    "--bundle",
-    "--platform=node",
-    "--target=node18",
-    "--format=cjs",
-    // pkg's Node 18 base binary has no import.meta; these are the only two uses.
-    "--define:import.meta.dirname=__dirname",
-    "--define:import.meta.filename=__filename",
-    `--outfile=${BUNDLE}`,
-  ],
-  { stdio: "inherit", cwd: ROOT },
-);
+runNpx([
+  "--yes", "esbuild", "server.mts",
+  "--bundle",
+  "--platform=node",
+  "--target=node18",
+  "--format=cjs",
+  // pkg's Node 18 base binary has no import.meta; these are the only two uses.
+  "--define:import.meta.dirname=__dirname",
+  "--define:import.meta.filename=__filename",
+  `--outfile=${BUNDLE}`,
+]);
 
 // 4. Turn the bundle into a single executable preparation blob.
 log("Preparing the single executable blob...");
@@ -167,10 +188,7 @@ const postjectArgs = [
 if (process.platform === "darwin") postjectArgs.push("--macho-segment-name", "NODE_SEA");
 
 try {
-  execFileSync(process.platform === "win32" ? "npx.cmd" : "npx", postjectArgs, {
-    stdio: "inherit",
-    cwd: ROOT,
-  });
+  runNpx(postjectArgs);
 } catch {
   console.error("\n  ❌ Injection failed. Make sure you have run: npm install");
   process.exit(1);
@@ -194,7 +212,7 @@ if (process.platform === "darwin") {
 // Windows resource editing, so the executable carries the project icon.
 if (process.platform === "win32" && fs.existsSync(ICON)) {
   try {
-    execFileSync("npx.cmd", ["--yes", "rcedit", BIN, "--set-icon", ICON], { stdio: "pipe" });
+    runNpx(["--yes", "rcedit", BIN, "--set-icon", ICON], true);
     log("Applied the application icon.");
   } catch {
     log("⚠️  rcedit failed — the executable will carry the default Node icon.");
