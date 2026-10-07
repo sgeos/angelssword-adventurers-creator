@@ -189,6 +189,13 @@ chose `npx.cmd` on Windows and none passed a shell, which Node has required for 
 batch file since 20.12. The branch was correct about the filename and wrong about
 the call, and only running it on Windows could show that.
 
+**`listen EPERM` is the sandbox, not the server.** A session run under a
+sandbox that forbids binding local ports saw 32 of 54 application programming
+interface tests fail at once, every one with that error. The same tests passed
+outside the sandbox and in continuous integration. Thirty-two simultaneous
+failures sharing one system error are a fact about the environment until shown
+otherwise.
+
 **A port in use is not a fault in the artefact.** The first container run
 could not bind 3001 because a development server held it. Bind a different
 host port for a check rather than reading the collision as a defect, and say

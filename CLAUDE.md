@@ -95,12 +95,16 @@ graph. Shared code belongs in the platform layer or the core.
 npm start              # build the browser half, serve on port 3001
 npm run check          # typecheck, then lint
 npm test               # unit and application programming interface tests
-npx playwright test    # browser specifications
+npm run test:browser   # browser specifications, rebuilding first
 npm run test:all       # everything
 node build-exe.mts     # standalone binary for the host platform
 ```
 
 Requires Node 22.18 or newer, which is what native type stripping demands.
+
+Use `npm run test:browser` rather than `npx playwright test`. Playwright reuses
+a server that is already running and then skips its own rebuild, so the bare
+command can test a stale bundle and report regressions that are not there.
 
 ## Before editing many files
 
@@ -111,6 +115,10 @@ than a hypothetical one.
 ## Open matters
 
 Tracked in [`docs/decisions/OPEN.md`](./docs/decisions/OPEN.md). In brief,
-five modules have no unit tests because they are coupled to a live canvas,
-only the macOS binary has been built, and no stage has been exercised against
-live keys.
+five entry modules have no unit tests because they are coupled to a live
+canvas, though their wiring is now covered by browser specifications and their
+arithmetic lives in the core. Continuous integration builds the container and
+the binary for Linux and Windows on every push, and macOS is built by hand.
+OpenAI sprites and Gemini video have been run against live keys by the
+operator. Grok and ComfyUI have not. The decisions awaiting the operator are
+listed in the handoff.
