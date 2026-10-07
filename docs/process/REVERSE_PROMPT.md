@@ -12,10 +12,94 @@ file is arranged this way rather than being rewritten wholesale.
 
 ## Last Updated
 
+2026-10-07. The repository prepared for handoff to Codex and Grok Build.
+
+## Verification
+
+`npm run check` passes. 644 unit tests, 54 application programming interface
+tests and 75 browser specifications pass, run outside this session's sandbox
+because the sandbox forbids binding local ports. 158 documentation links
+resolve. Continuous integration is read separately after the push.
+
+## Summary
+
+Grok Build's own documentation, read from its local copy, states that it loads
+both `AGENTS.md` and `CLAUDE.md` from the repository root, and only once the
+folder is trusted. Codex loads `AGENTS.md` and not `CLAUDE.md`. So the two files
+reach one agent together and must agree, and every rule Codex must obey has to
+be in `AGENTS.md` rather than behind a link.
+
+Checking both files against the tree found five statements that had stopped
+being true: a project count of four where there are five, a compiled-output path
+the layering work had moved, a browser test command that can test a stale
+bundle, a claim that only the macOS binary had been built, and a claim that no
+stage had met live keys. `AGENTS.md` also lacked the layering rules entirely.
+All are corrected, and a test now checks the mechanical parts of both files.
+
+The process documents name no tool-specific feature, so the protocol needed no
+change. It has, however, never been run by anything but Claude Code here, and the
+handoff now says so rather than implying otherwise.
+
+## The finding most likely to matter to the next agent
+
+Under this session's sandbox, 32 of 54 application programming interface tests
+failed at once with `listen EPERM`. That is the sandbox refusing to bind a local
+port, and every one passes outside it and in continuous integration. Codex and
+Grok Build both commonly run sandboxed, and an agent seeing thirty-two failures
+could reasonably conclude the server is broken. `AGENTS.md` and the handoff now
+tell it to report such a run as not executed, naming the restriction.
+
+## Questions for Human Pilot
+
+**Should the next agent's sandbox allow local port binding?** Without it the
+proxy tests and browser specifications cannot run at all. In Claude Code that is
+`sandbox.network.allowLocalBinding`. I have not checked the equivalent settings
+for Codex or Grok Build and would not want to guess them.
+
+The decisions from the previous block stand and are all still yours: how the
+frame rate should be established, whether to self-host the webfonts or correct
+the README, the Gemini experiment with two anchored reference images, and whether
+to cut a release now that three platform binaries exist.
+
+## Technical Concerns
+
+**The guard does not catch everything it was written for.** Run against the old
+files it fails on the project count and the Playwright command, but not on the
+moved output path, because it skips paths containing a wildcard. It checks
+scripts, paths, links and a count, never whether prose is true.
+
+**I wrote one false sentence while preparing this**, that the protocol had been
+run by more than one assistant. The history shows only Claude Code. It was
+corrected before commit.
+
+**Nothing here was exercised in Codex or Grok Build.** What each tool loads comes
+from Grok's documentation and from the established Codex convention, not from
+running either against this repository. Running `grok inspect` in the repository
+would confirm Grok's side directly.
+
+## Intended Next Step
+
+None of mine. The repository is ready for another agent to resume from the
+handoff, and the open items are decisions.
+
+## Session Context
+
+`main` at `d9131dc` before this refresh.
+
+---
+
+## Superseded history
+
+Nothing below this line describes the present.
+
+### Superseded 2026-09-30 — continuous integration builds the container and the binaries
+
+#### Last Updated
+
 2026-09-30. Continuous integration now builds the container and the binaries.
 Three more findings, all of them instructions nothing executed.
 
-## Verification
+#### Verification
 
 `npm run check` passes across all five projects. 644 unit tests, 49 application
 programming interface tests, 75 browser specifications, all passing. 158
@@ -26,7 +110,7 @@ of them**, which now includes the container and a binary on two platforms. That
 is stronger than my local runs, being a clean checkout on hardware I do not
 have.
 
-## Summary
+#### Summary
 
 Entry-layer coverage was spent, so this went after the artefacts that are built
 by hand or not at all. Two jobs: one builds the image, runs it, and fetches the
@@ -53,7 +137,7 @@ without a shell, under the hardening added for CVE-2024-27980, and three call
 sites chose `npx.cmd` without one. The platform branch had been written and then
 not followed through. It is fixed, and Windows now builds and serves.
 
-## What I think the real lesson of today is
+#### What I think the real lesson of today is
 
 Six defects today, and five share a category that is not "untested code". They
 were **instructions about the code, held where nothing executes them**: a
@@ -67,7 +151,7 @@ not have worked, because every one of these was written carefully by someone
 paying attention, including me. What worked was arranging for a machine to
 perform the act.
 
-## Questions for Human Pilot
+#### Questions for Human Pilot
 
 Unchanged from the previous block, and all still yours.
 
@@ -90,7 +174,7 @@ notarized.
 
 Four further decisions are in [../decisions/OPEN.md](../decisions/OPEN.md).
 
-## Technical Concerns
+#### Technical Concerns
 
 **An empty result from a convenience wrapper is a fact about the wrapper.**
 `gh run list` returned an empty array and I formed the hypothesis that continuous
@@ -109,7 +193,7 @@ describe the platform support as finished.
 
 Carried forward: Grok and ComfyUI remain unexercised against anything real.
 
-## Intended Next Step
+#### Intended Next Step
 
 I do not have a next item of comparable value, and I would rather say so than
 invent one. Entry-layer coverage is spent, the extraction tail is exhausted, and
@@ -118,16 +202,10 @@ the artefacts now build themselves.
 What remains is the canvas work, where a specification means comparing pixels and
 becomes a maintenance burden; and the decisions above, which are yours.
 
-## Session Context
+#### Session Context
 
 `main` at `9a5f904` before this refresh. Upstream carries two open pull requests
 and one open issue, all from this fork.
-
----
-
-## Superseded history
-
-Nothing below this line describes the present.
 
 ### Superseded 2026-09-30 — the exporter, the settings panel, and the trust boundary
 

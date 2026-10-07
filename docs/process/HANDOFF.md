@@ -2,7 +2,7 @@
 
 > **Navigation**: [Process](./README.md) | [Documentation Root](../README.md)
 
-**Refreshed 2026-09-30. The anchor is `9a5f904`, the last commit before this
+**Refreshed 2026-10-07. The anchor is `d9131dc`, the last commit before this
 refresh.** Read this block, run the validity check, then read the task below.
 
 ---
@@ -16,11 +16,11 @@ itself.
 
 ### Ancestry
 
-`main` should **contain** `9a5f904`, the last commit before this refresh. Test
+`main` should **contain** `d9131dc`, the last commit before this refresh. Test
 containment rather than equality.
 
 ```sh
-git merge-base --is-ancestor 9a5f904 HEAD
+git merge-base --is-ancestor d9131dc HEAD
 ```
 
 If that fails, this file predates a history rewrite and is stale. If it
@@ -40,7 +40,7 @@ of the list rather than taking the next unused number, and renumber when
 inserting, because a list whose numbers skip reads as though checks are
 missing.
 
-1. `git ls-files` reports **97** TypeScript files and exactly **one**
+1. `git ls-files` reports **98** TypeScript files and exactly **one**
    JavaScript file, `eslint.config.mjs`, which is deliberate.
 2. **Five** `tsconfig.*.json` projects exist at the repository root, and
    `src/` holds exactly four directories, `core`, `platform-browser`,
@@ -48,7 +48,7 @@ missing.
 3. `src/core/ports/` holds **three** capability interfaces, namely
    `storage.mts`, `http.mts`, and `clock.mts`, and `src/core/` holds
    **nineteen** modules.
-4. `npm test` reports **644** unit tests and **49** application programming
+4. `npm test` reports **644** unit tests and **54** application programming
    interface tests, all passing.
 5. `npm run test:browser` reports **75** passing browser specifications. Use
    that script rather than `npx playwright test`, which reuses a running
@@ -69,6 +69,11 @@ missing.
    from a running container, and `binary`, which builds the standalone
    executable on Linux and on Windows and fetches from each.
 
+   Without an authenticated `gh`, report assertion 8 as **unverified**, not as
+   failed, and say why. The same holds for assertions 4 and 5 under a sandbox
+   that forbids binding local ports, where the tests fail with `listen EPERM`
+   for reasons unrelated to the code.
+
 Every assertion above was executed at the anchor.
 
 **Assertion 8 used to read "the container builds and serves" and was false for
@@ -86,6 +91,17 @@ depends on a person remembering. A claim only a human executes is a claim that
 rots, and this one did.
 
 If an assertion fails, this file is stale. Trust the repository and say so.
+
+## If this session is not Claude Code
+
+The protocol below names no tool-specific feature. Every commit in the history so
+far was made with Claude Code, however, so it has not yet been exercised by any
+other assistant. Anything in it that turns out to assume a Claude feature is a
+defect in the protocol, and should be recorded in
+[`AGENT_PITFALLS.md`](./AGENT_PITFALLS.md) rather than worked around silently.
+[`AGENTS.md`](../../AGENTS.md) states which file each tool loads.
+Codex does not load `CLAUDE.md`, so read it explicitly. Grok Build loads both,
+and only once the folder is trusted.
 
 ## What a resuming session should do first
 

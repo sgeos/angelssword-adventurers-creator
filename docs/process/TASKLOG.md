@@ -81,7 +81,10 @@ dropped.
 | Linux and Windows binaries built | Complete | First time ever; both serve in CI |
 | Windows binary made buildable | Complete | `npx.cmd` needs a shell since Node 20.12 |
 | Stale path in the binary procedure fixed | Complete | Documented check returned 404 on a good binary |
-| `shell.mts` surveyed | Complete | Nothing extractable; claim now verified |
+| `shell.mts` surveyed | Complete | Nothing extractable, claim now verified |
+| Agent files prepared for Codex and Grok Build | Complete | Five stale facts corrected, layering rules added to AGENTS.md |
+| Agent instruction files guarded by a test | Complete | Fails on the old files, misses wildcard paths |
+| Sandbox port binding identified | Recorded | `listen EPERM` is the sandbox, not the server |
 
 ## Open Items
 
