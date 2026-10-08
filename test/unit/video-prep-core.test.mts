@@ -103,7 +103,8 @@ describe('video-prep-core buildVideoPrepHandoffPayload', () => {
             videoWidth: 512,
             videoHeight: 512,
             duration: 2.5,
-            fps: 30,
+            sourceFps: 30,
+            sourceFpsOrigin: 'detected',
             totalFrames: 75,
             loopMode: 'pingpong',
             loopPoint: 10,
@@ -111,7 +112,7 @@ describe('video-prep-core buildVideoPrepHandoffPayload', () => {
             concatWidth: 512,
             concatHeight: 512,
             concatDuration: 1.2,
-            concatFps: 24,
+            concatSourceFps: 24,
         }, overrides);
     }
 
@@ -127,7 +128,8 @@ describe('video-prep-core buildVideoPrepHandoffPayload', () => {
             videoWidth: 512,
             videoHeight: 512,
             duration: 2.5,
-            fps: 30,
+            sourceFps: 30,
+            sourceFpsOrigin: 'detected',
             totalFrames: 75,
             loopMode: 'pingpong',
             // Defaults to 0 for a state predating the control's start point,
@@ -153,7 +155,7 @@ describe('video-prep-core buildVideoPrepHandoffPayload', () => {
             videoWidth: 512,
             videoHeight: 512,
             duration: 1.2,
-            fps: 24,
+            sourceFps: 24,
             crossfade: true,
             crossfadeDuration: 300,
         });

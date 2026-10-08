@@ -2,6 +2,8 @@
  * Pure logic extracted from video-prep.
  */
 
+import type { FrameRateOrigin } from "./frame-rate.mts";
+
 export type LoopMode = "none" | "reverse" | "pingpong";
 
 /** Fewest frames a loop can span and still be worth playing. */
@@ -197,7 +199,9 @@ export interface VideoPrepState {
   readonly videoWidth?: number;
   readonly videoHeight?: number;
   readonly duration?: number;
-  readonly fps?: number;
+  /** The clip's encoded rate. Not how fast this machine plays it. */
+  readonly sourceFps?: number;
+  readonly sourceFpsOrigin?: FrameRateOrigin;
   readonly totalFrames: number;
   readonly loopMode: string;
   /** First frame of the loop. Absent means 0, for a caller predating it. */
@@ -207,7 +211,7 @@ export interface VideoPrepState {
   readonly concatWidth?: number;
   readonly concatHeight?: number;
   readonly concatDuration?: number;
-  readonly concatFps?: number;
+  readonly concatSourceFps?: number;
 }
 
 export interface HandoffOptions {
@@ -221,7 +225,7 @@ export interface ConcatPayload {
   readonly videoWidth: number | undefined;
   readonly videoHeight: number | undefined;
   readonly duration: number | undefined;
-  readonly fps: number | undefined;
+  readonly sourceFps: number | undefined;
   readonly crossfade: boolean;
   readonly crossfadeDuration: number;
 }
@@ -231,7 +235,12 @@ export interface HandoffPayload {
   readonly videoWidth: number | undefined;
   readonly videoHeight: number | undefined;
   readonly duration: number | undefined;
-  readonly fps: number | undefined;
+  /**
+   * The clip's encoded rate, and whether it was measured or assumed. The
+   * exporter adopts a measured figure and measures for itself otherwise.
+   */
+  readonly sourceFps: number | undefined;
+  readonly sourceFpsOrigin: FrameRateOrigin | undefined;
   readonly totalFrames: number;
   readonly loopMode: string;
   /**
@@ -257,7 +266,8 @@ export const buildVideoPrepHandoffPayload = (
   videoWidth: state.videoWidth,
   videoHeight: state.videoHeight,
   duration: state.duration,
-  fps: state.fps,
+  sourceFps: state.sourceFps,
+  sourceFpsOrigin: state.sourceFpsOrigin,
   totalFrames: state.totalFrames,
 
   loopMode: state.loopMode,
@@ -277,7 +287,7 @@ export const buildVideoPrepHandoffPayload = (
           videoWidth: state.concatWidth,
           videoHeight: state.concatHeight,
           duration: state.concatDuration,
-          fps: state.concatFps,
+          sourceFps: state.concatSourceFps,
           crossfade: opts.crossfade === true,
           crossfadeDuration: opts.crossfadeDuration ?? 0,
         }

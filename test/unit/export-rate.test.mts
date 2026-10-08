@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { ASSUMED_SOURCE_FPS } from '../../src/core/frame-rate.mts';
 import {
-    ASSUMED_SOURCE_FPS,
     gifDelayCentiseconds,
     resolveDimension,
     resolveExportFps,

@@ -65,6 +65,8 @@ import { browserStore } from "../platform-browser/local-storage.mts";
 import { fetchBlob } from "../platform-browser/binary.mts";
 import type { EncodeRequest, EncodeResponse, WorkerFrame } from "../core/gif-worker-core.mts";
 import type { TimerCommand } from "../platform-worker/timer-worker.mts";
+import { ASSUMED_SOURCE_FPS, describeSourceRate, type FrameRateOrigin, type SourceFrameRate } from "../core/frame-rate.mts";
+import { probeSourceRate } from "../platform-browser/frame-rate-probe.mts";
 
 /**
  * Read an integer from a numeric input, falling back when the field is blank
@@ -97,9 +99,14 @@ export class ModelExporter {
     videoLoaded = false;
     videoWidth = 0;
     videoHeight = 0;
-    fps = 30;
-    /** Frame rate measured from the decoder, when the browser reports one. */
-    detectedFps: number | undefined = undefined;
+    /**
+     * The clip's encoded rate, measured from its frame timestamps or assumed.
+     * It maps frame numbers to times. It is not the export rate, which is the
+     * output field resolved by `resolveExportFps`, and it is never how fast
+     * this machine happens to play the clip.
+     */
+    sourceFps: number = ASSUMED_SOURCE_FPS;
+    sourceFpsOrigin: FrameRateOrigin = 'assumed';
     duration = 0;
     totalFrames = 0;
     currentFrame = 0;
@@ -206,107 +213,78 @@ export class ModelExporter {
                 showToast('Please upload a video file', 'error');
                 return;
             }
-            this.loadVideo(file);
+            this.loadFrom(URL.createObjectURL(file), undefined).catch((e: unknown) => {
+                showToast(e instanceof Error ? e.message : 'Could not load the video', 'error');
+            });
         });
     }
 
-    loadVideo(fileOrBlob: Blob): void {
-        const url = URL.createObjectURL(fileOrBlob);
-        this.video.src = url;
+    /**
+     * Load a clip, and establish its source rate unless one is handed in.
+     *
+     * One routine for every route. There used to be two near copies that
+     * differed only in the rate: a dropped file was assumed to be thirty
+     * frames per second, and the URL route adopted Video Prep's figure. The
+     * normal handoff route went through the first, so in practice the rate
+     * Video Prep handed over was ignored and one clip had two frame counts.
+     *
+     * `handed` is adopted only when it was measured. An assumed figure from
+     * Video Prep is no better than measuring here, so the clip is measured.
+     */
+    async loadFrom(src: string, handed: SourceFrameRate | undefined): Promise<void> {
+        this.video.src = src;
+        // A file the browser cannot decode never reaches `loadedmetadata`, so
+        // the error is what ends the wait. The original waited forever.
+        await new Promise<void>((resolve, reject) => {
+            this.video.addEventListener('loadedmetadata', () => { resolve(); }, { once: true });
+            this.video.addEventListener('error', () => { reject(new Error('The browser could not decode this video')); }, { once: true });
+            this.video.load();
+        });
+        this.videoWidth = this.video.videoWidth;
+        this.videoHeight = this.video.videoHeight;
+        this.duration = this.video.duration;
 
-        this.video.addEventListener('loadedmetadata', () => {
-            this.videoWidth = this.video.videoWidth;
-            this.videoHeight = this.video.videoHeight;
-            this.duration = this.video.duration;
-            this.fps = 30; // default assumption
-            this.totalFrames = frameCountFromDuration(this.duration, this.fps);
-            this.currentFrame = 0;
+        const rate = handed?.origin === 'detected' ? handed : await probeSourceRate(this.video);
+        this.sourceFps = rate.fps;
+        this.sourceFpsOrigin = rate.origin;
+        this.totalFrames = frameCountFromDuration(this.duration, this.sourceFps);
+        this.currentFrame = 0;
 
-            // Set canvas size
-            this.previewCanvas.width = this.videoWidth;
-            this.previewCanvas.height = this.videoHeight;
-            this.workCanvas.width = this.videoWidth;
-            this.workCanvas.height = this.videoHeight;
+        // Set canvas size
+        this.previewCanvas.width = this.videoWidth;
+        this.previewCanvas.height = this.videoHeight;
+        this.workCanvas.width = this.videoWidth;
+        this.workCanvas.height = this.videoHeight;
 
-            // Enable stages
-            requireEl('exStage2', HTMLElement).classList.remove('disabled');
-            requireEl('exStage3', HTMLElement).classList.remove('disabled');
+        // Enable stages
+        requireEl('exStage2', HTMLElement).classList.remove('disabled');
+        requireEl('exStage3', HTMLElement).classList.remove('disabled');
 
-            // Set scrubber
-            const scrubber = requireEl('exScrubber', HTMLInputElement);
-            scrubber.max = String(this.totalFrames - 1);
-            scrubber.value = String(0);
+        // Set scrubber
+        const scrubber = requireEl('exScrubber', HTMLInputElement);
+        scrubber.max = String(this.totalFrames - 1);
+        scrubber.value = String(0);
 
-            // Set export range defaults
-            requireEl('exStartFrame', HTMLInputElement).value = String(0);
-            requireEl('exEndFrame', HTMLInputElement).value = String(this.totalFrames - 1);
-            this._applyPendingRange();
-            requireEl('exWidth', HTMLInputElement).value = String(this.videoWidth);
-            requireEl('exHeight', HTMLInputElement).value = String(this.videoHeight);
+        // Set export range defaults
+        requireEl('exStartFrame', HTMLInputElement).value = String(0);
+        requireEl('exEndFrame', HTMLInputElement).value = String(this.totalFrames - 1);
+        this._applyPendingRange();
+        requireEl('exWidth', HTMLInputElement).value = String(this.videoWidth);
+        requireEl('exHeight', HTMLInputElement).value = String(this.videoHeight);
 
-            this.videoLoaded = true;
-            this.updateFrameInfo();
-            this.updateVideoInfo();
-            this.updateSizeEstimate();
+        this.videoLoaded = true;
+        this.updateFrameInfo();
+        this.updateVideoInfo();
+        this.updateSizeEstimate();
 
-            // Seek to frame 0 so the browser decodes a visible frame for the canvas
-            this.video.currentTime = 0;
-            this.video.addEventListener('seeked', () => {
-                this.updatePreview();
-                // Auto-detect chroma key color on load
-                requireEl('exAutoDetect', HTMLButtonElement).click();
-                showToast(`Video loaded: ${this.videoWidth.toString()}×${this.videoHeight.toString()}, ${this.totalFrames.toString()} frames`, 'success');
-            }, { once: true });
+        // Seek to frame 0 so the browser decodes a visible frame for the canvas
+        this.video.currentTime = 0;
+        this.video.addEventListener('seeked', () => {
+            this.updatePreview();
+            // Auto-detect chroma key color on load
+            requireEl('exAutoDetect', HTMLButtonElement).click();
+            showToast(`Video loaded: ${this.videoWidth.toString()}×${this.videoHeight.toString()}, ${this.totalFrames.toString()} frames`, 'success');
         }, { once: true });
-
-        this.video.load();
-    }
-
-    loadVideoFromUrl(url: string): void {
-        this.video.src = url;
-
-        this.video.addEventListener('loadedmetadata', () => {
-            this.videoWidth = this.video.videoWidth;
-            this.videoHeight = this.video.videoHeight;
-            this.duration = this.video.duration;
-            this.fps = positiveOr(this.detectedFps ?? 0, 30);
-            this.totalFrames = frameCountFromDuration(this.duration, this.fps);
-            this.currentFrame = 0;
-
-            this.previewCanvas.width = this.videoWidth;
-            this.previewCanvas.height = this.videoHeight;
-            this.workCanvas.width = this.videoWidth;
-            this.workCanvas.height = this.videoHeight;
-
-            requireEl('exStage2', HTMLElement).classList.remove('disabled');
-            requireEl('exStage3', HTMLElement).classList.remove('disabled');
-
-            const scrubber = requireEl('exScrubber', HTMLInputElement);
-            scrubber.max = String(this.totalFrames - 1);
-            scrubber.value = String(0);
-
-            requireEl('exStartFrame', HTMLInputElement).value = String(0);
-            requireEl('exEndFrame', HTMLInputElement).value = String(this.totalFrames - 1);
-            this._applyPendingRange();
-            requireEl('exWidth', HTMLInputElement).value = String(this.videoWidth);
-            requireEl('exHeight', HTMLInputElement).value = String(this.videoHeight);
-
-            this.videoLoaded = true;
-            this.updateFrameInfo();
-            this.updateVideoInfo();
-            this.updateSizeEstimate();
-
-            // Seek to frame 0 so the browser decodes a visible frame for the canvas
-            this.video.currentTime = 0;
-            this.video.addEventListener('seeked', () => {
-                this.updatePreview();
-                // Auto-detect chroma key color on load
-                requireEl('exAutoDetect', HTMLButtonElement).click();
-                showToast(`Video loaded: ${this.videoWidth.toString()}×${this.videoHeight.toString()}, ${this.totalFrames.toString()} frames`, 'success');
-            }, { once: true });
-        }, { once: true });
-
-        this.video.load();
     }
 
     /**
@@ -346,13 +324,21 @@ export class ModelExporter {
                     // Set before loading: the handler that writes the default
                     // range fires later and calls _applyPendingRange after it.
                     this._pendingRange = exportRangeFromHandoff(data) ?? null;
+                    // Passed in rather than stored on the instance, where a
+                    // value from an earlier handoff used to linger.
+                    const handed: SourceFrameRate | undefined =
+                        data.sourceFps !== undefined && data.sourceFpsOrigin !== undefined
+                            ? { fps: data.sourceFps, origin: data.sourceFpsOrigin }
+                            : undefined;
                     try {
-                        this.loadVideo(await fetchBlob(videoSource));
+                        await this.loadFrom(URL.createObjectURL(await fetchBlob(videoSource)), handed);
                     } catch (e) {
                         // Fallback: load video directly from URL
                         console.warn('[ModelExporter] Could not fetch video blob, loading from URL:',
                             e instanceof Error ? e.message : 'unknown error');
-                        this.loadVideoFromUrl(videoSource);
+                        await this.loadFrom(videoSource, handed).catch((err: unknown) => {
+                            showToast(err instanceof Error ? err.message : 'Could not load the video', 'error');
+                        });
                     }
                     fromVP.classList.remove('hidden');
 
@@ -360,11 +346,6 @@ export class ModelExporter {
                         data.loopMode === 'pingpong' ? 'pingpong'
                         : data.loopMode === 'reverse' ? 'reverse'
                         : 'forward';
-
-                    // Store FPS from Video Prep if available
-                    if (data.fps !== undefined && data.fps > 0) {
-                        this.detectedFps = data.fps;
-                    }
 
                     // Adopt the key colour chosen in Sprite Prep. It lives on
                     // the handoff root rather than inside videoPrepData, which
@@ -824,7 +805,8 @@ export class ModelExporter {
         this.isPlaying = true;
         requireEl('exPlayBtn', HTMLButtonElement).textContent = '⏸';
 
-        const frameInterval = 1000 / this.fps;
+        // The preview shows the source clip, so it runs at the source rate.
+        const frameInterval = 1000 / this.sourceFps;
         this.playTimer = setInterval(() => {
             this.currentFrame++;
             if (this.currentFrame >= this.totalFrames) {
@@ -845,7 +827,7 @@ export class ModelExporter {
     }
 
     seekToFrame(frameNum: number): void {
-        const targetTime = frameTime(frameNum, this.fps, this.duration);
+        const targetTime = frameTime(frameNum, this.sourceFps, this.duration);
         this.updateFrameInfo();
 
         if (isAtTime(this.video.currentTime, targetTime)) {
@@ -1040,7 +1022,7 @@ export class ModelExporter {
         // Frame range changes
         ['exStartFrame', 'exEndFrame', 'exFrameSkip', 'exFPS'].forEach(id => {
             requireEl(id, HTMLInputElement)
-                .addEventListener('change', () => { this.updateSizeEstimate(); });
+                .addEventListener('change', () => { this.updateSizeEstimate(); this.updateVideoInfo(); });
         });
     }
 
@@ -1108,6 +1090,13 @@ export class ModelExporter {
         estSize.textContent = `Est. Size: ~${formatBytes(est)}`;
     }
 
+    /** The export rate as it will be applied, saying when it follows the source. */
+    describeExportRate(): string {
+        const asked = intFromField('exFPS', 0);
+        const fps = resolveExportFps(asked, this.sourceFps);
+        return asked > 0 ? `${fps.toString()} fps (set)` : `${fps.toString()} fps (matches source)`;
+    }
+
     updateVideoInfo(): void {
         const el = requireEl('exInfo', HTMLElement);
         if (!this.videoLoaded) {
@@ -1119,7 +1108,8 @@ export class ModelExporter {
             <div><strong>Resolution:</strong> ${this.videoWidth.toString()}×${this.videoHeight.toString()}</div>
             <div><strong>Duration:</strong> ${this.duration.toFixed(2)}s</div>
             <div><strong>Frames:</strong> ${this.totalFrames.toString()}</div>
-            <div><strong>FPS:</strong> ${this.fps.toString()}</div>
+            <div><strong>Source FPS:</strong> ${describeSourceRate({ fps: this.sourceFps, origin: this.sourceFpsOrigin })}</div>
+            <div><strong>Export FPS:</strong> ${this.describeExportRate()}</div>
         `;
     }
 
@@ -1163,7 +1153,7 @@ export class ModelExporter {
 
         const width = Math.min(resolveDimension(intFromField('exWidth', 0), this.videoWidth), limits.maxWidth);
         const height = Math.min(resolveDimension(intFromField('exHeight', 0), this.videoHeight), limits.maxHeight);
-        const exportFps = resolveExportFps(intFromField('exFPS', 0), this.fps);
+        const exportFps = resolveExportFps(intFromField('exFPS', 0), this.sourceFps);
         const startFrame = intFromField('exStartFrame', 0);
         const endFrame = intFromField('exEndFrame', 0);
         const skip = strideFromSkip(intFromField('exFrameSkip', 0));
@@ -1216,7 +1206,7 @@ export class ModelExporter {
 
                 const f = frameList[fi];
                 if (f === undefined) continue;
-                await this.seekToAsync(f / this.fps);
+                await this.seekToAsync(f / this.sourceFps);
 
                 drawScaled();
                 const imageData = recCtx.getImageData(0, 0, width, height);
@@ -1360,7 +1350,7 @@ export class ModelExporter {
         const width = Math.min(resolveDimension(intFromField('exWidth', 0), this.videoWidth), limits.maxWidth);
         const height = Math.min(resolveDimension(intFromField('exHeight', 0), this.videoHeight), limits.maxHeight);
         const maxColors = 128;
-        const exportFps = resolveExportFps(intFromField('exFPS', 0), this.fps);
+        const exportFps = resolveExportFps(intFromField('exFPS', 0), this.sourceFps);
         const delayCentiseconds = gifDelayCentiseconds(exportFps);
         const startFrame = intFromField('exStartFrame', 0);
         const endFrame = intFromField('exEndFrame', 0);
@@ -1414,7 +1404,7 @@ export class ModelExporter {
             for (let si = 0; si < totalFrames; si += sampleStep) {
                 const f = frameList[si];
                 if (f === undefined) continue;
-                await this.seekToAsync(f / this.fps);
+                await this.seekToAsync(f / this.sourceFps);
                 drawVideoScaled(outCtx, width, height);
                 const sd = outCtx.getImageData(0, 0, width, height);
                 this.chromaKey.process(sd);
@@ -1448,7 +1438,7 @@ export class ModelExporter {
 
                 const f = uniqueFrames[ui];
                 if (f === undefined) continue;
-                await this.seekToAsync(f / this.fps);
+                await this.seekToAsync(f / this.sourceFps);
 
                 drawVideoScaled(outCtx, width, height);
                 const imageData = outCtx.getImageData(0, 0, width, height);

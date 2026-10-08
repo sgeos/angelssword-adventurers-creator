@@ -193,37 +193,25 @@ test.describe('F — The output estimate follows its controls', () => {
 });
 
 /**
- * F — What the frame count rests on, which is not the file.
+ * F — The source rate is read from the clip, not assumed.
  *
- * Found while writing the range assertions above. The exporter reported sixty
- * frames for a clip that Video Prep reported as thirty-eight, the same clip in
- * both cases, and the reason is that the two stages establish the rate by
- * different means and neither reads it from the container.
- *
- * A file dropped on the exporter is assumed to be thirty frames per second,
- * marked in the source as a default assumption. Video Prep measures by playing
- * the clip, which under-reports on a host that cannot decode in real time.
- * A clip arriving by handoff carries Video Prep's figure, so the exporter
- * gives two different answers for one clip depending on how it arrived.
- *
- * Characterised rather than corrected. The reasoning for not changing
- * detection unilaterally, and what would decide it, is in
- * docs/decisions/OPEN.md.
+ * A file dropped here used to be assumed to be thirty frames per second, so a
+ * fifteen frame clip was counted as sixty frames with every real frame twice.
+ * The rate now comes from the frames' own timestamps.
  */
-test.describe('F — The assumed frame rate', () => {
-    test('assumes thirty frames per second, and so miscounts a clip at fifteen', async ({ page }) => {
+test.describe('F — The source rate is detected', () => {
+    test('counts a clip at fifteen frames per second as thirty frames', async ({ page }) => {
         await page.goto('/');
         await page.locator('.tab-btn[data-tab="tab-exporter"]').click();
         await page.locator('#exFileInput').setInputFiles(LOOP_CLIP_15FPS);
         await expect(page.locator('#exStage3')).not.toHaveClass(/disabled/);
 
-        // Two seconds at fifteen frames per second is thirty frames. The
-        // exporter says sixty, because it assumed the rate.
-        await expect(page.locator('#exEndFrame')).toHaveValue('59');
-        expect(await estimatedFrames(page)).toBe(60);
+        await expect(page.locator('#exEndFrame')).toHaveValue('29');
+        expect(await estimatedFrames(page)).toBe(30);
+        await expect(page.locator('#exInfo')).toContainText('15 fps (detected)');
     });
 
-    test('is not reading the rate from the file, which the two clips show', async ({ page }) => {
+    test('gives two clips of equal length but different rates different counts', async ({ page }) => {
         const counts: number[] = [];
         for (const clip of [LOOP_CLIP, LOOP_CLIP_15FPS]) {
             await page.goto('/');
@@ -232,8 +220,12 @@ test.describe('F — The assumed frame rate', () => {
             await expect(page.locator('#exStage3')).not.toHaveClass(/disabled/);
             counts.push(Number(await page.locator('#exEndFrame').inputValue()) + 1);
         }
-        // Same duration, half the rate, and the same count reported for both.
-        expect(counts[0]).toBe(counts[1]);
+        expect(counts).toEqual([60, 30]);
+    });
+
+    test('says the export rate follows the source unless set', async ({ page }) => {
+        await loadForExport(page);
+        await expect(page.locator('#exInfo')).toContainText('30 fps (matches source)');
     });
 });
 

@@ -1,3 +1,4 @@
+import { ASSUMED_SOURCE_FPS } from "./frame-rate.mts";
 import type { KeyValueStore } from "./ports/storage.mts";
 import { channel, type RgbaBuffer } from "./pixels.mts";
 
@@ -631,9 +632,6 @@ export const MAX_GIF_FPS: number = 100 / MIN_GIF_DELAY_CENTISECONDS;
  * centiseconds and becomes 4, which plays at 25. That drift is inherent to
  * the format rather than a choice made here.
  */
-/** The rate assumed when nothing better is known. Not a measurement. */
-export const ASSUMED_SOURCE_FPS = 30;
-
 /**
  * The rate an export plays at, given the output rate field and the source.
  *

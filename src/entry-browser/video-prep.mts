@@ -23,6 +23,8 @@ import {
     seekDuration,
     stepFrame,
 } from "../core/video-time.mts";
+import { ASSUMED_SOURCE_FPS, describeSourceRate, type FrameRateOrigin } from "../core/frame-rate.mts";
+import { probeSourceRate } from "../platform-browser/frame-rate-probe.mts";
 
 /**
  * Start playback, reporting the rejection the browser raises when an
@@ -52,7 +54,9 @@ interface VideoPrepState {
     duration: number;
     videoWidth: number;
     videoHeight: number;
-    fps: number;
+    /** The clip's encoded rate. Never how fast this machine plays it. */
+    sourceFps: number;
+    sourceFpsOrigin: FrameRateOrigin;
     totalFrames: number;
     currentFrame: number;
     /** Offscreen canvas of frame 0, used for onion skinning. */
@@ -79,7 +83,7 @@ interface VideoPrepState {
     concatDuration: number;
     concatWidth: number;
     concatHeight: number;
-    concatFps: number;
+    concatSourceFps: number;
 
     fromVideoGen: boolean;
 }
@@ -91,7 +95,8 @@ const state: VideoPrepState = {
     duration: 0,
     videoWidth: 0,
     videoHeight: 0,
-    fps: 30,
+    sourceFps: ASSUMED_SOURCE_FPS,
+    sourceFpsOrigin: 'assumed',
     totalFrames: 0,
     currentFrame: 0,
     frame0Image: null,     // offscreen canvas of frame 0 for onion skin
@@ -122,7 +127,7 @@ const state: VideoPrepState = {
     concatDuration: 0,
     concatWidth: 0,
     concatHeight: 0,
-    concatFps: 30,
+    concatSourceFps: ASSUMED_SOURCE_FPS,
 
     // Source tracking
     fromVideoGen: false,
@@ -173,7 +178,7 @@ function updateVideoInfo(): void {
     let html = `
         <div><strong>Resolution:</strong> ${state.videoWidth.toString()} × ${state.videoHeight.toString()}</div>
         <div><strong>Duration:</strong> ${state.duration.toFixed(2)}s</div>
-        <div><strong>FPS:</strong> ${state.fps.toString()}</div>
+        <div><strong>Source FPS:</strong> ${describeSourceRate({ fps: state.sourceFps, origin: state.sourceFpsOrigin })}</div>
         <div><strong>Frames:</strong> ${state.totalFrames.toString()}</div>
     `;
 
@@ -202,7 +207,7 @@ function updateVideoInfo(): void {
             <hr style="border-color:rgba(255,255,255,0.1);margin:0.4rem 0">
             <div><strong>2nd Video:</strong> ${state.concatWidth.toString()}×${state.concatHeight.toString()}</div>
             <div><strong>2nd Duration:</strong> ${state.concatDuration.toFixed(2)}s</div>
-            <div><strong>2nd FPS:</strong> ${state.concatFps.toString()}</div>
+            <div><strong>2nd Source FPS:</strong> ${state.concatSourceFps.toString()}</div>
             <div><strong>Crossfade:</strong> ${crossfade.checked ? `${cfDur.value}ms` : 'Off'}</div>
         `;
     }
@@ -240,24 +245,16 @@ async function loadVideo(file: File): Promise<void> {
     state.videoWidth = video.videoWidth;
     state.videoHeight = video.videoHeight;
 
-    // ── FPS Detection ──
-    let fps = 30;
-    if (typeof video.getVideoPlaybackQuality === 'function') {
-        video.playbackRate = 4;
-        playOrWarn(video);
-        await new Promise(r => setTimeout(r, 500));
-        const q = video.getVideoPlaybackQuality();
-        if (q.totalVideoFrames > 0) {
-            fps = Math.round(q.totalVideoFrames / (video.currentTime > 0 ? video.currentTime : 0.5));
-        }
-        video.pause();
-        video.playbackRate = 1;
-        video.currentTime = 0;
-    }
-    // Validate
-    if (fps < 10 || fps > 120) fps = 30;
-    state.fps = fps;
-    state.totalFrames = frameCountFromDuration(state.duration, fps);
+    // ── Source frame rate ──
+    // The rate the clip was encoded at, read from its own frame timestamps.
+    // This used to measure how fast this machine could decode at four times
+    // speed and call that the clip's rate, which reported nineteen for a
+    // thirty frame clip on a slow host. See core/frame-rate.mts.
+    const rate = await probeSourceRate(video);
+    video.currentTime = 0;
+    state.sourceFps = rate.fps;
+    state.sourceFpsOrigin = rate.origin;
+    state.totalFrames = frameCountFromDuration(state.duration, rate.fps);
 
     // ── Setup canvas ──
     const canvas = requireEl('vpCanvas', HTMLCanvasElement);
@@ -324,7 +321,7 @@ async function loadVideo(file: File): Promise<void> {
     requireEl('vpStage3', HTMLElement).classList.remove('disabled');
 
     updateVideoInfo();
-    showToast(`Video loaded: ${state.totalFrames.toString()} frames @ ${fps.toString()}fps`, 'success');
+    showToast(`Video loaded: ${state.totalFrames.toString()} frames @ ${describeSourceRate({ fps: state.sourceFps, origin: state.sourceFpsOrigin })}`, 'success');
 
     // ── Auto-cache frames for instant scrubbing ──
     void autoCacheFrames();
@@ -377,7 +374,7 @@ async function autoCacheFrames(): Promise<void> {
     for (let i = 0; i < total; i++) {
         if (!stillCaching()) break; // Video changed, abort
 
-        const time = frameTime(i, state.fps, state.duration);
+        const time = frameTime(i, state.sourceFps, state.duration);
         video.currentTime = time;
         await new Promise(r => { video.addEventListener('seeked', r, { once: true }); });
 
@@ -405,7 +402,7 @@ async function autoCacheFrames(): Promise<void> {
 
 function seekToFrame(frameIdx: number): void {
     if (!state.videoLoaded) return;
-    const time = frameTime(frameIdx, state.fps, state.duration);
+    const time = frameTime(frameIdx, state.sourceFps, state.duration);
 
     // Update scrubber and info
     const info = requireEl('vpFrameInfo', HTMLElement);
@@ -459,7 +456,7 @@ function playVideo(): void {
     // two drift apart, and `autoCacheFrames` leaves the element on the LAST
     // frame. Resuming from there fires `ended` on the first animation frame
     // and playback stops before it starts.
-    const resumeAt = frameTime(state.currentFrame, state.fps, state.duration);
+    const resumeAt = frameTime(state.currentFrame, state.sourceFps, state.duration);
     if (!isAtTime(video.currentTime, resumeAt)) video.currentTime = resumeAt;
 
     playOrWarn(video);
@@ -472,7 +469,7 @@ function playVideo(): void {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
         // Update timeline and frame counter
-        const frame = Math.round(video.currentTime * state.fps);
+        const frame = Math.round(video.currentTime * state.sourceFps);
         state.currentFrame = Math.min(frame, state.totalFrames - 1);
         requireEl('vpScrubber', HTMLInputElement).value = String(state.currentFrame);
         requireEl('vpFrameInfo', HTMLElement).textContent =
@@ -625,7 +622,8 @@ function previewLoop(): void {
     const canvas = requireEl('vpCanvas', HTMLCanvasElement);
     const ctx = require2d(canvas);
     // Real time, because the cache holds exact frames rather than samples.
-    const frameDelay = 1000 / (state.fps > 0 ? state.fps : 30);
+    // The loop preview shows source frames, so it runs at the source rate.
+    const frameDelay = 1000 / (state.sourceFps > 0 ? state.sourceFps : ASSUMED_SOURCE_FPS);
 
     let idx = 0;
     let lastFrameTime = performance.now();
@@ -690,30 +688,20 @@ async function loadConcatVideo(file: File): Promise<void> {
     state.concatWidth = video.videoWidth;
     state.concatHeight = video.videoHeight;
 
-    // Detect FPS for 2nd video
-    let fps = 30;
-    if (typeof video.getVideoPlaybackQuality === 'function') {
-        video.playbackRate = 4;
-        playOrWarn(video);
-        await new Promise(r => setTimeout(r, 500));
-        const q = video.getVideoPlaybackQuality();
-        if (q.totalVideoFrames > 0) {
-            fps = Math.round(q.totalVideoFrames / (video.currentTime > 0 ? video.currentTime : 0.5));
-        }
-        video.pause();
-        video.playbackRate = 1;
-        video.currentTime = 0;
-    }
-    if (fps < 10 || fps > 120) fps = 30;
-    state.concatFps = fps;
+    // The second clip's own source rate, established the same way. The two
+    // clips need not share one.
+    const rate = await probeSourceRate(video);
+    video.currentTime = 0;
+    state.concatSourceFps = rate.fps;
+    const fps = describeSourceRate(rate);
 
     // Update UI
     requireEl('vpConcatText', HTMLElement).textContent =
-        `2nd video: ${state.concatWidth.toString()}×${state.concatHeight.toString()}, ${state.concatDuration.toFixed(2)}s @ ${fps.toString()}fps`;
+        `2nd video: ${state.concatWidth.toString()}×${state.concatHeight.toString()}, ${state.concatDuration.toFixed(2)}s @ ${fps}`;
     requireEl('vpConcatInfo', HTMLElement).classList.remove('hidden');
 
     updateVideoInfo();
-    showToast(`2nd video loaded: ${state.concatDuration.toFixed(2)}s @ ${fps.toString()}fps`, 'success');
+    showToast(`2nd video loaded: ${state.concatDuration.toFixed(2)}s @ ${fps}`, 'success');
 }
 
 function removeConcatVideo(silent = false): void {
