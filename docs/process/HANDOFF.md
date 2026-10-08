@@ -2,7 +2,7 @@
 
 > **Navigation**: [Process](./README.md) | [Documentation Root](../README.md)
 
-**Refreshed 2026-10-07. The anchor is `d9131dc`, the last commit before this
+**Refreshed 2026-10-07. The anchor is `adfffe2`, the last commit before this
 refresh.** Read this block, run the validity check, then read the task below.
 
 ---
@@ -16,11 +16,11 @@ itself.
 
 ### Ancestry
 
-`main` should **contain** `d9131dc`, the last commit before this refresh. Test
+`main` should **contain** `adfffe2`, the last commit before this refresh. Test
 containment rather than equality.
 
 ```sh
-git merge-base --is-ancestor d9131dc HEAD
+git merge-base --is-ancestor adfffe2 HEAD
 ```
 
 If that fails, this file predates a history rewrite and is stale. If it
@@ -40,7 +40,7 @@ of the list rather than taking the next unused number, and renumber when
 inserting, because a list whose numbers skip reads as though checks are
 missing.
 
-1. `git ls-files` reports **98** TypeScript files and exactly **one**
+1. `git ls-files` reports **99** TypeScript files and exactly **one**
    JavaScript file, `eslint.config.mjs`, which is deliberate.
 2. **Five** `tsconfig.*.json` projects exist at the repository root, and
    `src/` holds exactly four directories, `core`, `platform-browser`,
@@ -48,9 +48,9 @@ missing.
 3. `src/core/ports/` holds **three** capability interfaces, namely
    `storage.mts`, `http.mts`, and `clock.mts`, and `src/core/` holds
    **nineteen** modules.
-4. `npm test` reports **644** unit tests and **54** application programming
+4. `npm test` reports **654** unit tests and **54** application programming
    interface tests, all passing.
-5. `npm run test:browser` reports **75** passing browser specifications. Use
+5. `npm run test:browser` reports **77** passing browser specifications. Use
    that script rather than `npx playwright test`, which reuses a running
    server and therefore skips its own rebuild.
 6. `tsc -p tsconfig.core.json` succeeds, and adding `localStorage` to any file
@@ -188,36 +188,38 @@ The remedy is a machine performing the act, not more careful prose.
 
 ## The next task
 
-**Run the discriminating test, and it needs the operator.** Gemini returned a
-landscape clip from two reference images and a portrait clip from one. The two
-images were also misaligned, because the generated-result handoff forwarded
-the raw image; that is fixed, so two properly anchored images now settle
-whether the cause was multiplicity or misalignment.
-
-If multiplicity, sending every reference image is a regression and should
-become a choice or be reverted. That change rests on an argument about conduct
-rather than evidence about results, which is stated in `OPEN.md`.
+**Nothing is queued for an agent.** The discriminating Gemini test is
+superseded: the operator chose to send only the first reference image instead,
+so the cause of the landscape result will stay unknown unless someone needs it.
 
 Everything else outstanding is either a decision for the operator or ordinary
 work with diminishing returns.
 
-**Decisions**, none taken. Two of them now have evidence behind them rather
-than only a question.
+**Decisions taken by the operator on 2026-10-07.**
 
-**How the frame rate should be established**, which is the one with the widest
-reach. Three paths decide it differently and give different counts for one clip.
-Measuring by playback under-reports on a slow host; assuming thirty is exact
-for a thirty frame clip and wrong in proportion for any other. Whichever is
-chosen, the paths should agree afterwards. `requestVideoFrameCallback` is the
-accurate option; exposing the rate for editing solves the practical problem
-without touching detection.
+- **Sandbox.** Allow local port binding for this project only, other projects
+  being decided case by case. Codex and Grok Build have been vetted green by the
+  operator. For Claude Code this is `sandbox.network.allowLocalBinding` in the
+  project's `.claude/settings.local.json`, an edit the operator makes, since a
+  sandboxed session cannot write that file.
+- **Gemini reference images.** Send only the first. Done in `adfffe2`. Keyframe
+  mode still sends its start and end frames, and whether the decision covers it
+  is an open question to the operator.
+- **Release.** Hold until steady state.
 
-**Whether the webfonts should be self-hosted.** Six requests leave on every page
-load, the README says the later stages work fully offline, and the two cannot
-both stand. Self-hosting removes the requests and adds weight to the repository,
-the image and the binary. Correcting the README instead is honest and free.
+**Awaiting the operator.**
 
-And the four already recorded: whether the Graphics Interchange Format decode
+- **Web fonts.** The answer arrived as "Hist", read as "host" and awaiting
+  confirmation before any work. Hosting means carrying the four families, under
+  the SIL Open Font License, in the repository, the image and the binary.
+- **Frame rate.** The operator asked for more information before deciding. Read
+  the frame rate entry in `OPEN.md`, which was corrected on 2026-10-07: a wrong
+  rate costs temporal resolution and loop-seam precision, not length or speed.
+  A far worse defect was found while gathering that information, exports at
+  default settings playing too fast, and it is fixed.
+- **Keyframe mode** under the single-image decision, as above.
+
+And the four recorded earlier: whether the Graphics Interchange Format decode
 path should exist when nothing imports it, and whether its two divergences from
 the format are worth correcting if it does; whether the sprite zoom should
 anchor to the character's feet rather than the image edge; whether framing

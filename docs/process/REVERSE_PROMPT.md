@@ -12,16 +12,86 @@ file is arranged this way rather than being rewritten wholesale.
 
 ## Last Updated
 
-2026-10-07. The repository prepared for handoff to Codex and Grok Build.
+2026-10-07. The operator's decisions acted on, and a worse defect found while
+answering the frame rate question.
 
 ## Verification
+
+`npm run check` passes. 654 unit tests, 54 application programming interface
+tests and 77 browser specifications pass, run outside this session's sandbox,
+which forbids binding local ports. Continuous integration is read after the
+push.
+
+## Summary
+
+**Exports at default settings played too fast, and that is fixed.** The output
+rate field means "match source" at zero, its default. The TypeScript conversion
+broke that on 2026-09-17. Measured on a two second clip, the GIF export lasted
+1.20 seconds and the WebM 0.22 seconds. After the fix they keep the clip's
+duration. Two browser specifications now export real files, and both fail on
+the old code. The same lost fallback affected the width, height and stored
+sprite zoom, which are restored too.
+
+**Gemini reference mode sends only the first image**, as decided. Keyframe mode
+still sends its start and end frames.
+
+**My earlier account of the frame rate defect was wrong**, and `OPEN.md` is
+corrected. A rate read too low skips frames throughout the clip. It does not cut
+off the end or change the speed.
+
+## Questions for Human Pilot
+
+**Web fonts.** The reply read "Hist". I took it as "host" and did nothing,
+because a guess there would add files to the repository, the image and the
+binary.
+
+**Keyframe mode.** Should "send only the first" apply to it too? That would
+leave keyframe mode unable to send its end frame.
+
+**Frame rate.** Decision pending. The explanation is in the reply that
+accompanies this refresh.
+
+**Claude Code sandbox.** The setting is in the project's
+`.claude/settings.local.json`, which this session cannot write.
+
+## Technical Concerns
+
+The two new export checks run in headless Chromium only. Firefox records WebM
+by a different path, captureStream at the export rate, and nothing here checks
+it.
+
+Nothing in the pipeline has been exercised end to end with a Wan clip, whose
+rate of sixteen frames per second is the plainest case of the exporter's thirty
+frame assumption being wrong.
+
+## Intended Next Step
+
+None of mine until the questions above are answered.
+
+## Session Context
+
+`main` at `adfffe2` before this refresh.
+
+---
+
+## Superseded history
+
+Nothing below this line describes the present.
+
+### Superseded 2026-10-07 — prepared for Codex and Grok Build
+
+#### Last Updated
+
+2026-10-07. The repository prepared for handoff to Codex and Grok Build.
+
+#### Verification
 
 `npm run check` passes. 644 unit tests, 54 application programming interface
 tests and 75 browser specifications pass, run outside this session's sandbox
 because the sandbox forbids binding local ports. 158 documentation links
 resolve. Continuous integration is read separately after the push.
 
-## Summary
+#### Summary
 
 Grok Build's own documentation, read from its local copy, states that it loads
 both `AGENTS.md` and `CLAUDE.md` from the repository root, and only once the
@@ -40,7 +110,7 @@ The process documents name no tool-specific feature, so the protocol needed no
 change. It has, however, never been run by anything but Claude Code here, and the
 handoff now says so rather than implying otherwise.
 
-## The finding most likely to matter to the next agent
+#### The finding most likely to matter to the next agent
 
 Under this session's sandbox, 32 of 54 application programming interface tests
 failed at once with `listen EPERM`. That is the sandbox refusing to bind a local
@@ -49,7 +119,7 @@ Grok Build both commonly run sandboxed, and an agent seeing thirty-two failures
 could reasonably conclude the server is broken. `AGENTS.md` and the handoff now
 tell it to report such a run as not executed, naming the restriction.
 
-## Questions for Human Pilot
+#### Questions for Human Pilot
 
 **Should the next agent's sandbox allow local port binding?** Without it the
 proxy tests and browser specifications cannot run at all. In Claude Code that is
@@ -61,7 +131,7 @@ frame rate should be established, whether to self-host the webfonts or correct
 the README, the Gemini experiment with two anchored reference images, and whether
 to cut a release now that three platform binaries exist.
 
-## Technical Concerns
+#### Technical Concerns
 
 **The guard does not catch everything it was written for.** Run against the old
 files it fails on the project count and the Playwright command, but not on the
@@ -77,20 +147,14 @@ from Grok's documentation and from the established Codex convention, not from
 running either against this repository. Running `grok inspect` in the repository
 would confirm Grok's side directly.
 
-## Intended Next Step
+#### Intended Next Step
 
 None of mine. The repository is ready for another agent to resume from the
 handoff, and the open items are decisions.
 
-## Session Context
+#### Session Context
 
 `main` at `d9131dc` before this refresh.
-
----
-
-## Superseded history
-
-Nothing below this line describes the present.
 
 ### Superseded 2026-09-30 — continuous integration builds the container and the binaries
 
