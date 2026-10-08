@@ -196,6 +196,16 @@ outside the sandbox and in continuous integration. Thirty-two simultaneous
 failures sharing one system error are a fact about the environment until shown
 otherwise.
 
+**`parseInt(x) || fallback` is not `parseInt(x)` with a `NaN` check.** The
+first falls back on zero too. Converting one into the other silently changed
+three fields labelled "0 = match source" or "0 = auto", and every default export
+then played too fast for three weeks. When converting a fallback, ask whether
+zero was meant to fall through, and read the field's own label.
+
+**A test suite that never performs the act cannot catch its failure.** The
+exporter had seventeen browser specifications and none exported a file. The
+defect was in the one step none of them took.
+
 **A port in use is not a fault in the artefact.** The first container run
 could not bind 3001 because a development server held it. Bind a different
 host port for a check rather than reading the collision as a defect, and say

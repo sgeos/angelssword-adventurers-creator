@@ -347,12 +347,11 @@ export const MAX_REFERENCE_IMAGES = 3;
 /**
  * What a provider does with the reference images it is given.
  *
- * The interface accepted three, read three and announced three, while every
- * provider used the first. Gemini now receives all of them; the other two
- * still take one, because their requests carry a single image by shape
- * rather than by omission.
+ * Every provider now uses the first. Grok and the Wan graph take one image by
+ * the shape of their requests. Gemini took all of them from 2026-09-28 until
+ * the operator's decision of 2026-10-07, which returned it to the first after
+ * a two image run came back landscape. The provider is still a parameter
+ * because the answer has differed by provider before and may again.
  */
-export const describeReferenceUse = (provider: VideoProviderId): string =>
-  provider === "google"
-    ? `Uses every image you add, up to ${MAX_REFERENCE_IMAGES.toString()}`
-    : "Uses the first image only";
+export const describeReferenceUse = (_provider: VideoProviderId): string =>
+  "Uses the first image only";

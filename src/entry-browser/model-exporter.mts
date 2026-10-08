@@ -28,6 +28,8 @@ import {
     MODE_LIMITS,
     asCropRatio,
     gifDelayCentiseconds,
+    resolveDimension,
+    resolveExportFps,
     paletteSampling,
     paletteSlots,
     buildExportFrameList,
@@ -1099,8 +1101,8 @@ export class ModelExporter {
 
         const est = estimateExportBytes(
             count,
-            intFromField('exWidth', this.videoWidth),
-            intFromField('exHeight', this.videoHeight),
+            resolveDimension(intFromField('exWidth', 0), this.videoWidth),
+            resolveDimension(intFromField('exHeight', 0), this.videoHeight),
             MODE_LIMITS[this.mode].format,
         );
         estSize.textContent = `Est. Size: ~${formatBytes(est)}`;
@@ -1159,9 +1161,9 @@ export class ModelExporter {
             return;
         }
 
-        const width = Math.min(intFromField('exWidth', this.videoWidth), limits.maxWidth);
-        const height = Math.min(intFromField('exHeight', this.videoHeight), limits.maxHeight);
-        const exportFps = intFromField('exFPS', this.fps);
+        const width = Math.min(resolveDimension(intFromField('exWidth', 0), this.videoWidth), limits.maxWidth);
+        const height = Math.min(resolveDimension(intFromField('exHeight', 0), this.videoHeight), limits.maxHeight);
+        const exportFps = resolveExportFps(intFromField('exFPS', 0), this.fps);
         const startFrame = intFromField('exStartFrame', 0);
         const endFrame = intFromField('exEndFrame', 0);
         const skip = strideFromSkip(intFromField('exFrameSkip', 0));
@@ -1355,10 +1357,10 @@ export class ModelExporter {
             return;
         }
 
-        const width = Math.min(intFromField('exWidth', this.videoWidth), limits.maxWidth);
-        const height = Math.min(intFromField('exHeight', this.videoHeight), limits.maxHeight);
+        const width = Math.min(resolveDimension(intFromField('exWidth', 0), this.videoWidth), limits.maxWidth);
+        const height = Math.min(resolveDimension(intFromField('exHeight', 0), this.videoHeight), limits.maxHeight);
         const maxColors = 128;
-        const exportFps = intFromField('exFPS', this.fps);
+        const exportFps = resolveExportFps(intFromField('exFPS', 0), this.fps);
         const delayCentiseconds = gifDelayCentiseconds(exportFps);
         const startFrame = intFromField('exStartFrame', 0);
         const endFrame = intFromField('exEndFrame', 0);

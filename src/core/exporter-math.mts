@@ -631,6 +631,41 @@ export const MAX_GIF_FPS: number = 100 / MIN_GIF_DELAY_CENTISECONDS;
  * centiseconds and becomes 4, which plays at 25. That drift is inherent to
  * the format rather than a choice made here.
  */
+/** The rate assumed when nothing better is known. Not a measurement. */
+export const ASSUMED_SOURCE_FPS = 30;
+
+/**
+ * The rate an export plays at, given the output rate field and the source.
+ *
+ * The field is labelled "0 = match source", and zero is its default. The
+ * original read it as `parseInt(value) || source`, so a zero fell through to
+ * the source rate. The TypeScript conversion replaced that with a helper that
+ * falls back only on a value that is not a number, so zero reached the
+ * encoders. Measured on a two second clip at default settings, a Graphics
+ * Interchange Format export lasted 1.20 seconds, every frame at its two
+ * centisecond floor, and a WebM export lasted 0.22 seconds, the recording timer
+ * having been handed an infinite interval that browsers read as zero.
+ *
+ * Anything that is not a positive finite number means "match the source". A
+ * source rate that is itself unusable falls back to the thirty frames per second
+ * the exporter already assumes for a dropped file.
+ */
+export const resolveExportFps = (requested: number, sourceFps: number): number => {
+  if (Number.isFinite(requested) && requested > 0) return requested;
+  if (Number.isFinite(sourceFps) && sourceFps > 0) return sourceFps;
+  return ASSUMED_SOURCE_FPS;
+};
+
+/**
+ * An output dimension, given the field and the clip's own size.
+ *
+ * Labelled "0 = auto", and lost the same way as the rate. Less exposed, since
+ * loading a clip writes its size into both fields, so only a zero typed by the
+ * user reached the canvas, which then had no width or no height.
+ */
+export const resolveDimension = (requested: number, natural: number): number =>
+  Number.isFinite(requested) && requested > 0 ? requested : natural;
+
 export const gifDelayCentiseconds = (fps: number): number => {
     if (!Number.isFinite(fps) || fps <= 0) return MIN_GIF_DELAY_CENTISECONDS;
     return Math.max(MIN_GIF_DELAY_CENTISECONDS, Math.round(100 / fps));

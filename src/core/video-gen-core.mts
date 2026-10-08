@@ -4,16 +4,17 @@
  * One quirk remains locked, and the tests pin it: `duration` is collected by
  * the UI and is not placed in the POST body.
  *
- * A second quirk is RESOLVED as of 2026-09-28. Every reference image is now
- * sent rather than only the first. The interface accepted three, read three,
- * and announced three, while the request carried one; keyframe mode went
- * further and REFUSED to proceed without a second image it then discarded,
- * describing the end pose in prose instead.
+ * Reference mode sends the FIRST image only, by the operator's decision of
+ * 2026-10-07. On 2026-09-28 every reference image was sent instead, and the
+ * first live run with two images returned a landscape clip where a run with
+ * one returned portrait. Whether the number of images or their misalignment
+ * caused that was never settled, and the operator chose the single image
+ * rather than run the experiment. The extra slots remain in the interface and
+ * reach no provider in reference mode.
  *
- * This is a behaviour change on a path that has been exercised against the
- * live service exactly once, so what Gemini makes of several images is not
- * established here. The previous behaviour was not established either: it
- * was an omission rather than a finding.
+ * Keyframe mode is outside that decision and still sends both of its images,
+ * the start frame and the end frame, which is what the mode means. It used to
+ * refuse to proceed without a second image and then discard it.
  */
 
 export const DEFAULT_PROMPT =
@@ -80,9 +81,10 @@ export const buildVideoRequestBody = (opts: VideoRequestOptions = {}): VideoRequ
         + `Animate a smooth transition between them. ${textPrompt}`
       : textPrompt;
 
-  // Every image, in the order the user supplied them, then the text. A
-  // caller that supplied one gets exactly what it got before.
-  const parts: RequestPart[] = images.map((image) => ({
+  // Keyframe sends its start and end frames. Reference mode sends the first
+  // image alone, whatever else was supplied. The text always comes last.
+  const sent: readonly ReferenceImage[] = mode === "keyframe" ? images : [first];
+  const parts: RequestPart[] = sent.map((image) => ({
     type: "image",
     data: stripDataUrl(image.dataUrl),
     mime_type: detectMime(image.dataUrl),

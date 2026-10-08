@@ -250,6 +250,16 @@ regression and should become a choice or be reverted. That change was made on
 the reasoning that silently discarding user input is worse than sending it,
 which is an argument about conduct rather than evidence about results.
 
+**Decided 2026-10-07 by the operator: send only the first.** The experiment was
+not run, so the cause remains unknown, and the decision does not depend on it.
+Reference mode now sends the first image to Gemini, as it does to every other
+provider, and the interface says so. The extra slots remain and reach no
+provider in reference mode.
+
+Keyframe mode was left sending its start and end frames, since a keyframe
+request without an end frame is not one. Whether the decision was meant to
+cover keyframe mode too is a question put to the operator, not assumed.
+
 ### The retreat from full body has corroborating evidence
 
 **Still a hypothesis.** Nobody recorded a reason, so this is inference from
@@ -266,6 +276,30 @@ So the bust framing reads as engineered against the failure the live runs
 produced. That is a mechanism and a fingerprint rather than a record, and it
 could still be coincidence.
 
+## Exports at default settings played too fast
+
+**Found and fixed 2026-10-07.** A regression from the TypeScript conversion of
+the exporter on 2026-09-17, not inherited from upstream.
+
+The output rate field is labelled "0 = match source" and defaults to zero. The
+original read it as `parseInt(value) || source`, so zero fell through to the
+source rate. The conversion replaced that with a helper that falls back only on
+a value that is not a number, so zero reached the encoders. Measured on a two
+second clip at default settings: a Graphics Interchange Format export lasted
+1.20 seconds, every frame at the two centisecond floor, which is fifty frames
+per second; a WebM export lasted 0.22 seconds, its recording timer having been
+handed `1000 / 0`. After the fix the WebM spans 1.99 seconds and every
+Graphics Interchange Format delay is three centiseconds.
+
+No specification exported anything, which is why it survived three weeks. Two
+now do, and both fail on the exporter as it was. The width and height fields
+had lost their "0 = auto" meaning the same way, with less exposure because
+loading a clip writes its size into them. A sweep of every `parseInt(...) ||`
+in the original found one more instance, the stored sprite zoom, also restored.
+
+This is separate from how the source rate is established, below. It mattered
+more: it affected every export left at its defaults, whatever the rate.
+
 ## Three paths decide the frame rate differently, and they disagree
 
 `loadVideo` does not read the frame rate from the file. It sets
@@ -275,9 +309,17 @@ frame count in the pipeline follows from that number.
 
 **Observed 2026-09-30.** A clip generated at exactly thirty frames per second
 for exactly two seconds, so sixty frames, was reported as nineteen frames per
-second and thirty-eight frames in headless Chromium. That is not a rounding
-error; it is a third of the clip declared not to exist. The last twenty-two
-frames become unreachable, and an export runs at a rate the clip never had.
+second and thirty-eight frames in headless Chromium.
+
+**Corrected 2026-10-07.** This entry first said the last twenty-two frames
+became unreachable and that an export ran at a rate the clip never had. Both
+were wrong, and reading the seek arithmetic shows why. Frame `k` is shown at
+`k / rate` seconds, so a rate read low still spans the whole clip, in coarser
+steps. Thirty-eight steps across two seconds means about twenty-two of the
+sixty real frames, spread through the clip rather than at its end, can never be
+selected, previewed, chosen as a loop point or exported. An export at the
+believed rate keeps the clip's duration and loses those frames. The cost is
+temporal resolution and loop-seam precision, not length or speed.
 
 The mechanism is that the quantity being measured is how fast the host can
 decode, which equals the clip's rate only when the host keeps up. Headless
@@ -304,7 +346,11 @@ handoff.
 Neither path is reliable and they fail in opposite directions. The assumption
 is exactly right for a thirty frame clip and wrong in proportion for anything
 else: a two second clip at fifteen frames per second holds thirty frames and
-the exporter reports sixty, so half the frame numbers it offers do not exist.
+the exporter reports sixty. Every real frame then appears twice under two
+numbers, so an export carries each frame twice, roughly doubling a Graphics
+Interchange Format file for no gain in motion, while keeping the duration.
+This entry first said half the frame numbers did not exist, which was wrong in
+the same way as the passage corrected above.
 The measurement is right for any rate when the host keeps up and low when it
 does not.
 

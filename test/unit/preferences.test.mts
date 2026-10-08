@@ -114,6 +114,18 @@ describe('sprite offset and zoom', () => {
         assert.equal(loadSpriteZoom(store), SPRITE_ZOOM_DEFAULT);
     });
 
+    /**
+     * A zero zoom draws nothing, and the original fell back on it. A zero
+     * offset is an ordinary position and must be kept, which is why the two
+     * are not treated alike.
+     */
+    it('falls back on a zoom that is not positive, but keeps a zero offset', () => {
+        for (const raw of ['0', '-20']) {
+            assert.equal(loadSpriteZoom(memoryStore({ [SPRITE_ZOOM_KEY]: raw })), SPRITE_ZOOM_DEFAULT, raw);
+        }
+        assert.equal(loadSpriteOffset(memoryStore({ [SPRITE_OFFSET_KEY]: '0' })), 0);
+    });
+
     it('keeps the two under separate keys', () => {
         const store = memoryStore();
         saveSpriteOffset(store, 5);

@@ -53,8 +53,8 @@ test.describe('L — Reference slots', () => {
         const sources = await slotSources(page);
         expect(sources).toHaveLength(2);
 
-        // The large preview is the first image, which is the one every
-        // provider uses; only Gemini is sent the rest.
+        // The large preview is the first image, which is the only one any
+        // provider is sent in reference mode.
         const primary = await page.locator('#vgRefPrimary').getAttribute('src');
         expect(primary).toBe(sources[0]);
     });
@@ -124,9 +124,10 @@ test.describe('L — Reference slots', () => {
         await page.goto('/');
         await page.locator('.tab-btn[data-tab="tab-video-gen"]').click();
 
-        // Gemini is the only provider sent more than the first image.
+        // Since the operator's decision of 2026-10-07, Gemini too is sent
+        // only the first image in reference mode.
         await page.locator('#vgProvider .seg-btn[data-mode="google"]').click();
-        await expect(page.locator('#vgReferenceUse')).toContainText('every image you add');
+        await expect(page.locator('#vgReferenceUse')).toContainText('first image only');
 
         await page.locator('#vgProvider .seg-btn[data-mode="xai"]').click();
         await expect(page.locator('#vgReferenceUse')).toContainText('first image only');

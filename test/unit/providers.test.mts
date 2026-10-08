@@ -188,9 +188,10 @@ describe('describeVideoOutput says what each provider actually produces', () => 
 });
 
 describe('describeReferenceUse tells the user what becomes of the extras', () => {
-    it('says Gemini uses them all, and names the limit', () => {
-        assert.match(describeReferenceUse('google'), /every image you add, up to 3/);
-        assert.equal(MAX_REFERENCE_IMAGES, 3);
+    /** Gemini took them all until the operator's decision of 2026-10-07. */
+    it('says Gemini uses the first only, like the others', () => {
+        assert.equal(describeReferenceUse('google'), 'Uses the first image only');
+        assert.equal(MAX_REFERENCE_IMAGES, 3, 'the interface still accepts three');
     });
 
     /**

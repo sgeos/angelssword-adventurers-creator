@@ -85,6 +85,10 @@ dropped.
 | Agent files prepared for Codex and Grok Build | Complete | Five stale facts corrected, layering rules added to AGENTS.md |
 | Agent instruction files guarded by a test | Complete | Fails on the old files, misses wildcard paths |
 | Sandbox port binding identified | Recorded | `listen EPERM` is the sandbox, not the server |
+| Default export rate regression fixed | Complete | GIF ran at 50 fps, WebM about 9x fast, from the conversion |
+| Zero fallbacks restored | Complete | Output rate, width, height, stored sprite zoom |
+| Gemini reference mode sends the first image only | Complete | Operator decision, keyframe mode unchanged |
+| Frame rate consequence corrected in OPEN.md | Complete | Coarser sampling, not a lost tail or wrong speed |
 
 ## Open Items
 

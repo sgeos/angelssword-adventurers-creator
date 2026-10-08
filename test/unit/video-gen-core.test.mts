@@ -91,61 +91,56 @@ describe('video-gen-core buildVideoRequestBody', () => {
         assert.equal(body.generation_config?.video_config.task, 'image_to_video');
     });
 
-    describe('every reference image is sent', () => {
-        /**
-         * The interface accepted three, read three and announced three,
-         * while the request carried one. The extras were read, counted,
-         * previewed away and discarded.
-         */
-        it('sends all three, in the order they were supplied', () => {
+    /**
+     * The operator's decision of 2026-10-07. A two image run came back
+     * landscape where a one image run came back portrait, and the operator
+     * chose the single image rather than settle the cause by experiment.
+     */
+    describe('reference mode sends the first image only', () => {
+        const three = [
+            { dataUrl: 'data:image/png;base64,ONE' },
+            { dataUrl: 'data:image/jpeg;base64,TWO' },
+            { dataUrl: 'data:image/png;base64,THREE' },
+        ];
+
+        it('drops every image after the first', () => {
+            const body = buildVideoRequestBody({ prompt: 'idle', mode: 'reference', referenceImages: three });
+            assert.equal(body.input.length, 2, 'one image and the text');
+            assert.equal(imagePart(body.input, 0).data, 'ONE');
+            assert.equal(textPart(body.input, 1).text, 'idle');
+        });
+
+        it('sends the same request for one image as for three', () => {
+            const one = buildVideoRequestBody({ prompt: 'x', mode: 'reference', referenceImages: three.slice(0, 1) });
+            const all = buildVideoRequestBody({ prompt: 'x', mode: 'reference', referenceImages: three });
+            assert.deepEqual(all, one);
+        });
+
+        it('applies when no mode is named, reference being the default', () => {
+            const body = buildVideoRequestBody({ prompt: 'x', referenceImages: three });
+            assert.equal(body.input.length, 2);
+        });
+
+        it('keeps the first image own mime type', () => {
             const body = buildVideoRequestBody({
-                prompt: 'idle',
-                mode: 'reference',
-                referenceImages: [
-                    { dataUrl: 'data:image/png;base64,ONE' },
-                    { dataUrl: 'data:image/png;base64,TWO' },
-                    { dataUrl: 'data:image/png;base64,THREE' },
-                ],
+                prompt: 'x', mode: 'reference',
+                referenceImages: [{ dataUrl: 'data:image/jpeg;base64,J' }, { dataUrl: 'data:image/png;base64,P' }],
             });
-            assert.equal(body.input.length, 4, 'three images and the text');
-            assert.deepEqual(
-                [0, 1, 2].map((i) => imagePart(body.input, i).data),
-                ['ONE', 'TWO', 'THREE'],
-            );
-            assert.equal(textPart(body.input, 3).text, 'idle');
+            assert.equal(imagePart(body.input, 0).mime_type, 'image/jpeg');
         });
+    });
 
-        it('keeps the text last, whatever the image count', () => {
-            for (const count of [1, 2, 3]) {
-                const images = Array.from({ length: count }, (_v, i) => ({
-                    dataUrl: `data:image/png;base64,IMG${i.toString()}`,
-                }));
-                const body = buildVideoRequestBody({ prompt: 'x', mode: 'reference', referenceImages: images });
-                assert.equal(body.input.length, count + 1, count.toString());
-                assert.equal(textPart(body.input, count).text, 'x');
-            }
-        });
-
-        it('carries each image own mime type rather than the first one', () => {
+    /** Outside the decision: a keyframe request means a start and an end. */
+    describe('keyframe mode still sends its start and end frames', () => {
+        it('sends both, start first, and says which is which', () => {
             const body = buildVideoRequestBody({
-                prompt: 'x',
-                mode: 'reference',
-                referenceImages: [
-                    { dataUrl: 'data:image/png;base64,P' },
-                    { dataUrl: 'data:image/jpeg;base64,J' },
-                ],
+                prompt: 'jump', mode: 'keyframe',
+                referenceImages: [{ dataUrl: 'data:image/png;base64,START' }, { dataUrl: 'data:image/png;base64,END' }],
             });
-            assert.equal(imagePart(body.input, 0).mime_type, 'image/png');
-            assert.equal(imagePart(body.input, 1).mime_type, 'image/jpeg');
-        });
-
-        it('is unchanged for a single image, which is what most callers send', () => {
-            const one = buildVideoRequestBody({
-                prompt: 'idle', mode: 'reference',
-                referenceImages: [{ dataUrl: 'data:image/png;base64,AAAA' }],
-            });
-            assert.equal(one.input.length, 2);
-            assert.equal(imagePart(one.input, 0).data, 'AAAA');
+            assert.equal(body.input.length, 3);
+            assert.equal(imagePart(body.input, 0).data, 'START');
+            assert.equal(imagePart(body.input, 1).data, 'END');
+            assert.match(textPart(body.input, 2).text, /first image is the start frame/);
         });
     });
 

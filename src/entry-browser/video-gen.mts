@@ -108,10 +108,11 @@ let slotBeingFilled: number | null = null;
 /**
  * Show the references: the first large, then every slot beneath it.
  *
- * The large one is the first deliberately. Every provider uses that image,
- * and only Gemini is sent the rest, so the layout says which one always
- * matters. The strip beneath shows all three positions, filled or empty, and
- * each is replaceable on its own.
+ * The large one is the first deliberately. In reference mode it is the only
+ * image any provider is sent, so the layout says which one matters. The strip
+ * beneath shows all three positions, filled or empty, and each is replaceable
+ * on its own. The other two reach no provider since the operator's decision of
+ * 2026-10-07, and are kept because removing the slots is a separate choice.
  */
 function renderReferencePreviews(): void {
     const preview = requireEl('vgRefImagePreview', HTMLElement);
@@ -515,7 +516,8 @@ async function generateOneGrokVideo(
 async function generateOneVideo(apiKey: string, prompt: string, _duration: number, mode: string): Promise<GeneratedVideo | null> {
     // Build the Gemini Omni Flash Interactions API request via pure core.
     // Quirk: `duration` is collected by the UI but is NOT placed in the POST body.
-    // Quirk: keyframe end image is loaded in UI but NOT sent (only first/start image).
+    // Keyframe sends its start and end frames. Reference mode sends the first
+    // image only, by the operator's decision of 2026-10-07.
     const requestBody = VideoGenCore.buildVideoRequestBody({
         prompt,
         mode,
@@ -686,8 +688,8 @@ function refreshOutputNote(provider: VideoProviderId): void {
         const wan = loadWanSettings(browserStore);
         note.textContent = describeVideoOutput(provider, { width: wan.width, height: wan.height });
     }
-    // The references panel says what becomes of the extras, which differs by
-    // provider: only Gemini is sent more than the first.
+    // The references panel says what becomes of the extras. Every provider now
+    // uses the first only, but the answer has differed by provider before.
     const refs = findEl('vgReferenceUse', HTMLElement);
     if (refs !== undefined) refs.textContent = describeReferenceUse(provider);
 }

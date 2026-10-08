@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { LOOP_CLIP, LOOP_CLIP_15FPS, toggleSwitch } from './helpers';
 
@@ -324,5 +325,74 @@ test.describe('F — Filename presets', () => {
         await page.locator('.filename-preset-btn[data-preset="Outro"]').click();
         await expect(page.locator('#exFilenamePresets .filename-preset-btn.active')).toHaveCount(1);
         await expect(page.locator('.filename-preset-btn[data-preset="Intro"]')).not.toHaveClass(/active/);
+    });
+});
+
+/**
+ * F — Exports at default settings play at the source rate.
+ *
+ * The output rate field is labelled "0 = match source" and defaults to zero.
+ * The TypeScript conversion stopped honouring that, and nothing noticed because
+ * no specification exported anything. Measured before the fix on this two
+ * second clip: the Graphics Interchange Format export lasted 1.20 seconds with
+ * every delay at the two centisecond floor, and the WebM lasted 0.22 seconds.
+ */
+test.describe('F — Default exports keep the source rate', () => {
+    const exportAtDefaults = async (page: Page, mode: string): Promise<{ path: string; elapsedMs: number }> => {
+        await page.goto('/');
+        await page.locator('.tab-btn[data-tab="tab-exporter"]').click();
+        await chooseMode(page, mode);
+        await page.locator('#exFileInput').setInputFiles(LOOP_CLIP);
+        await expect(page.locator('#exStage3')).not.toHaveClass(/disabled/);
+        await expect(page.locator('#exFPS')).toHaveValue('0');
+
+        const started = Date.now();
+        const [download] = await Promise.all([
+            page.waitForEvent('download', { timeout: 110_000 }),
+            page.locator('#exExportBtn').click(),
+        ]);
+        const elapsedMs = Date.now() - started;
+        const path = await download.path();
+        return { path, elapsedMs };
+    };
+
+    /** Every Graphic Control Extension's delay, in hundredths of a second. */
+    const gifDelays = (bytes: Buffer): number[] => {
+        const delays: number[] = [];
+        let at = bytes.indexOf(Buffer.from([0x21, 0xf9, 0x04]));
+        // Each step moves past the match, so the search position only grows
+        // and the loop ends when no further extension is found.
+        while (at >= 0) {
+            delays.push(bytes.readUInt16LE(at + 4));
+            at = bytes.indexOf(Buffer.from([0x21, 0xf9, 0x04]), at + 6);
+        }
+        return delays;
+    };
+
+    test('a GIF carries the source rate delay, not the floor', async ({ page }) => {
+        test.setTimeout(120_000);
+        const total = await loadForExport(page);
+        expect(total).toBe(60);
+        const { path } = await exportAtDefaults(page, 'normal');
+        const delays = gifDelays(readFileSync(path));
+
+        expect(delays.length).toBe(60);
+        // Thirty frames per second is 3.33 centiseconds, stored as 3. The
+        // shortfall is the format's own drift, not this defect, whose
+        // signature was a delay of 2 on every frame.
+        expect(new Set(delays)).toEqual(new Set([3]));
+    });
+
+    /**
+     * A WebM is recorded in real time, so recording sixty frames at thirty per
+     * second takes two seconds. The defect recorded it in under half a second.
+     * A lower bound on elapsed time can only be met more easily by a slower
+     * machine, so this does not become flaky in the direction that would hide
+     * the defect.
+     */
+    test('a WebM takes the clip own duration to record', async ({ page }) => {
+        test.setTimeout(120_000);
+        const { elapsedMs } = await exportAtDefaults(page, 'adventurer');
+        expect(elapsedMs).toBeGreaterThan(1_500);
     });
 });

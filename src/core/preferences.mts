@@ -95,8 +95,15 @@ export const saveSpriteOffset = (store: KeyValueStore, offset: number): void => 
 };
 
 /** The sprite's stored zoom, or the default. */
-export const loadSpriteZoom = (store: KeyValueStore): number =>
-    storedInteger(store.read(SPRITE_ZOOM_KEY), SPRITE_ZOOM_DEFAULT);
+export const loadSpriteZoom = (store: KeyValueStore): number => {
+    // A zero or negative zoom draws nothing. The original read this as
+    // `parseInt(value) || 100`, so a stored zero fell back to full size; the
+    // conversion kept a zero, the same lost fallback that made default exports
+    // play too fast. The slider's floor of ten means only an edited or damaged
+    // stored value reaches this, so the cost was small and the fix is cheap.
+    const zoom = storedInteger(store.read(SPRITE_ZOOM_KEY), SPRITE_ZOOM_DEFAULT);
+    return zoom > 0 ? zoom : SPRITE_ZOOM_DEFAULT;
+};
 
 /** Remember the sprite's zoom. */
 export const saveSpriteZoom = (store: KeyValueStore, zoom: number): void => {
