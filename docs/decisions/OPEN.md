@@ -302,6 +302,20 @@ more: it affected every export left at its defaults, whatever the rate.
 
 ## Three paths decide the frame rate differently, and they disagree
 
+**Resolved 2026-10-08, commit `573ee9b`.** The source rate is now read from the
+presentation timestamps of displayed frames, in `core/frame-rate.mts`, through
+one probe both stages use. The exporter's two loaders became one that takes the
+rate as a parameter and adopts a handed rate only when it was measured. The
+export rate stays the output field, zero meaning the source rate. How fast this
+machine plays a clip is no longer measured or used. A fifteen frame per second
+clip now counts as thirty frames in the exporter rather than sixty.
+
+What it does not resolve, recorded in the module: a host that skipped exactly
+every other frame looks like a clip at half the rate, a variable frame rate clip
+has no single answer, and 29.97 is reported as 30. The history below is kept as
+it was written, including its corrections.
+
+
 `loadVideo` does not read the frame rate from the file. It sets
 `playbackRate` to four, plays for five hundred milliseconds, and divides the
 frames `getVideoPlaybackQuality` reports by the elapsed media time. Every
@@ -420,6 +434,35 @@ Not decided, because it is a change to what three artefacts carry.
 `settings.spec.ts` asserts the requests happen, so the fact is pinned and a
 later fix will show up as those assertions failing, which is the intended
 behaviour of pinning a defect rather than a feature.
+
+## The exporter never reads the second clip
+
+Video Preparation can concatenate a second clip with an optional crossfade. It
+loads the clip, establishes its source rate, shows it in the information panel,
+and carries its address, size, duration, rate and the crossfade settings in the
+handoff. The exporter reads none of it. `model-exporter.mts` contains no
+reference to the concatenation at all, so a user who adds a second clip exports
+the first alone, with nothing to say so.
+
+Found 2026-10-08 while tracing every consumer of a frame rate. The same shape as
+the loop start before it was wired: a field written carefully and never read.
+
+**What would decide it.** Either the exporter learns to play the two clips in
+sequence with the crossfade, which is real work in the frame selection and the
+seek loop, or Video Preparation stops offering the feature until it does. Leaving
+both halves as they are is the one option that misleads.
+
+## The browser specifications cannot run inside Claude Code's macOS sandbox
+
+**Observed 2026-10-08.** With local port binding allowed for this project, the
+server tests pass inside the sandbox, all 54 of them. The browser specifications
+still fail, every one, because Chromium cannot register a Mach port at startup:
+`bootstrap_check_in ... Permission denied`. That is a macOS service the sandbox
+withholds, separate from network access, and no setting tried so far grants it.
+They pass outside the sandbox and in continuous integration.
+
+Not a defect in the code. Recorded so that a sandboxed session does not mistake
+seventy-eight launch failures for seventy-eight regressions.
 
 ## No release has been cut
 

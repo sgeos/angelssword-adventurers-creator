@@ -71,7 +71,10 @@ TypeScript throughout, a hard fork of a JavaScript upstream that is dormant.
   one fails with `listen EPERM`, which is the sandbox and not the server.
   `npm ci` and the Playwright browser download also need network access. Report
   such a run as not executed rather than as failing, and say which restriction
-  caused it. Continuous integration runs the same suites unsandboxed.
+  caused it. Continuous integration runs the same suites unsandboxed. On
+  macOS, Chromium also needs a system service that Claude Code's sandbox
+  withholds even when port binding is allowed, so the browser specifications
+  need the sandbox lifted there.
 - **Never commit `secret/` or `tmp/` contents.** Both carry a tracked
   `.gitkeep` and ignore everything else.
 - **No commits or pushes without explicit authorisation**, even when the work

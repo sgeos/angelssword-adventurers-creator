@@ -89,6 +89,10 @@ dropped.
 | Zero fallbacks restored | Complete | Output rate, width, height, stored sprite zoom |
 | Gemini reference mode sends the first image only | Complete | Operator decision, keyframe mode unchanged |
 | Frame rate consequence corrected in OPEN.md | Complete | Coarser sampling, not a lost tail or wrong speed |
+| Source frame rate detected from frame timestamps | Complete | One probe for both stages, export rate kept separate |
+| Exporter loaders merged | Complete | The handed rate was ignored on the normal route |
+| Second clip never read by the exporter | Recorded | Collected and handed over, then dropped |
+| Chromium blocked by the macOS sandbox | Recorded | Browser specifications need the sandbox lifted |
 
 ## Open Items
 
