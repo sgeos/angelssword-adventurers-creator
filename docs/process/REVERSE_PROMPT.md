@@ -12,17 +12,85 @@ file is arranged this way rather than being rewritten wholesale.
 
 ## Last Updated
 
+2026-10-23. Prepared for a power cycle. The frame rate work is verified,
+recorded and pushed.
+
+## Verification
+
+`npm run check` passes. 675 unit tests and 54 application programming interface
+tests pass, and 78 browser specifications pass outside the sandbox. The browser
+specifications cannot run inside Claude Code's macOS sandbox, because Chromium
+is refused a Mach port at startup. Continuous integration is read after the
+push.
+
+## Summary
+
+The source frame rate is now detected from the timestamps of displayed frames
+and kept apart from the export rate. The rate this machine can play at is not
+used for anything. Both stages share one probe, and the rate is passed
+explicitly. The exporter's normal route from Video Preparation had been ignoring
+the rate it was handed. One loader now serves every route.
+
+Tracing every consumer of the rate turned up one more defect, recorded and not
+fixed. The exporter never reads the concatenated second clip that Video
+Preparation offers, measures and hands over.
+
+## State that survives a power cycle
+
+- `main` is pushed and the working tree is clean. There is no stash.
+- Two local branches, `pr1` and `pr2`, are copies of upstream pull requests from
+  July with no remote of their own. They were left untouched.
+- `tmp/embedded-prompts-report.md` is a review from 2026-09-10. It is ignored by
+  git, as everything in `tmp/` is meant to be.
+- `.claude/settings.local.json` holds the operator's port binding setting. It is
+  ignored by git and survives on disk.
+- No server, container or test process started by this session is left running.
+  That was not true until this refresh. Five standalone binaries from smoke tests
+  on 19 and 30 September were still running and holding ports 3998 and 3999,
+  because the command that was meant to stop them matched nothing and I reported
+  them stopped. They are stopped now, and that was confirmed by checking.
+
+## Questions for Human Pilot
+
+The web fonts, keyframe mode, the second clip, and whether to exclude `gh` from
+the sandbox. Each is set out in [HANDOFF.md](./HANDOFF.md).
+
+## Technical Concerns
+
+The probe has been exercised in headless Chromium on macOS and through
+continuous integration on Linux. It has not been run in Firefox or Safari, nor
+against a variable frame rate clip from a real generator.
+
+## Intended Next Step
+
+Two browser specifications for the frame rate change, listed in the handoff.
+Otherwise nothing until the questions are answered.
+
+## Session Context
+
+`main` at `dc70dba` before this refresh.
+
+---
+
+## Superseded history
+
+Nothing below this line describes the present.
+
+### Superseded 2026-10-23 — the operator's decisions, and the export rate regression
+
+#### Last Updated
+
 2026-10-07. The operator's decisions acted on, and a worse defect found while
 answering the frame rate question.
 
-## Verification
+#### Verification
 
 `npm run check` passes. 654 unit tests, 54 application programming interface
 tests and 77 browser specifications pass, run outside this session's sandbox,
 which forbids binding local ports. Continuous integration is read after the
 push.
 
-## Summary
+#### Summary
 
 **Exports at default settings played too fast, and that is fixed.** The output
 rate field means "match source" at zero, its default. The TypeScript conversion
@@ -39,7 +107,7 @@ still sends its start and end frames.
 corrected. A rate read too low skips frames throughout the clip. It does not cut
 off the end or change the speed.
 
-## Questions for Human Pilot
+#### Questions for Human Pilot
 
 **Web fonts.** The reply read "Hist". I took it as "host" and did nothing,
 because a guess there would add files to the repository, the image and the
@@ -54,7 +122,7 @@ accompanies this refresh.
 **Claude Code sandbox.** The setting is in the project's
 `.claude/settings.local.json`, which this session cannot write.
 
-## Technical Concerns
+#### Technical Concerns
 
 The two new export checks run in headless Chromium only. Firefox records WebM
 by a different path, captureStream at the export rate, and nothing here checks
@@ -64,19 +132,13 @@ Nothing in the pipeline has been exercised end to end with a Wan clip, whose
 rate of sixteen frames per second is the plainest case of the exporter's thirty
 frame assumption being wrong.
 
-## Intended Next Step
+#### Intended Next Step
 
 None of mine until the questions above are answered.
 
-## Session Context
+#### Session Context
 
 `main` at `adfffe2` before this refresh.
-
----
-
-## Superseded history
-
-Nothing below this line describes the present.
 
 ### Superseded 2026-10-07 — prepared for Codex and Grok Build
 

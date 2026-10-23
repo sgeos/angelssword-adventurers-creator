@@ -2,7 +2,7 @@
 
 > **Navigation**: [Process](./README.md) | [Documentation Root](../README.md)
 
-**Refreshed 2026-10-07. The anchor is `adfffe2`, the last commit before this
+**Refreshed 2026-10-23. The anchor is `dc70dba`, the last commit before this
 refresh.** Read this block, run the validity check, then read the task below.
 
 ---
@@ -16,11 +16,11 @@ itself.
 
 ### Ancestry
 
-`main` should **contain** `adfffe2`, the last commit before this refresh. Test
+`main` should **contain** `dc70dba`, the last commit before this refresh. Test
 containment rather than equality.
 
 ```sh
-git merge-base --is-ancestor adfffe2 HEAD
+git merge-base --is-ancestor dc70dba HEAD
 ```
 
 If that fails, this file predates a history rewrite and is stale. If it
@@ -40,7 +40,7 @@ of the list rather than taking the next unused number, and renumber when
 inserting, because a list whose numbers skip reads as though checks are
 missing.
 
-1. `git ls-files` reports **99** TypeScript files and exactly **one**
+1. `git ls-files` reports **102** TypeScript files and exactly **one**
    JavaScript file, `eslint.config.mjs`, which is deliberate.
 2. **Five** `tsconfig.*.json` projects exist at the repository root, and
    `src/` holds exactly four directories, `core`, `platform-browser`,
@@ -48,9 +48,9 @@ missing.
 3. `src/core/ports/` holds **three** capability interfaces, namely
    `storage.mts`, `http.mts`, and `clock.mts`, and `src/core/` holds
    **nineteen** modules.
-4. `npm test` reports **654** unit tests and **54** application programming
+4. `npm test` reports **675** unit tests and **54** application programming
    interface tests, all passing.
-5. `npm run test:browser` reports **77** passing browser specifications. Use
+5. `npm run test:browser` reports **78** passing browser specifications. Use
    that script rather than `npx playwright test`, which reuses a running
    server and therefore skips its own rebuild.
 6. `tsc -p tsconfig.core.json` succeeds, and adding `localStorage` to any file
@@ -188,36 +188,40 @@ The remedy is a machine performing the act, not more careful prose.
 
 ## The next task
 
-**Nothing is queued for an agent.** The discriminating Gemini test is
-superseded: the operator chose to send only the first reference image instead,
-so the cause of the landscape result will stay unknown unless someone needs it.
+**Two small pieces of work are queued, neither urgent.**
 
-Everything else outstanding is either a decision for the operator or ordinary
-work with diminishing returns.
+1. Two browser specifications the frame rate change deserves and does not yet
+   have: Video Preparation reporting a fifteen frame per second clip as fifteen,
+   and the exporter adopting a measured rate handed over from Video Preparation
+   rather than measuring again. The exporter's own detection is covered.
+2. Nothing else is queued for an agent. Everything below is the operator's.
 
-**Decisions taken by the operator on 2026-10-07.**
+**Decisions taken by the operator.**
 
-- **Sandbox.** Allow local port binding for this project only, other projects
-  being decided case by case. Codex and Grok Build have been vetted green by the
-  operator. For Claude Code this is `sandbox.network.allowLocalBinding` in the
-  project's `.claude/settings.local.json`, an edit the operator makes, since a
-  sandboxed session cannot write that file.
-- **Gemini reference images.** Send only the first. Done in `adfffe2`. Keyframe
-  mode still sends its start and end frames, and whether the decision covers it
-  is an open question to the operator.
-- **Release.** Hold until steady state.
+- **Sandbox**, 2026-10-07. Local port binding is allowed for this project only,
+  through `.claude/settings.local.json`, which exists and is in effect: the
+  server tests pass inside the sandbox. The browser specifications still need
+  the sandbox lifted, for the reason in `OPEN.md`. Codex and Grok Build were
+  vetted green by the operator.
+- **Gemini reference images**, 2026-10-07. Send only the first. Done in
+  `adfffe2`.
+- **Release**, 2026-10-07. Hold until steady state.
+- **Frame rate**, 2026-10-08. Detect the source rate, keep it apart from the
+  export rate, pass it explicitly, and never use this machine's playback rate in
+  its place. Done in `573ee9b`.
 
 **Awaiting the operator.**
 
-- **Web fonts.** The answer arrived as "Hist", read as "host" and awaiting
-  confirmation before any work. Hosting means carrying the four families, under
-  the SIL Open Font License, in the repository, the image and the binary.
-- **Frame rate.** The operator asked for more information before deciding. Read
-  the frame rate entry in `OPEN.md`, which was corrected on 2026-10-07: a wrong
-  rate costs temporal resolution and loop-seam precision, not length or speed.
-  A far worse defect was found while gathering that information, exports at
-  default settings playing too fast, and it is fixed.
-- **Keyframe mode** under the single-image decision, as above.
+- **Web fonts.** The answer arrived as "Hist", read as "host" and not acted on
+  until confirmed. Hosting means carrying the four families, under the SIL Open
+  Font License, in the repository, the image and the binary.
+- **Keyframe mode.** Whether "send only the first" covers it. It currently still
+  sends its start and end frames.
+- **The second clip.** The exporter ignores it entirely. Wire it up, or stop
+  offering it. See `OPEN.md`.
+- **Whether to add `"gh *"` to the sandbox's excluded commands.** Offered and
+  not taken. It would run `gh` wholly outside the sandbox, which is broader than
+  a network allowance.
 
 And the four recorded earlier: whether the Graphics Interchange Format decode
 path should exist when nothing imports it, and whether its two divergences from

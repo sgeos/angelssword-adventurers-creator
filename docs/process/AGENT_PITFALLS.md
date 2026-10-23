@@ -206,6 +206,12 @@ zero was meant to fall through, and read the field's own label.
 exporter had seventeen browser specifications and none exported a file. The
 defect was in the one step none of them took.
 
+**A stop command that matches nothing reports success.** Binaries started as
+`./ASAdventurer` for smoke tests were "stopped" with `pkill -f` against their
+full path, which matched no process, printed nothing alarming, and was reported
+as done. Five of them ran for weeks holding two ports. Confirm a stop by
+checking the port or the process afterwards, never by the stop command's exit.
+
 **A port in use is not a fault in the artefact.** The first container run
 could not bind 3001 because a development server held it. Bind a different
 host port for a check rather than reading the collision as a defect, and say
