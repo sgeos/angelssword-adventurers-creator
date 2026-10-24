@@ -12,10 +12,77 @@ file is arranged this way rather than being rewritten wholesale.
 
 ## Last Updated
 
+2026-10-24. Deprecation warnings addressed and dependencies updated, with two
+regressions from Express 5 found and fixed before they shipped.
+
+## Verification
+
+`npm run check` passes. 677 unit tests and 56 application programming interface
+tests pass, the two new ones included. 82 browser specifications pass outside
+the sandbox. The standalone binary builds on macOS and serves the page, a
+compiled module and a proxy route. `npm audit` reports no vulnerabilities, and
+`npm ci` prints no deprecation warning. Each new test was run on Express 4,
+where it passed, and on Express 5 before the fix, where it failed. Docker is
+not running on this machine, so the new image is checked only by the
+`container` job. Continuous integration is read after the push.
+
+## Summary
+
+**Deprecations.** The workflow's three actions moved from v4 to v7, which run
+on Node 24. `multer` was deprecated over vulnerabilities and imported nowhere,
+so it is gone. `rcedit` was archived and deprecated, and its only call had
+failed on every Windows build, because the package declares no command for npx
+to run. It is gone too, and the icon is recorded as a decision.
+
+**Updates.** Everything in range, plus Playwright to 1.64 with its browser,
+plus Express 5. The image moves from Node 22.18 to 22.23, five security
+releases later. Continuous integration still tests the 22.18 floor.
+
+**Express 5 changed two things the tests did not cover.** `app.listen` now
+calls its callback on a failed bind, so on a port already in use the server
+printed that it was running and opened a browser on someone else's port. And
+`req.body` is now undefined rather than `{}` without a body, so five proxy
+routes would have forwarded no body at all. Both are fixed and each has a test.
+
+**Held.** TypeScript 7, because `typescript-eslint` does not yet accept it.
+node-fetch 3, because it dropped the `timeout` option the proxy relies on, and
+silently. `@types/node` 26, because it is ahead of the supported runtime.
+
+## Questions for Human Pilot
+
+Three decisions in `OPEN.md`. The Gemini key test, unchanged. Whether the
+Windows executable should carry the icon. And whether to raise the development
+Node floor to 22.22.2, which `jsdom` 30.1 declares and continuous integration
+does not use.
+
+## Technical Concerns
+
+The Node 22.18 floor is tested only by continuous integration, and the binaries
+it builds embed 22.18. They are smoke tests rather than releases, but a release
+built the same way would ship that runtime.
+
+## Intended Next Step
+
+Nothing is queued for an agent.
+
+## Session Context
+
+`main` at `86c7850` before this work.
+
+---
+
+## Superseded history
+
+Nothing below this line describes the present.
+
+### Superseded 2026-10-24 — the frame rate specifications
+
+#### Last Updated
+
 2026-10-24. The two queued frame rate browser specifications are written, and
 the handoff is corrected where it contradicted itself.
 
-## Verification
+#### Verification
 
 `npm run check` passes. 677 unit tests and 54 application programming interface
 tests pass. 82 browser specifications pass outside the sandbox, the three new
@@ -23,7 +90,7 @@ ones among them. Disabling the exporter's adoption of a handed rate was confirme
 to fail the adoption specification, and the source was restored and rebuilt
 before the final run. Continuous integration is read after the push.
 
-## Summary
+#### Summary
 
 **`frame-rate.spec.ts`.** Video Preparation reports the fifteen frame clip as
 fifteen frames per second and thirty frames. The exporter adopts the rate Video
@@ -43,30 +110,24 @@ reports a missing workflow, so it now names the fork. The open matters list said
 the binaries had never been built and that a queued task addressed the untested
 modules, and the summary gave nineteen modules and 644 tests. All corrected.
 
-## Questions for Human Pilot
+#### Questions for Human Pilot
 
 **The Gemini key test** is unchanged and still awaits a decision. No key was
 available this session, and nothing here depended on one.
 
-## Technical Concerns
+#### Technical Concerns
 
 The adoption specification depends on `requestVideoFrameCallback` being
 deletable from the prototype. It is in Chromium, and the specification reads the
 removal back so that a browser where it is not would fail rather than pass.
 
-## Intended Next Step
+#### Intended Next Step
 
 Nothing is queued for an agent.
 
-## Session Context
+#### Session Context
 
 `main` at `a4e1ea1` before this work.
-
----
-
-## Superseded history
-
-Nothing below this line describes the present.
 
 ### Superseded 2026-10-24 — three of the operator's decisions acted on
 

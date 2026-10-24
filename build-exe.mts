@@ -209,14 +209,15 @@ if (process.platform === "darwin") {
   }
 }
 
-// Windows resource editing, so the executable carries the project icon.
-if (process.platform === "win32" && fs.existsSync(ICON)) {
-  try {
-    runNpx(["--yes", "rcedit", BIN, "--set-icon", ICON], true);
-    log("Applied the application icon.");
-  } catch {
-    log("⚠️  rcedit failed — the executable will carry the default Node icon.");
-  }
+// No icon is embedded in the Windows executable. A step here used to call
+// `npx rcedit`, but the rcedit package exports a library and declares no
+// command, so npx had nothing to run and the step failed on every build,
+// caught and logged as a warning. The package was also archived upstream and
+// deprecated on npm. It was removed rather than repaired, because repairing it
+// is new behaviour that only a Windows build can verify. See the entry in
+// docs/decisions/OPEN.md.
+if (process.platform === "win32") {
+  log("Note: the executable carries the default Node icon. See docs/decisions/OPEN.md.");
 }
 
 // 6. Copy public/, which now includes the compiled js/ from step 1

@@ -514,6 +514,53 @@ log. Google also accepts the key in an `x-goog-api-key` header.
 other providers' tests are, and whether to move the key from the query string
 to the header on the server's calls. Both are small. Neither was asked for.
 
+## The Windows executable has never carried the project icon
+
+**Found 2026-10-24, not fixed.** The binary build called `npx rcedit` to embed
+`icon.ico`. The `rcedit` package exports a library and declares no command, so
+npx had nothing to run, the call failed on every Windows build, and the failure
+was caught and logged as a warning. The continuous integration log for run
+`40093131743` shows it. The package was also archived by the Electron project
+on 2026-04-01 and deprecated on npm, so it was removed during the dependency
+update rather than repaired. The build now says the default icon is used.
+
+**What would decide it.** Whether the icon matters. If it does, `resedit` is
+maintained, pure JavaScript, and edits the resources of an executable. Applying
+it to the copied Node binary before the blob is injected keeps the injection
+the last modification. Only a Windows build can verify it, so the change should
+make the build fail when the icon is not applied, which the `binary` job would
+then check. Neither was done, because it adds behaviour the project never had.
+
+## Dependencies held below their latest major
+
+**Recorded 2026-10-24.** Each was considered and held, for the reason given.
+
+- **TypeScript 7.** `typescript-eslint` 8.72, the newest, declares TypeScript
+  `>=4.8.4 <6.1.0`. The lint is part of the gate, so TypeScript stays at 6.0.
+  Revisit when `typescript-eslint` widens its range.
+- **node-fetch 3.** The proxy passes node-fetch 2's `timeout` option on its
+  five minute image calls. Version 3 removed that option without an error, so
+  upgrading would silently drop every timeout. The better move is to Node's
+  own `fetch` and `FormData` with `AbortSignal.timeout`, which would also
+  remove `form-data`, but that changes the request type the core shares with
+  the browser and is a piece of work rather than an update.
+- **`@types/node` 26.** The project supports Node 22.18. Types for a newer
+  runtime than the floor describe APIs the floor does not have. The types are
+  already one major ahead, at 24, which predates this entry.
+
+## `jsdom` declares a higher Node floor than the project does
+
+**Found 2026-10-24.** `jsdom` 30.1, every patch of it, declares Node
+`^22.22.2 || ^24.15.0 || >=26.0.0`. The project declares `^22.18.0`, and
+continuous integration runs the unit tests on 22.18.0, where they pass. So the
+range is not enforced and the tests do not currently depend on whatever raised
+it, but nothing guarantees that a later `jsdom` patch will not. It is a
+development dependency only, and the runtime floor is unaffected.
+
+**What would decide it.** Whether to raise the development floor to 22.22.2,
+which would also bring the security releases since 22.18, or to hold `jsdom`
+at a version whose declared range includes 22.18.
+
 ## No release has been cut
 
 The binary is how a non-technical user obtains this tool, and at present the

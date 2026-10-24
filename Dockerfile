@@ -4,7 +4,12 @@
 # Node 22.18 is the floor, because the server is TypeScript and runs through
 # native type stripping with no build step. Upstream pull request 1 used
 # node:20, which cannot load this server at all.
-FROM node:22.18-alpine AS build
+#
+# The image is not the floor, though. Continuous integration tests the floor
+# with setup-node. What ships here should carry the security releases made
+# since, five of them between 22.18.0 and 22.23.4, so the image tracks the
+# newest 22 minor. The container job runs this image, which is what checks it.
+FROM node:22.23-alpine AS build
 
 WORKDIR /app
 
@@ -20,7 +25,7 @@ COPY src/ ./src/
 RUN npx tsc -p tsconfig.browser.json && npx tsc -p tsconfig.worker.json
 
 
-FROM node:22.18-alpine AS runtime
+FROM node:22.23-alpine AS runtime
 
 WORKDIR /app
 

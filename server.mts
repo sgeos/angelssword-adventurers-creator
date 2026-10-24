@@ -158,15 +158,30 @@ const parsePort = (raw: string | undefined): number => {
 type AsyncRoute = (req: Request, res: Response) => Promise<void>;
 
 /**
- * Express 4 predates promise-aware routing, so an async handler that
- * rejects leaves the request hanging until it times out. Wrapping funnels
- * rejections into `next()`.
+ * Funnel an async handler's rejection into `next()`.
+ *
+ * Written for Express 4, which predates promise-aware routing and left a
+ * rejected handler's request hanging until it timed out. Express 5 forwards a
+ * rejection itself, so this is now redundant there. It is kept because it
+ * states the handling at each route rather than relying on a framework
+ * default, and because the lint's floating promise rules see an explicit
+ * `catch`.
  */
 const route =
   (handler: AsyncRoute): RequestHandler =>
   (req, res, next) => {
     handler(req, res).catch(next);
   };
+
+/**
+ * The JSON text forwarded for a parsed request body.
+ *
+ * Express 5 leaves `req.body` undefined when no parser matched, where Express 4
+ * gave `{}`. `JSON.stringify(undefined)` is undefined, not a string, so passing
+ * the body straight through sent upstream a POST with no body at all. An
+ * absent body is forwarded as the empty object Express 4 produced.
+ */
+const forwardedJson = (body: unknown): string => JSON.stringify(body ?? {});
 
 /** Forward an upstream response verbatim, preserving its status. */
 const relay = async (res: Response, upstream: { status: number; text: () => Promise<string> }): Promise<void> => {
@@ -258,7 +273,7 @@ app.post(
       const upstream = await fetchImpl("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: authHeader },
-        body: JSON.stringify(req.body),
+        body: forwardedJson(req.body),
         timeout: 300_000,
       });
       console.log(`  [PROXY] /v1/images/generations → ${upstream.status.toString()}`);
@@ -385,7 +400,7 @@ app.post(
       const upstream = await fetchImpl("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: authHeader },
-        body: JSON.stringify(req.body),
+        body: forwardedJson(req.body),
         timeout: 30_000,
       });
       console.log(`  [PROXY] /v1/chat/completions → ${upstream.status.toString()}`);
@@ -428,7 +443,7 @@ app.post(
       const upstream = await fetchImpl(`${XAI_API_BASE}/images/generations`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: authHeader },
-        body: JSON.stringify(req.body),
+        body: forwardedJson(req.body),
         timeout: 300_000,
       });
       console.log(`  [PROXY] xAI /v1/images/generations → ${upstream.status.toString()}`);
@@ -454,7 +469,7 @@ app.post(
       const upstream = await fetchImpl(`${XAI_API_BASE}/videos/generations`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: authHeader },
-        body: JSON.stringify(req.body),
+        body: forwardedJson(req.body),
         timeout: 600_000,
       });
       console.log(`  [PROXY] xAI /v1/videos/generations → ${upstream.status.toString()}`);
@@ -637,7 +652,7 @@ app.post(
       const upstream = await fetchImpl(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(req.body),
+        body: forwardedJson(req.body),
         timeout: 600_000,
       });
 
@@ -698,7 +713,16 @@ return app;
 const isEntryPoint = process.argv[1] !== undefined && import.meta.filename === path.resolve(process.argv[1]);
 
 if (isEntryPoint) {
-createApp().listen(PORT, () => {
+// Express 5 calls this on a failed bind as well as on success, passing the
+// error. Ignoring the argument printed that the server was running, and opened
+// a browser, on a port another process held. Express 4 crashed instead, with a
+// nonzero status, which is the outcome kept here.
+createApp().listen(PORT, (error?: Error) => {
+  if (error !== undefined) {
+    console.error(`  [ERROR] Could not listen on port ${PORT.toString()}: ${error.message}`);
+    process.exitCode = 1;
+    return;
+  }
   console.log("");
   console.log("  ⚔️  AS Adventurer — VTuber Creation Pipeline");
   console.log("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");

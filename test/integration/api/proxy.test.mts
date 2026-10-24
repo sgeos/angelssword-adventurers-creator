@@ -459,6 +459,33 @@ describe('AS Adventurer API characterization', () => {
 
         assert.ok(!callAt().url.includes('/../'), `path traversal reached upstream: ${callAt().url}`);
     });
+
+    /**
+     * A request with no JSON body forwards an empty object, not nothing.
+     *
+     * Express 4 gave `req.body` as `{}` when no parser matched, and Express 5
+     * leaves it undefined. `JSON.stringify(undefined)` is undefined rather than
+     * a string, so after the upgrade these routes would have sent upstream a
+     * POST with no body at all. Each route is exercised because each forwards
+     * the body separately.
+     */
+    it('forwards an empty object when a request carries no JSON body', async () => {
+        const routes: readonly (readonly [string, Readonly<Record<string, string>>])[] = [
+            ['/api/generate', { Authorization: 'Bearer sk-test' }],
+            ['/api/chat', { Authorization: 'Bearer sk-test' }],
+            ['/api/xai/images/generations', { Authorization: 'Bearer xai-test' }],
+            ['/api/xai/videos/generations', { Authorization: 'Bearer xai-test' }],
+            ['/api/video/generate', { 'x-api-key': 'google-test' }],
+        ];
+        for (const [path, headers] of routes) {
+            resetMockFetch();
+            mockFetchResponse(200, {});
+            const res = await request(app).post(path).set(headers);
+
+            assert.equal(res.status, 200, path);
+            assert.equal(callBodyText(), '{}', path);
+        }
+    });
 });
 
 describe('xAI video fetch allowlist', () => {

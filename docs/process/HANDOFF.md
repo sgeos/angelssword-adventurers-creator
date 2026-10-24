@@ -2,7 +2,7 @@
 
 > **Navigation**: [Process](./README.md) | [Documentation Root](../README.md)
 
-**Refreshed 2026-10-24. The anchor is `a4e1ea1`, the last commit before this
+**Refreshed 2026-10-24. The anchor is `86c7850`, the last commit before this
 refresh.** Read this block, run the validity check, then read the task below.
 
 ---
@@ -16,11 +16,11 @@ itself.
 
 ### Ancestry
 
-`main` should **contain** `a4e1ea1`, the last commit before this refresh. Test
+`main` should **contain** `86c7850`, the last commit before this refresh. Test
 containment rather than equality.
 
 ```sh
-git merge-base --is-ancestor a4e1ea1 HEAD
+git merge-base --is-ancestor 86c7850 HEAD
 ```
 
 If that fails, this file predates a history rewrite and is stale. If it
@@ -40,7 +40,7 @@ of the list rather than taking the next unused number, and renumber when
 inserting, because a list whose numbers skip reads as though checks are
 missing.
 
-1. `git ls-files` reports **103** TypeScript files and exactly **one**
+1. `git ls-files` reports **104** TypeScript files and exactly **one**
    JavaScript file, `eslint.config.mjs`, which is deliberate.
 2. **Five** projects exist at the repository root, `tsconfig.json` and four
    `tsconfig.*.json` files, and `src/` holds exactly four directories,
@@ -48,7 +48,7 @@ missing.
 3. `src/core/ports/` holds **three** capability interfaces, namely
    `storage.mts`, `http.mts`, and `clock.mts`, and `src/core/` holds
    **twenty** modules, counting `frame-rate.mts`.
-4. `npm test` reports **677** unit tests and **54** application programming
+4. `npm test` reports **677** unit tests and **56** application programming
    interface tests, all passing.
 5. `npm run test:browser` reports **82** passing browser specifications. Use
    that script rather than `npx playwright test`, which reuses a running
@@ -225,12 +225,28 @@ now assert sixty exactly.
   outside the sandbox and works. A `gh` inside a compound command does not
   match the pattern and stays sandboxed. `git` over SSH still needs the sandbox
   lifted, deliberately.
+- **Dependencies**, 2026-10-24. Address the deprecation warnings and update
+  everything that can be updated responsibly. Done: the workflow's actions are
+  at v7, which run on Node 24; Express is at 5, with two regressions it
+  introduced found and fixed, each now guarded by a test; `multer` and `rcedit`
+  are removed, the first unused and the second never working; the image ships
+  Node 22.23; `npm audit` reports nothing. TypeScript 7, node-fetch 3 and
+  `@types/node` 26 are held, for the reasons in `OPEN.md`. Inside the sandbox
+  the npm cache in the home directory is not writable, so set
+  `npm_config_cache` to a temporary directory. Locally npm 12 blocks
+  `esbuild`'s install script, and the build and the binary work without it.
 
 **Awaiting the operator.**
 
 - **The Gemini key test.** It calls Google directly from the browser with the
   key in the query string, bypassing the proxy. Recorded in `OPEN.md`, not
   fixed, since it was not asked for.
+- **The Windows icon.** The executable has never carried it, the `rcedit` call
+  having had nothing to run. The archived package was removed. Whether to add
+  the icon with `resedit` is recorded in `OPEN.md`.
+- **The development Node floor.** `jsdom` 30.1 declares Node 22.22.2, above the
+  project's 22.18, and continuous integration tests at 22.18. Recorded in
+  `OPEN.md`.
 
 And the four recorded earlier: whether the Graphics Interchange Format decode
 path should exist when nothing imports it, and whether its two divergences from

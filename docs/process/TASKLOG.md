@@ -101,6 +101,13 @@ dropped.
 | Exporter adoption of a handed rate covered | Complete | Fails with adoption disabled; paired control |
 | Loose frame count bounds tightened to sixty | Complete | Two specifications, stale comments corrected |
 | Handoff contradictions corrected | Complete | `gh` names the fork; binaries, counts, open list |
+| Workflow actions moved off Node 20 | Complete | checkout, setup-node, upload-artifact at v7 |
+| In-range dependency updates and audit fixes | Complete | `npm audit` reports zero |
+| Express 5 adopted | Complete | Two regressions found, fixed, and guarded by tests |
+| Unused `multer` removed | Complete | Deprecated over vulnerabilities, imported nowhere |
+| Archived `rcedit` removed | Complete | Its step had failed on every Windows build |
+| Container image moved to Node 22.23 | Complete | Five security releases since 22.18 |
+| Held majors and `jsdom` floor recorded | Recorded | TypeScript 7, node-fetch 3, `@types/node` 26 |
 
 ## Open Items
 
