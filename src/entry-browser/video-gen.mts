@@ -31,6 +31,7 @@ import {
     VIDEO_PROVIDERS,
     asVideoProviderId,
     MAX_REFERENCE_IMAGES,
+    describeKeyframeUse,
     describeReferenceUse,
     describeVideoOutput,
     loadCredential,
@@ -276,15 +277,17 @@ async function generateVideo(): Promise<void> {
         apiKey = stored;
     }
 
-    if (referenceImages.length === 0) {
-        showToast('Upload a reference image first, or send one from Sprite Prep', 'warning');
-        return;
-    }
-
     // Get mode early so we can validate keyframes
     const modeSelector = requireEl('vgModeSelector', HTMLElement);
     const activeMode = modeSelector.querySelector('.mode-btn.active');
     const mode = (activeMode instanceof HTMLElement ? activeMode.dataset['mode'] : undefined) ?? 'reference';
+
+    if (referenceImages.length === 0) {
+        showToast(mode === 'keyframe'
+            ? 'Keyframe mode needs a Start Frame'
+            : 'Upload a reference image first, or send one from Sprite Prep', 'warning');
+        return;
+    }
 
     if (mode === 'keyframe' && provider.id === 'google' && referenceImages.length < 2) {
         showToast('Keyframe mode requires both a Start Frame and End Frame', 'warning');
@@ -692,6 +695,9 @@ function refreshOutputNote(provider: VideoProviderId): void {
     // uses the first only, but the answer has differed by provider before.
     const refs = findEl('vgReferenceUse', HTMLElement);
     if (refs !== undefined) refs.textContent = describeReferenceUse(provider);
+    // Keyframe mode differs by provider: only Gemini is sent the end frame.
+    const keys = findEl('vgKeyframeUse', HTMLElement);
+    if (keys !== undefined) keys.textContent = describeKeyframeUse(provider);
 }
 
 function initVideoGen(): void {

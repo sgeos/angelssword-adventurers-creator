@@ -355,3 +355,22 @@ export const MAX_REFERENCE_IMAGES = 3;
  */
 export const describeReferenceUse = (_provider: VideoProviderId): string =>
   "Uses the first image only";
+
+/**
+ * What a provider does with the two frames keyframe mode collects.
+ *
+ * The operator's rule of 2026-10-24: Gemini is sent both, Grok and Wan the
+ * start frame. That was already what the requests did, since Grok's body and
+ * Wan's graph each carry one image by shape. What was missing was the telling:
+ * both accepted an end frame and dropped it without a word.
+ */
+export const describeKeyframeUse = (provider: VideoProviderId): string => {
+  switch (provider) {
+    case "google":
+      return "Gemini is sent both frames, the start and then the end.";
+    case "xai":
+      return "Grok is sent the start frame only. The end frame is not used.";
+    case "comfyui":
+      return "Wan is sent the start frame only. The end frame is not used.";
+  }
+};

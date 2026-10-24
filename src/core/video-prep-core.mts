@@ -171,28 +171,6 @@ export const buildLoopSequence = (cachedLength: number, loopMode: string): numbe
   return sequence;
 };
 
-export interface CrossfadeStep {
-  readonly t: number;
-  readonly alpha1: number;
-  readonly alpha2: number;
-}
-
-/**
- * Blend weights across a crossfade, from all-first to all-second.
- *
- * A count of 1 divides by zero and yields a non-finite t. That is the
- * existing behaviour and the tests pin it, so it is preserved rather than
- * quietly changed here.
- */
-export const buildCrossfadeAlphas = (count: number): CrossfadeStep[] => {
-  const result: CrossfadeStep[] = [];
-  for (let i = 0; i < count; i++) {
-    const t = i / (count - 1);
-    result.push({ t, alpha1: 1 - t, alpha2: t });
-  }
-  return result;
-};
-
 /** The subset of video-prep state the handoff payload reads. */
 export interface VideoPrepState {
   readonly video?: { readonly src?: string } | null;
@@ -207,27 +185,6 @@ export interface VideoPrepState {
   /** First frame of the loop. Absent means 0, for a caller predating it. */
   readonly loopStart?: number;
   readonly loopPoint: number;
-  readonly concatVideo?: { readonly src?: string } | null;
-  readonly concatWidth?: number;
-  readonly concatHeight?: number;
-  readonly concatDuration?: number;
-  readonly concatSourceFps?: number;
-}
-
-export interface HandoffOptions {
-  readonly concatEnabled?: boolean;
-  readonly crossfade?: boolean;
-  readonly crossfadeDuration?: number;
-}
-
-export interface ConcatPayload {
-  readonly videoSrc: string | undefined;
-  readonly videoWidth: number | undefined;
-  readonly videoHeight: number | undefined;
-  readonly duration: number | undefined;
-  readonly sourceFps: number | undefined;
-  readonly crossfade: boolean;
-  readonly crossfadeDuration: number;
 }
 
 export interface HandoffPayload {
@@ -254,14 +211,10 @@ export interface HandoffPayload {
   /** Last frame of the loop, inclusive. */
   readonly loopPoint: number;
   readonly outputFrameCount: number;
-  readonly concat: ConcatPayload | null;
 }
 
 /** Payload handed to the exporter stage. */
-export const buildVideoPrepHandoffPayload = (
-  state: VideoPrepState,
-  opts: HandoffOptions = {},
-): HandoffPayload => ({
+export const buildVideoPrepHandoffPayload = (state: VideoPrepState): HandoffPayload => ({
   videoSrc: state.video?.src,
   videoWidth: state.videoWidth,
   videoHeight: state.videoHeight,
@@ -279,19 +232,6 @@ export const buildVideoPrepHandoffPayload = (
     loopMode: state.loopMode,
     totalFrames: state.totalFrames,
   }),
-
-  concat:
-    opts.concatEnabled === true
-      ? {
-          videoSrc: state.concatVideo?.src,
-          videoWidth: state.concatWidth,
-          videoHeight: state.concatHeight,
-          duration: state.concatDuration,
-          sourceFps: state.concatSourceFps,
-          crossfade: opts.crossfade === true,
-          crossfadeDuration: opts.crossfadeDuration ?? 0,
-        }
-      : null,
 });
 
 /* ────────────────────────────────────────────────────────────────────────

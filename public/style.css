@@ -1547,19 +1547,6 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* ============================================
-   CROSSFADE CONTROLS
-   ============================================ */
-.crossfade-controls {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 14px;
-    background: var(--bg-panel);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-}
-
-/* ============================================
    ANIMATIONS
    ============================================ */
 @keyframes fadeIn {

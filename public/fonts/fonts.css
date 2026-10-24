@@ -1,0 +1,47 @@
+/*
+ * The four families the page uses, served from this application rather than
+ * from Google. Each file is the original published in github.com/google/fonts,
+ * unmodified, beside its licence. See README.md in this directory.
+ *
+ * Weight ranges for the variable fonts are read from their own fvar tables.
+ */
+
+@font-face {
+    font-family: 'Cinzel';
+    font-style: normal;
+    font-weight: 400 900;
+    font-display: swap;
+    src: url("cinzel/Cinzel%5Bwght%5D.ttf") format("truetype");
+}
+
+@font-face {
+    font-family: 'Cinzel Decorative';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("cinzel-decorative/CinzelDecorative-Regular.ttf") format("truetype");
+}
+
+@font-face {
+    font-family: 'Cinzel Decorative';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url("cinzel-decorative/CinzelDecorative-Bold.ttf") format("truetype");
+}
+
+@font-face {
+    font-family: 'Outfit';
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url("outfit/Outfit%5Bwght%5D.ttf") format("truetype");
+}
+
+@font-face {
+    font-family: 'Share Tech Mono';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("share-tech-mono/ShareTechMono-Regular.ttf") format("truetype");
+}

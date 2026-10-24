@@ -1,18 +1,21 @@
 /**
  * AS Adventurer — video preparation.
  *
- * Stage 3: trim to a loop point, choose a loop mode, and optionally
- * concatenate a second clip with a crossfade, before handing off to export.
+ * Stage 3: trim to a loop point and choose a loop mode, before handing off
+ * to export.
+ *
+ * A second clip could once be appended here with a crossfade. It was removed
+ * on 2026-10-24 by the operator's decision: the exporter never read it, here
+ * or upstream, so a user who added one exported the first clip alone.
  */
 import {
     ASAdventurer,
     initModeSelector,
-    initRange,
     initUploadZone,
     showToast,
     switchTab,
 } from "../platform-browser/shell.mts";
-import { findEl, require2d, requireEl } from "../platform-browser/dom.mts";
+import { require2d, requireEl } from "../platform-browser/dom.mts";
 import { fetchBlob } from "../platform-browser/binary.mts";
 import * as VideoPrepCore from "../core/video-prep-core.mts";
 import {
@@ -78,13 +81,6 @@ interface VideoPrepState {
     frameCache: HTMLCanvasElement[] | null;
     frameCacheComplete: boolean;
 
-    concatVideo: HTMLVideoElement | null;
-    concatLoaded: boolean;
-    concatDuration: number;
-    concatWidth: number;
-    concatHeight: number;
-    concatSourceFps: number;
-
     fromVideoGen: boolean;
 }
 
@@ -120,14 +116,6 @@ const state: VideoPrepState = {
     // Auto frame cache (for instant scrubbing)
     frameCache: null,         // array of offscreen canvases, one per frame
     frameCacheComplete: false, // true when all frames are cached
-
-    // Concatenation
-    concatVideo: null,     // <video> element for 2nd video
-    concatLoaded: false,
-    concatDuration: 0,
-    concatWidth: 0,
-    concatHeight: 0,
-    concatSourceFps: ASSUMED_SOURCE_FPS,
 
     // Source tracking
     fromVideoGen: false,
@@ -197,18 +185,6 @@ function updateVideoInfo(): void {
             <div><strong>Loop:</strong> Frames ${state.loopStart.toString()} → ${state.loopPoint.toString()}</div>
             <div><strong>Mode:</strong> ${summary.modeLabel}</div>
             <div><strong>Output Frames:</strong> ${summary.outputFrames.toString()}</div>
-        `;
-    }
-
-    if (state.concatLoaded) {
-        const crossfade = requireEl('vpCrossfade', HTMLInputElement);
-        const cfDur = requireEl('vpCrossfadeDuration', HTMLInputElement);
-        html += `
-            <hr style="border-color:rgba(255,255,255,0.1);margin:0.4rem 0">
-            <div><strong>2nd Video:</strong> ${state.concatWidth.toString()}×${state.concatHeight.toString()}</div>
-            <div><strong>2nd Duration:</strong> ${state.concatDuration.toFixed(2)}s</div>
-            <div><strong>2nd Source FPS:</strong> ${state.concatSourceFps.toString()}</div>
-            <div><strong>Crossfade:</strong> ${crossfade.checked ? `${cfDur.value}ms` : 'Off'}</div>
         `;
     }
 
@@ -667,62 +643,6 @@ function stopPreview(): void {
 }
 
 // ================================================================
-// NEW: VIDEO CONCATENATION
-// ================================================================
-
-async function loadConcatVideo(file: File): Promise<void> {
-    // Remove previous
-    removeConcatVideo(true);
-
-    const video = createVideoElement();
-    video.src = URL.createObjectURL(file);
-
-    await new Promise((resolve, reject) => {
-        video.onloadedmetadata = resolve;
-        video.onerror = (): void => { reject(new Error('Failed to load second video')); };
-    });
-
-    state.concatVideo = video;
-    state.concatLoaded = true;
-    state.concatDuration = video.duration;
-    state.concatWidth = video.videoWidth;
-    state.concatHeight = video.videoHeight;
-
-    // The second clip's own source rate, established the same way. The two
-    // clips need not share one.
-    const rate = await probeSourceRate(video);
-    video.currentTime = 0;
-    state.concatSourceFps = rate.fps;
-    const fps = describeSourceRate(rate);
-
-    // Update UI
-    requireEl('vpConcatText', HTMLElement).textContent =
-        `2nd video: ${state.concatWidth.toString()}×${state.concatHeight.toString()}, ${state.concatDuration.toFixed(2)}s @ ${fps}`;
-    requireEl('vpConcatInfo', HTMLElement).classList.remove('hidden');
-
-    updateVideoInfo();
-    showToast(`2nd video loaded: ${state.concatDuration.toFixed(2)}s @ ${fps}`, 'success');
-}
-
-function removeConcatVideo(silent = false): void {
-    if (state.concatVideo !== null) {
-        URL.revokeObjectURL(state.concatVideo.src);
-        state.concatVideo.remove();
-        state.concatVideo = null;
-    }
-    state.concatLoaded = false;
-    state.concatDuration = 0;
-    state.concatWidth = 0;
-    state.concatHeight = 0;
-
-    requireEl('vpConcatInfo', HTMLElement).classList.add('hidden');
-    requireEl('vpCrossfade', HTMLInputElement).checked = false;
-
-    updateVideoInfo();
-    if (!silent) showToast('2nd video removed', 'info');
-}
-
-// ================================================================
 // HANDOFF: SEND TO MODEL EXPORTER
 // ================================================================
 
@@ -735,19 +655,7 @@ function sendToExporter(): void {
     stopPreview();
     pauseVideo();
 
-    // The original tolerated these controls being absent; findEl keeps that.
-    const crossfadeEnabled =
-        state.concatLoaded && (findEl('vpCrossfade', HTMLInputElement)?.checked ?? false);
-    const crossfadeDuration = crossfadeEnabled
-        ? parseInt(findEl('vpCrossfadeDuration', HTMLInputElement)?.value ?? '300', 10)
-        : 0;
-
-    // Pack handoff data via pure core (matches prior sendToExporter shape)
-    ASAdventurer.handoff.videoPrepData = VideoPrepCore.buildVideoPrepHandoffPayload(state, {
-        concatEnabled: state.concatLoaded,
-        crossfade: crossfadeEnabled,
-        crossfadeDuration: crossfadeDuration,
-    });
+    ASAdventurer.handoff.videoPrepData = VideoPrepCore.buildVideoPrepHandoffPayload(state);
 
     showToast('Video data sent to Model Exporter!', 'success');
     switchTab('tab-exporter');
@@ -762,8 +670,6 @@ function sendToExporter(): void {
 export function clearAll(): void {
     stopPreview();
     pauseVideo();
-    removeConcatVideo(true);
-
     state.videoLoaded = false;
     state.loopStart = 0;
     state.loopPoint = -1;
@@ -860,37 +766,6 @@ function init(): void {
     initModeSelector('vpLoopMode', (mode) => {
         state.loopMode = mode;
         refreshLoopInfo();
-    });
-
-    // ── Concatenation ──
-    const concatInput = requireEl('vpConcatFileInput', HTMLInputElement);
-    requireEl('vpAddVideoBtn', HTMLElement).addEventListener('click', () => {
-        concatInput.click();
-    });
-
-    concatInput.addEventListener('change', () => {
-        const f = concatInput.files?.[0];
-        if (f?.type.startsWith('video/') === true) {
-            void loadConcatVideo(f);
-        } else if (f !== undefined) {
-            showToast('Please select a video file', 'error');
-        }
-        concatInput.value = ''; // reset so same file can be re-selected
-    });
-
-    requireEl('vpRemoveConcat', HTMLElement).addEventListener('click', () => {
-        removeConcatVideo(false);
-    });
-
-    // ── Crossfade controls ──
-    requireEl('vpCrossfade', HTMLElement).addEventListener('change', () => {
-        updateVideoInfo();
-    });
-
-    initRange('vpCrossfadeDuration', 'vpCrossfadeDurationVal', 'ms');
-
-    requireEl('vpCrossfadeDuration', HTMLElement).addEventListener('input', () => {
-        updateVideoInfo();
     });
 
     // ── Handoff Button ──

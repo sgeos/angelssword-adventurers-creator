@@ -5,9 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="AS Adventurer Creator — VTuber Creation Pipeline by Angel's Sword Studios. Create animated PNGtuber and VTuber assets from scratch in minutes.">
     <title>⚔️ AS Adventurer Creator — VTuber Creation Pipeline</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cinzel+Decorative:wght@400;700&family=Outfit:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap">
+    <!-- Hosted locally; see fonts/README.md. -->
+    <link rel="stylesheet" href="fonts/fonts.css">
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚔️</text></svg>">
 </head>
@@ -58,7 +57,7 @@
             <span class="tab-icon">🎬</span>
             <span class="tab-label">Generate Video</span>
         </button>
-        <button class="tab-btn" data-tab="tab-video-prep" title="Build loops, concatenate videos, and add crossfades">
+        <button class="tab-btn" data-tab="tab-video-prep" title="Build loops and choose a loop mode">
             <span class="tab-icon">🔄</span>
             <span class="tab-label">Video Prep</span>
         </button>
@@ -449,6 +448,7 @@
 
                         <!-- Keyframe Mode Fields -->
                         <div id="vgKeyframeMode" class="hidden">
+                            <div class="text-muted mb-1" id="vgKeyframeUse" style="font-size:0.8rem" title="What the selected provider does with the two frames">Gemini is sent both frames, the start and then the end.</div>
                             <div class="two-col">
                                 <div class="form-row">
                                     <label>Start Frame</label>
@@ -623,7 +623,7 @@
                         </div>
                     </section>
 
-                    <!-- Stage 3: Loop Mode & Concat -->
+                    <!-- Stage 3: Loop Mode -->
                     <section class="stage disabled" id="vpStage3">
                         <div class="stage-header">
                             <span class="stage-number">3</span>
@@ -640,34 +640,6 @@
                             </div>
 
                             <hr class="gold-divider">
-
-                            <!-- Video Concatenation -->
-                            <div class="form-row">
-                                <label>Video Concatenation</label>
-                                <div id="vpConcatSection">
-                                    <button class="btn btn-sm btn-secondary" id="vpAddVideoBtn" title="Upload a second video to append to the first">
-                                        ➕ Add 2nd Video
-                                    </button>
-                                    <input type="file" id="vpConcatFileInput" accept="video/mp4,video/webm,video/quicktime,.mov" class="hidden">
-                                </div>
-                                <div id="vpConcatInfo" class="hidden mt-1">
-                                    <div class="status-msg info">
-                                        <span>🔗</span> <span id="vpConcatText">2nd video loaded — will be appended</span>
-                                        <button class="btn btn-sm btn-danger" id="vpRemoveConcat" style="margin-left:auto" title="Remove the second video">✖</button>
-                                    </div>
-                                    <div class="crossfade-controls mt-1">
-                                        <label class="toggle-switch" title="Add a crossfade transition between the two videos">
-                                            <input type="checkbox" id="vpCrossfade">
-                                            <span class="slider"></span>
-                                        </label>
-                                        <label for="vpCrossfade" style="margin-bottom:0;flex:1">Crossfade</label>
-                                        <div class="range-row" style="flex:2">
-                                            <input type="range" id="vpCrossfadeDuration" min="100" max="1000" value="300" step="50" title="Crossfade duration in milliseconds">
-                                            <span class="range-value" id="vpCrossfadeDurationVal">300ms</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
 
                             <button class="btn-handoff mt-2" id="vpHandoffBtn" title="Send the prepared video to Model Exporter">
                                 Send to Model Exporter →

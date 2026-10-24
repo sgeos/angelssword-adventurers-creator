@@ -8,6 +8,7 @@ import {
     asProviderId,
     buildImageRequest,
     credentialFrom,
+    describeKeyframeUse,
     describeReferenceUse,
     describeVideoOutput,
     providerFrom,
@@ -207,6 +208,30 @@ describe('describeReferenceUse tells the user what becomes of the extras', () =>
     it('says something for every provider in the table', () => {
         for (const id of VIDEO_PROVIDER_ORDER) {
             assert.ok(describeReferenceUse(id).length > 0, id);
+        }
+    });
+});
+
+/**
+ * The operator's rule of 2026-10-24: Gemini is sent both keyframes, Grok and
+ * Wan the start frame. The requests already did that. The interface did not
+ * say so, and both accepted an end frame they then dropped.
+ */
+describe('describeKeyframeUse says which frames each provider is sent', () => {
+    it('says Gemini is sent both', () => {
+        assert.match(describeKeyframeUse('google'), /both frames/);
+    });
+
+    it('says Grok and Wan are sent the start frame only, and the end frame is unused', () => {
+        for (const id of ['xai', 'comfyui'] as const) {
+            assert.match(describeKeyframeUse(id), /start frame only/, id);
+            assert.match(describeKeyframeUse(id), /end frame is not used/, id);
+        }
+    });
+
+    it('says something for every provider in the table', () => {
+        for (const id of VIDEO_PROVIDER_ORDER) {
+            assert.ok(describeKeyframeUse(id).length > 0, id);
         }
     });
 });

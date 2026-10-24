@@ -78,7 +78,6 @@ test.describe('E — Mocked video generate → prep handoff', () => {
         loopStart: 0,
         loopPoint: -1,
         outputFrameCount: 30,
-        concat: null,
       };
       return Object.keys(app.handoff.videoPrepData).sort();
     });
@@ -96,7 +95,6 @@ test.describe('E — Mocked video generate → prep handoff', () => {
         'loopStart',
         'loopPoint',
         'outputFrameCount',
-        'concat',
       ]),
     );
 

@@ -44,6 +44,17 @@ describe('buildGrokVideoRequest', () => {
         const plain = buildGrokVideoRequest({ prompt: 'sway', imageDataUri: DATA_URI, durationSeconds: 6, mode: 'loop' });
         assert.equal(plain.prompt, 'sway');
     });
+
+    /**
+     * Grok is sent the start frame only in keyframe mode, by the operator's
+     * rule of 2026-10-24. The request has room for one image, so the end
+     * frame cannot reach it however it is called.
+     */
+    it('carries exactly one image in keyframe mode, the one it was given', () => {
+        const key = buildGrokVideoRequest({ prompt: 'x', imageDataUri: DATA_URI, durationSeconds: 6, mode: 'keyframe' });
+        assert.deepEqual(key.image, { url: DATA_URI });
+        assert.deepEqual(Object.keys(key).filter((k) => /image/i.test(k)), ['image']);
+    });
 });
 
 describe('extractRequestId', () => {

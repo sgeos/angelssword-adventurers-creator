@@ -132,4 +132,23 @@ test.describe('L — Reference slots', () => {
         await page.locator('#vgProvider .seg-btn[data-mode="xai"]').click();
         await expect(page.locator('#vgReferenceUse')).toContainText('first image only');
     });
+
+    /**
+     * Keyframe mode names which frames each provider is sent: both for
+     * Gemini, the start only for Grok and Wan.
+     */
+    test('says which keyframes the selected provider is sent', async ({ page }) => {
+        await page.goto('/');
+        await page.locator('.tab-btn[data-tab="tab-video-gen"]').click();
+        await page.locator('#vgModeSelector .mode-btn[data-mode="keyframe"]').click();
+        await expect(page.locator('#vgKeyframeMode')).not.toHaveClass(/hidden/);
+
+        await page.locator('#vgProvider .seg-btn[data-mode="google"]').click();
+        await expect(page.locator('#vgKeyframeUse')).toContainText('both frames');
+
+        for (const provider of ['xai', 'comfyui']) {
+            await page.locator(`#vgProvider .seg-btn[data-mode="${provider}"]`).click();
+            await expect(page.locator('#vgKeyframeUse')).toContainText('start frame only');
+        }
+    });
 });

@@ -4,12 +4,10 @@
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { at } from '../helpers/at.mts';
 import type { VideoPrepState } from '../../src/core/video-prep-core.mts';
 import {
     getOutputFrameCount,
     buildLoopSequence,
-    buildCrossfadeAlphas,
     buildVideoPrepHandoffPayload,
 } from '../../src/core/video-prep-core.mts';
 
@@ -79,23 +77,6 @@ describe('video-prep-core buildLoopSequence', () => {
     });
 });
 
-describe('video-prep-core buildCrossfadeAlphas', () => {
-    it('crossfade endpoint alphas: first (1,0) and last (0,1)', () => {
-        const alphas = buildCrossfadeAlphas(5);
-        assert.equal(alphas.length, 5);
-        assert.equal(at(alphas, 0).alpha1, 1);
-        assert.equal(at(alphas, 0).alpha2, 0);
-        assert.equal(at(alphas, 0).t, 0);
-        assert.equal(at(alphas, 4).alpha1, 0);
-        assert.equal(at(alphas, 4).alpha2, 1);
-        assert.equal(at(alphas, 4).t, 1);
-        // midpoint
-        assert.equal(at(alphas, 2).t, 0.5);
-        assert.equal(at(alphas, 2).alpha1, 0.5);
-        assert.equal(at(alphas, 2).alpha2, 0.5);
-    });
-});
-
 describe('video-prep-core buildVideoPrepHandoffPayload', () => {
     function makeState(overrides: Partial<VideoPrepState> = {}): VideoPrepState {
         return Object.assign({
@@ -108,20 +89,11 @@ describe('video-prep-core buildVideoPrepHandoffPayload', () => {
             totalFrames: 75,
             loopMode: 'pingpong',
             loopPoint: 10,
-            concatVideo: { src: 'blob:second' },
-            concatWidth: 512,
-            concatHeight: 512,
-            concatDuration: 1.2,
-            concatSourceFps: 24,
         }, overrides);
     }
 
-    it('handoff payload shape without concat', () => {
-        const payload = buildVideoPrepHandoffPayload(makeState(), {
-            concatEnabled: false,
-            crossfade: false,
-            crossfadeDuration: 0,
-        });
+    it('handoff payload shape', () => {
+        const payload = buildVideoPrepHandoffPayload(makeState());
 
         assert.deepEqual(payload, {
             videoSrc: 'blob:primary',
@@ -137,39 +109,16 @@ describe('video-prep-core buildVideoPrepHandoffPayload', () => {
             loopStart: 0,
             loopPoint: 10,
             outputFrameCount: 20, // 2 * L
-            concat: null,
         });
     });
 
-    it('handoff payload shape with concat + crossfade', () => {
-        const payload = buildVideoPrepHandoffPayload(makeState(), {
-            concatEnabled: true,
-            crossfade: true,
-            crossfadeDuration: 300,
-        });
-
-        assert.equal(payload.videoSrc, 'blob:primary');
-        assert.equal(payload.outputFrameCount, 20);
-        assert.deepEqual(payload.concat, {
-            videoSrc: 'blob:second',
-            videoWidth: 512,
-            videoHeight: 512,
-            duration: 1.2,
-            sourceFps: 24,
-            crossfade: true,
-            crossfadeDuration: 300,
-        });
-    });
-
-    it('handoff with concat enabled but crossfade off', () => {
-        const payload = buildVideoPrepHandoffPayload(makeState(), {
-            concatEnabled: true,
-            crossfade: false,
-            crossfadeDuration: 0,
-        });
-        const concat = payload.concat;
-        if (concat === null) throw new Error('concat payload must be present when enabled');
-        assert.equal(concat.crossfade, false);
-        assert.equal(concat.crossfadeDuration, 0);
+    /**
+     * The second clip and its crossfade were removed on 2026-10-24. The
+     * exporter never read them, here or upstream. Nothing about them may
+     * reappear in the handoff without the exporter reading it.
+     */
+    it('carries nothing about a second clip', () => {
+        const payload = buildVideoPrepHandoffPayload(makeState());
+        assert.ok(!('concat' in payload));
     });
 });

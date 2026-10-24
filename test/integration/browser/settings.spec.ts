@@ -224,65 +224,58 @@ test.describe('B — Non-credential preferences', () => {
 });
 
 /**
- * B — What the page fetches from elsewhere, which nothing had checked.
+ * B — The page loads nothing from another origin.
  *
- * Found by the save test above, which recorded requests from page load before
- * it was narrowed to the save. The page requests a stylesheet and font files
- * from Google on every load.
- *
- * That contradicts the README, which says the later steps work fully offline
- * and that the internet is needed only for generation. The application does
- * keep working, the fonts falling back, so the claim holds as a statement
- * about function and fails as a statement about traffic. Every load also tells
- * a third party the user's address, on a tool whose whole proxy arrangement
- * exists so that keys and prompts reach only the service they are for.
- *
- * Characterised, not fixed: self-hosting the faces is a change to what the
- * repository, the container and the binary all carry. Recorded in
- * docs/decisions/OPEN.md. These assertions are written to fail when it is
- * fixed, which is the point of pinning it.
+ * Until 2026-10-24 every load fetched a stylesheet and five font files from
+ * Google, contradicting the README's offline claim and telling a third party
+ * each time the tool was opened. The faces are now hosted in `public/fonts/`.
  */
-test.describe('B — Third party requests on load', () => {
-    test('requests webfonts from a third party, despite the offline claim', async ({ page }) => {
+test.describe('B — No third party requests on load', () => {
+    test('requests nothing from another origin', async ({ page }) => {
         const offSite: string[] = [];
+        const local: string[] = [];
         page.on('request', (request) => {
             const url = request.url();
             if (url.startsWith('data:') || url.startsWith('blob:')) return;
-            if (url.startsWith('http://localhost') || url.startsWith('http://127.0.0.1')) return;
-            offSite.push(url);
+            if (url.startsWith('http://localhost') || url.startsWith('http://127.0.0.1')) local.push(url);
+            else offSite.push(url);
         });
 
         await page.goto('/');
         await expect(page.locator('#tab-sprite-prep')).toHaveClass(/active/);
+        await page.evaluate(async () => { await document.fonts.ready; });
 
-        expect(offSite.length).toBeGreaterThan(0);
-        expect(offSite.some((u) => u.includes('fonts.googleapis.com'))).toBe(true);
+        expect(offSite).toEqual([]);
+        // NOT VACUOUS. The same listener sees the local stylesheet and at
+        // least one local font file, so an empty list above is not a
+        // listener that saw nothing.
+        expect(local.some((u) => u.endsWith('/fonts/fonts.css'))).toBe(true);
+        expect(local.some((u) => u.includes('/fonts/') && u.endsWith('.ttf'))).toBe(true);
     });
 
     /**
-     * The other half of what matters: nothing the user typed is in any of it.
-     * A third party learning that this tool is in use is a different order of
-     * problem from a third party learning a key.
+     * Hosting them is worth nothing if they do not load. `document.fonts.check`
+     * would not show that, since it reports true for a family with no face at
+     * all, so each face is loaded explicitly and must match one declared in
+     * `fonts/fonts.css`.
      */
-    test('sends nothing the user entered to the third party', async ({ page }) => {
-        const offSite: string[] = [];
-        page.on('request', (request) => {
-            const url = request.url();
-            if (!url.startsWith('http://localhost') && !url.startsWith('http://127.0.0.1')) {
-                offSite.push(url);
-            }
-        });
-
+    test('loads every family the page uses from the local files', async ({ page }) => {
         await page.goto('/');
-        await openSettings(page);
-        await page.locator('#settingsOpenAIKey').fill(FAKE.openai);
-        await page.locator('#settingsOpenAISave').click();
-        expect(await stored(page, 'openai_api_key')).toBe(FAKE.openai);
-        await page.reload();
-
-        for (const url of offSite) {
-            expect(url).not.toContain(FAKE.openai);
-            expect(url).not.toContain('sk-');
+        const loaded = await page.evaluate(async () => {
+            const wanted = [
+                '400 16px "Cinzel"', '700 16px "Cinzel"',
+                '400 16px "Cinzel Decorative"', '700 16px "Cinzel Decorative"',
+                '300 16px "Outfit"', '700 16px "Outfit"',
+                '400 16px "Share Tech Mono"',
+            ];
+            const result: Record<string, number> = {};
+            for (const font of wanted) {
+                result[font] = (await document.fonts.load(font)).length;
+            }
+            return result;
+        });
+        for (const [font, faces] of Object.entries(loaded)) {
+            expect(faces, font).toBeGreaterThan(0);
         }
     });
 });
