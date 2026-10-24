@@ -21,16 +21,11 @@ import { LOOP_CLIP } from './helpers';
 /**
  * Load the clip and report how many frames the stage decided it has.
  *
- * The count is READ rather than assumed, and deliberately so. The clip is two
- * seconds at thirty frames per second, so sixty, but the stage does not read
- * the rate from the container: it plays the clip at four times speed for half
- * a second and divides the frames the browser reports decoding by the elapsed
- * media time. A machine that cannot decode that fast reports fewer, and
- * headless Chromium reports nineteen frames per second for this clip.
- *
- * Asserting sixty here would therefore test the host's decoder rather than the
- * loop controls. The weakness is real and recorded in docs/decisions/OPEN.md;
- * it is not what this file is for.
+ * The clip is two seconds at thirty frames per second, so sixty. The count
+ * used to depend on the host, the stage having estimated the rate by playing
+ * the clip at four times speed and counting decoded frames, which headless
+ * Chromium put at nineteen. The rate now comes from the frames' timestamps, so
+ * sixty is asserted exactly. Detection itself is covered in `frame-rate.spec.ts`.
  */
 const loadClip = async (page: Page): Promise<number> => {
     await page.goto('/');
@@ -43,7 +38,7 @@ const loadClip = async (page: Page): Promise<number> => {
     // rest of the stage works from.
     const max = await page.locator('#vpScrubber').getAttribute('max');
     const total = Number(max) + 1;
-    expect(total).toBeGreaterThan(30);
+    expect(total).toBe(60);
     return total;
 };
 

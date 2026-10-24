@@ -12,11 +12,71 @@ file is arranged this way rather than being rewritten wholesale.
 
 ## Last Updated
 
+2026-10-24. The two queued frame rate browser specifications are written, and
+the handoff is corrected where it contradicted itself.
+
+## Verification
+
+`npm run check` passes. 677 unit tests and 54 application programming interface
+tests pass. 82 browser specifications pass outside the sandbox, the three new
+ones among them. Disabling the exporter's adoption of a handed rate was confirmed
+to fail the adoption specification, and the source was restored and rebuilt
+before the final run. Continuous integration is read after the push.
+
+## Summary
+
+**`frame-rate.spec.ts`.** Video Preparation reports the fifteen frame clip as
+fifteen frames per second and thirty frames. The exporter adopts the rate Video
+Preparation hands it. Since measuring again would also give fifteen, the
+specification removes `requestVideoFrameCallback` after Video Preparation has
+measured, and a paired control shows that the exporter, measuring without it,
+reports thirty, assumed. Without the control the adoption test could pass on a
+probe that still worked.
+
+**Two loose bounds tightened.** The exporter and loop control specifications
+asserted only more than thirty frames, with comments explaining that the rate
+varied by host. It no longer does, so both assert sixty, and the comments say
+why.
+
+**The handoff.** The documented `gh` command resolves to the upstream remote and
+reports a missing workflow, so it now names the fork. The open matters list said
+the binaries had never been built and that a queued task addressed the untested
+modules, and the summary gave nineteen modules and 644 tests. All corrected.
+
+## Questions for Human Pilot
+
+**The Gemini key test** is unchanged and still awaits a decision. No key was
+available this session, and nothing here depended on one.
+
+## Technical Concerns
+
+The adoption specification depends on `requestVideoFrameCallback` being
+deletable from the prototype. It is in Chromium, and the specification reads the
+removal back so that a browser where it is not would fail rather than pass.
+
+## Intended Next Step
+
+Nothing is queued for an agent.
+
+## Session Context
+
+`main` at `a4e1ea1` before this work.
+
+---
+
+## Superseded history
+
+Nothing below this line describes the present.
+
+### Superseded 2026-10-24 — three of the operator's decisions acted on
+
+#### Last Updated
+
 2026-10-24. Three of the operator's decisions acted on: web fonts hosted,
 keyframe use stated per provider, the second clip removed. Committed in
 `bddf5ec` and pushed on the operator's authorisation.
 
-## Verification
+#### Verification
 
 `npm run check` passes. 677 unit tests, 54 application programming interface
 tests and 79 browser specifications pass, the browser specifications outside the
@@ -24,7 +84,7 @@ sandbox. The new test that the page requests nothing from another origin was run
 against the page as it was and failed, naming all six Google requests.
 Continuous integration has not seen these changes.
 
-## Summary
+#### Summary
 
 **Web fonts.** The four families are hosted in `public/fonts/` as the original
 files from Google's font repository, unmodified, beside their licences. Google's
@@ -40,13 +100,13 @@ frame is reported as such rather than as a missing reference image.
 and the stylesheet, with the unused crossfade helper. The README had also
 advertised a crossfade loop mode that never existed, and no longer does.
 
-## Questions for Human Pilot
+#### Questions for Human Pilot
 
 **The Gemini key test**, found while removing the font links. It calls Google
 directly from the browser with the key in the query string, bypassing the proxy
 every other call uses. Recorded in `OPEN.md`, not fixed.
 
-## Technical Concerns
+#### Technical Concerns
 
 The licence reasoning is mine, not a lawyer's. Shipping the unmodified originals
 is the conservative reading. Converting them to WOFF2 or subsetting them to save
@@ -54,20 +114,14 @@ weight would reopen the question.
 
 Whether Gemini honours a keyframe end frame is still not established.
 
-## Intended Next Step
+#### Intended Next Step
 
 The two browser specifications for the frame rate change remain queued.
 Otherwise nothing until the Gemini key test is decided.
 
-## Session Context
+#### Session Context
 
 `main` at `bddf5ec` before this refresh.
-
----
-
-## Superseded history
-
-Nothing below this line describes the present.
 
 ### Superseded 2026-10-24 — prepared for a power cycle
 

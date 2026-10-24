@@ -315,6 +315,14 @@ every other frame looks like a clip at half the rate, a variable frame rate clip
 has no single answer, and 29.97 is reported as 30. The history below is kept as
 it was written, including its corrections.
 
+**Covered in the browser 2026-10-24.** `frame-rate.spec.ts` asserts that Video
+Prep reports the fifteen frame clip as fifteen, and that the exporter adopts the
+rate handed to it rather than measuring again. The second is made to
+discriminate by removing `requestVideoFrameCallback` after Video Prep has
+measured, so a second measurement would fall back to thirty, and a paired
+control shows that it does. Disabling the adoption in the exporter was
+confirmed to fail the test.
+
 
 `loadVideo` does not read the frame rate from the file. It sets
 `playbackRate` to four, plays for five hundred milliseconds, and divides the

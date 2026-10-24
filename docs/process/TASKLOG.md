@@ -97,6 +97,10 @@ dropped.
 | Second clip removed | Complete | Never read by the exporter, here or upstream |
 | Keyframe use stated per provider | Complete | Gemini both frames, Grok and Wan the start frame |
 | Gemini key test bypasses the proxy | Recorded | Direct call with the key in the query string |
+| Video Prep rate detection covered in the browser | Complete | Fifteen frame clip reported as fifteen |
+| Exporter adoption of a handed rate covered | Complete | Fails with adoption disabled; paired control |
+| Loose frame count bounds tightened to sixty | Complete | Two specifications, stale comments corrected |
+| Handoff contradictions corrected | Complete | `gh` names the fork; binaries, counts, open list |
 
 ## Open Items
 

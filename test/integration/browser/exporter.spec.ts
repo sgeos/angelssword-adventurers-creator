@@ -33,12 +33,12 @@ const loadForExport = async (page: Page): Promise<number> => {
     await expect(page.locator('#exStage2')).not.toHaveClass(/disabled/);
     await expect(page.locator('#exStage3')).not.toHaveClass(/disabled/);
 
-    // Read the count rather than assume sixty. The frame rate is estimated by
-    // playing the clip, so the count depends on the host's decoder; that is a
-    // recorded defect and not this file's subject.
+    // The rate comes from the frames' timestamps rather than from how fast
+    // this host decodes, so the two second clip at thirty is sixty frames on
+    // any machine. The count used to vary by host and was only bounded here.
     const end = await page.locator('#exEndFrame').inputValue();
     const total = Number(end) + 1;
-    expect(total).toBeGreaterThan(30);
+    expect(total).toBe(60);
     return total;
 };
 

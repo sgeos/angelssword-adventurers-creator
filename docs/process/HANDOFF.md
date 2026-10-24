@@ -2,7 +2,7 @@
 
 > **Navigation**: [Process](./README.md) | [Documentation Root](../README.md)
 
-**Refreshed 2026-10-24. The anchor is `bddf5ec`, the last commit before this
+**Refreshed 2026-10-24. The anchor is `a4e1ea1`, the last commit before this
 refresh.** Read this block, run the validity check, then read the task below.
 
 ---
@@ -16,11 +16,11 @@ itself.
 
 ### Ancestry
 
-`main` should **contain** `bddf5ec`, the last commit before this refresh. Test
+`main` should **contain** `a4e1ea1`, the last commit before this refresh. Test
 containment rather than equality.
 
 ```sh
-git merge-base --is-ancestor bddf5ec HEAD
+git merge-base --is-ancestor a4e1ea1 HEAD
 ```
 
 If that fails, this file predates a history rewrite and is stale. If it
@@ -40,30 +40,34 @@ of the list rather than taking the next unused number, and renumber when
 inserting, because a list whose numbers skip reads as though checks are
 missing.
 
-1. `git ls-files` reports **102** TypeScript files and exactly **one**
+1. `git ls-files` reports **103** TypeScript files and exactly **one**
    JavaScript file, `eslint.config.mjs`, which is deliberate.
-2. **Five** `tsconfig.*.json` projects exist at the repository root, and
-   `src/` holds exactly four directories, `core`, `platform-browser`,
-   `platform-worker`, and `entry-browser`.
+2. **Five** projects exist at the repository root, `tsconfig.json` and four
+   `tsconfig.*.json` files, and `src/` holds exactly four directories,
+   `core`, `platform-browser`, `platform-worker`, and `entry-browser`.
 3. `src/core/ports/` holds **three** capability interfaces, namely
    `storage.mts`, `http.mts`, and `clock.mts`, and `src/core/` holds
-   **nineteen** modules.
+   **twenty** modules, counting `frame-rate.mts`.
 4. `npm test` reports **677** unit tests and **54** application programming
    interface tests, all passing.
-5. `npm run test:browser` reports **79** passing browser specifications. Use
+5. `npm run test:browser` reports **82** passing browser specifications. Use
    that script rather than `npx playwright test`, which reuses a running
    server and therefore skips its own rebuild.
 6. `tsc -p tsconfig.core.json` succeeds, and adding `localStorage` to any file
    under `src/core/` makes it fail.
 7. `test/fixtures/media` holds **four** fixtures, two of them small generated
-   clips at different frame rates which the loop and exporter specifications
-   require, and `test/fixtures` holds no other directory.
+   clips at different frame rates which the loop, exporter and frame rate
+   specifications require, and `test/fixtures` holds no other directory.
 8. `.github/workflows/verify.yml` declares **five** jobs, and the most recent
    run on `main` passed all of them. Read it rather than taking this on trust:
 
    ```sh
-   gh run list --workflow verify.yml --limit 1
+   gh run list --repo sgeos/angelssword-adventurers-creator --workflow verify.yml --limit 1
    ```
+
+   The repository is named because `gh` otherwise resolves to the upstream
+   remote and reports that the workflow does not exist, which reads as a
+   failure of this assertion and is not one.
 
    The two beyond the gate are `container`, which builds the image and fetches
    from a running container, and `binary`, which builds the standalone
@@ -154,20 +158,18 @@ interface, and both sprite handoffs anchoring consistently.
 **The most recent work turned outward, to the things the gate does not
 reach, and it has paid every time.** The container was found broken and fixed,
 with a test guarding the agreement between the server's imports and the image's
-contents. Browser coverage went from 31 specifications to **75**: the loop
-controls, the two sprite selectors, the exporter's controls, and the settings
-panel including the boundary that keys are not to cross.
+contents. Browser coverage went from 31 specifications to **75**, and is
+**82** at this refresh: the loop controls, the two sprite selectors, the
+exporter's controls, and the settings panel including the boundary that keys
+are not to cross.
 
 **Three rounds of coverage, three defects nobody had looked for.** A loader
 whose output order depended on which file decoded first. A second place judging
 whether a loop is usable, disagreeing with the first about loops that cross the
-seam. And two recorded but unfixed: three paths deciding the frame rate
-differently, so the same clip is sixty frames in one stage and thirty-eight in
-another; and webfonts fetched from a third party on every page load, against a
-README that says the later stages work fully offline.
-
-The reasoning for leaving those two to the operator is in `OPEN.md`. Both are
-pinned by specifications written to fail when they are fixed.
+seam. And two that were recorded and later fixed on operator decisions: three
+paths deciding the frame rate differently, resolved in `573ee9b` by measuring
+the source rate from frame timestamps, and webfonts fetched from a third party
+on every page load, resolved in `bddf5ec` by hosting the fonts.
 
 **Then the same attention went to the artefacts nobody builds, and found more.**
 Continuous integration now has five jobs: the three that run the gate, plus one
@@ -188,13 +190,15 @@ The remedy is a machine performing the act, not more careful prose.
 
 ## The next task
 
-**Two small pieces of work are queued, neither urgent.**
+**Nothing is queued for an agent.** Everything below is the operator's.
 
-1. Two browser specifications the frame rate change deserves and does not yet
-   have: Video Preparation reporting a fifteen frame per second clip as fifteen,
-   and the exporter adopting a measured rate handed over from Video Preparation
-   rather than measuring again. The exporter's own detection is covered.
-2. Nothing else is queued for an agent. Everything below is the operator's.
+The two frame rate browser specifications that were queued are written, in
+`frame-rate.spec.ts`. The adoption specification removes
+`requestVideoFrameCallback` after Video Preparation has measured, so that a
+second measurement would visibly fall back to thirty, and it was confirmed to
+fail with the exporter's adoption disabled. Two older specifications that
+bounded the clip's frame count loosely, because the rate used to vary by host,
+now assert sixty exactly.
 
 **Decisions taken by the operator.**
 
@@ -267,8 +271,8 @@ found this way lived in the wiring rather than the arithmetic.
 
 The core has **zero** references to a platform facility of any kind, which
 `tsconfig.core.json` refuses to compile. Storage and the network are each
-confined by lint to named adapter files. Nineteen core modules carry what the
-application computes; 644 unit tests reach all of it.
+confined by lint to named adapter files. Twenty core modules carry what the
+application computes; 677 unit tests reach all of it.
 
 The entry-layer behaviour worth asserting is covered: the reference slots, the
 loop controls, the framing and art style selectors, the exporter's mode limits,
@@ -350,15 +354,18 @@ measures floating point rather than the function under test.
 
 Recorded in [../decisions/OPEN.md](../decisions/OPEN.md).
 
-- The five largest modules still have no unit tests, which the task above
-  addresses.
+- The five largest modules still have no unit tests. Their arithmetic is in
+  the core and their wiring is covered by browser specifications, so what
+  remains untested is canvas and element work.
 - `gif-composite` diverges from the Graphics Interchange Format in two ways.
 - The format's decode path has no production consumer at all.
-- The Windows and Linux binary builds have never been run.
-- OpenAI sprites and Gemini video have been run against live keys. Grok,
-  ComfyUI and the binary have not. Both extracted exchanges are covered by unit tests against a
-  scripted client and by a browser specification against mocked routes, which
-  is not the same as having run against the service.
+- OpenAI sprites and Gemini video have been run against live keys. Grok and
+  ComfyUI have not. Both extracted exchanges are covered by unit tests against
+  a scripted client and by a browser specification against mocked routes,
+  which is not the same as having run against the service. The binary is
+  built and served by continuous integration on Linux and Windows, and by hand
+  on macOS.
+- The Gemini key test bypasses the proxy, awaiting the operator.
 - No release has been cut.
 
 ## Relationship to upstream
