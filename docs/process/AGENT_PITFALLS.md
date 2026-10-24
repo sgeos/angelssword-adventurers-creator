@@ -67,8 +67,9 @@ iterating filenames in the shell.
 
 **Never infer a type from an identifier.** Five element lookups were typed from
 their names rather than from the markup, producing five runtime failures.
-Element types come from the tag in `public/index.html`, which is the source of
-truth.
+Element types come from the tag in the component that renders the element,
+under `src/entry-browser/tabs/`, which is the source of truth. It was
+`public/index.html` until the port to Tamagui and TanStack Start.
 
 **Read a signature before writing against it.** A return type was guessed as a
 tuple when the function returns an object. Open the definition.
@@ -236,6 +237,68 @@ a case that the same rule does catch.
 twice, the second time immediately after the first, by splitting the block on
 its first newline to remove a heading that was not there. Compare section counts
 before and after, and check a distinctive phrase from the old block survives.
+
+## Porting the interface to Tamagui
+
+Every entry here was hit during the port, and most passed the existing
+specifications, which assert behaviour rather than presentation. What found
+them was comparing the new page with the previous build: the bounding box of
+every identified element, measured in both, and then screenshots, which found
+what the measurement could not, because the defect was in elements without an
+identifier.
+
+**Tamagui's atomic rules are `:root .class`.** A plain class selector in a
+stylesheet ties with them, and Tamagui's rules come later, so the class loses.
+A last form row kept its margin this way. A web-only rule that must beat
+Tamagui is written with `:root` in front.
+
+**React hoists stylesheet links above inline styles.** Writing a `<link>` after
+Tamagui's `<style>` in the head did not put it after; React moved it to the top,
+and the stage's grid lost to Tamagui's `display: flex` for every view. Rules that
+must follow Tamagui's go in an inline `<style>`, which stays where it is written.
+
+**A Tamagui view is a flex container, and margins do not collapse in flex
+layout.** The design relied on a form row's margin collapsing into a divider's,
+and every such pair grew by sixteen pixels. A container whose children were
+laid out as blocks is given `display: "block"`.
+
+**A size token resolves against the spacing scale unless the font family is
+named.** `fontSize: "$8"` on a text with no `fontFamily` gave 24 pixels, the
+spacing token, rather than 16, the font size. Every text derives from one that
+names its family.
+
+**A font's `true` values are applied to every text.** Tamagui sets each text's
+size, line height and weight from the font's default whatever the text's own
+size, where the stylesheet let them inherit. Declaring no `true` entries lets
+the document's inheritance apply.
+
+**A Tamagui group is a size container.** Adding `group` to the tab buttons, to
+light the label on hover, made each button's width independent of its content,
+and all five collapsed onto the first. The colour went on the button instead,
+and the label inherits it.
+
+**Re-indenting generated markup re-indents the inside of a template literal.**
+The converter that produced the stage components indented every line, and the
+prompt's default text, held in a multi-line literal, gained eight spaces on
+its second paragraph. Text that must be exact is a string with explicit `\n`,
+never a literal spanning indented lines.
+
+**Anything in `public/` ships.** Vite copies the directory into the build. The
+old build's output, regenerated there once by running the old build during a
+stash, was shipped beside the new one, and the worker specifications passed
+against those files while the application used others. `public/js/` was then
+removed from the ignore list, so that if it reappears it is seen.
+
+**A mutation test of a browser specification needs a server already running.**
+With none, Playwright starts its own, whose command rebuilds, and the rebuild
+undid the deliberate breakage, so the specification passed and proved nothing.
+Start the server, break the build output, then run the specification.
+
+**A page that renders after hydration is not ready at the load event.** The
+handoff object, published from a component, appeared after the specifications
+had started reading it. It is published in the client entry, before hydration,
+which is when the old page published it. A specification that reads the page
+directly, rather than through a locator, waits for an element first.
 
 ## Working discipline
 

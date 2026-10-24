@@ -14,7 +14,7 @@ tested logic lives.
 
 **Handoff.** The shared mutable object through which pipeline stages pass
 values, declared in `src/platform-browser/shell.mts` and published on the global
-object by `src/entry-browser/app.mts`.
+object by `src/entry-browser/client.tsx` before the page hydrates.
 Distinct from the session handoff protocol in
 [process/HANDOFF.md](../process/HANDOFF.md), which is unrelated and shares only
 the word.

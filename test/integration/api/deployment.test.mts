@@ -122,6 +122,23 @@ const copiedIntoImage = (): string[] => {
     return sources;
 };
 
+/**
+ * The destinations the final stage fills from an earlier stage, normalised to
+ * repository-relative directories. These are build products, such as the page.
+ */
+const builtIntoImage = (): string[] => {
+    const text = readFileSync(join(ROOT, 'Dockerfile'), 'utf8');
+    const stages = text.split(/^FROM /m);
+    const runtime = stages[stages.length - 1] ?? '';
+    const destinations: string[] = [];
+    for (const line of runtime.split('\n')) {
+        const copy = /^COPY\s+--from=\S+\s+\S+\s+(\S+)$/.exec(line.trim());
+        const destination = copy?.[1];
+        if (destination !== undefined) destinations.push(destination.replace(/^\.\//, '').replace(/\/$/, ''));
+    }
+    return destinations;
+};
+
 /** Whether a repository-relative path is carried by one of the copied paths. */
 const isCarriedBy = (path: string, sources: readonly string[]): boolean =>
     sources.some((source) => {
@@ -176,6 +193,25 @@ describe('the container carries everything the server loads', () => {
      * platform consumer of the portable core, so its reach may include core
      * and may not include anything built for a browser or a worker.
      */
+    /**
+     * The page, as well as the modules. The server serves the browser build's
+     * output from a directory beside it, and the image has to carry that
+     * directory or every request for the page answers 404 from a server that
+     * started perfectly well. The directory is read from the server's own
+     * expression rather than restated, so moving it without moving the copy
+     * fails here.
+     */
+    it('carries the directory the server serves the page from', () => {
+        const source = readFileSync(server, 'utf8');
+        const served = /path\.join\(import\.meta\.dirname,\s*"([^"]+)",\s*"([^"]+)"\)/.exec(source);
+        assert.ok(served !== null, 'the server no longer names its page directory as path.join(import.meta.dirname, ...)');
+        const directory = `${served[1] ?? ''}/${served[2] ?? ''}`;
+        assert.ok(
+            builtIntoImage().includes(directory),
+            `the server serves ${directory}, and the image copies no build output there (built: ${builtIntoImage().join(', ')})`,
+        );
+    });
+
     it('reaches only the portable core, never a browser or worker layer', () => {
         for (const file of closureOf(server).files) {
             assert.ok(

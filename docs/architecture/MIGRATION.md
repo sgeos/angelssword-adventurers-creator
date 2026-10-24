@@ -2,47 +2,78 @@
 
 > **Navigation**: [Architecture](./README.md) | [Documentation Root](../README.md)
 
-The plan to move the interface onto Tamagui, with TanStack Start for the web
-and Expo for iOS and Android. Adopted by the operator on 2026-10-24. The
-decision is recorded in [RESOLVED.md](../decisions/RESOLVED.md), and the
-questions the first step must answer are in [OPEN.md](../decisions/OPEN.md).
+The move of the interface onto Tamagui, with TanStack Start for the web and
+Expo for iOS and Android. Adopted by the operator on 2026-10-24. The decision
+is recorded in [RESOLVED.md](../decisions/RESOLVED.md), and the questions still
+open are in [OPEN.md](../decisions/OPEN.md).
 
-**The first step is a spike, and nothing is rewritten until it passes.**
+**The web port is complete, as of 2026-10-24. The native half has not begun.**
+The plan put a spike on devices first. The operator then directed the web port
+ahead of it, so the web port was done first and the spike remains the first
+step of the native half.
 
-## What moves and what does not
+## What the web port did
 
-Measured on 2026-10-24.
-
-| Layer | Size | Under the migration |
+| Layer | Before | After |
 |---|---|---|
-| `src/core/` and its ports | 6,109 lines, 677 unit tests | Unchanged. It already has no platform and reaches every capability through a port |
-| `src/platform-browser/`, `src/platform-worker/` | Part of 5,855 lines | Retained for the web. A native platform layer is added beside it |
-| `src/entry-browser/` and `public/index.html` | The rest of the 5,855, plus 1,169 lines of markup and 227 element identifiers | Rewritten as React components. This is the bulk of the work |
-| `server.mts` | 726 lines | Becomes server routes on the web. Not used on iOS or Android |
+| `src/core/` and its ports | 6,109 lines, 677 unit tests | Unchanged, to the line |
+| The page's markup | `public/index.html`, 1,169 lines, 227 element identifiers | React components in `src/entry-browser/`, 2,637 lines with the chrome, the settings panel and the design system. Every identifier, class and `data-` attribute kept |
+| The four media stages | Script-tag entry points in `src/entry-browser/` | Controllers in `src/platform-browser/stages/`, 4,485 lines, each exporting a mount function. Behaviour unchanged |
+| Tabs, toasts, settings | Imperative code in `shell.mts` | Tabs and toasts are stores in the platform layer that React renders. Settings is a React component with its own state |
+| Styling | `public/style.css`, 1,812 lines | Tamagui tokens and components for the chrome, panels, layout and settings. The stylesheet keeps 1,270 lines for the stage interiors, whose controllers also generate markup at run time |
+| The build | `tsc` emitting `public/js/` | TanStack Start on Vite, single-page mode, into `dist/client/` |
+| `server.mts` | Served `public/` | Serves `dist/client/`. Otherwise unchanged |
+| Page scripts | 428 kilobytes, 113 gzipped | 616 kilobytes, 192 gzipped |
 
-The three-layer rule in [LAYERING.md](./LAYERING.md) continues to hold. The
-core gains no platform facility, and a capability a native platform needs
-becomes a port, never an import.
+**Verified against the previous build, not only against the specifications.**
+The bounding box of every identified element on every tab, 167 of them, was
+measured in the old build and the new one, and they agree within a pixel and
+a half. Hover and active colours of the chrome were compared the same way.
+Screenshots of every tab were compared by eye, which found two defects the
+measurement could not see, in elements without identifiers. The browser
+specifications went from 82 to 88; the six added pin the layout defects the
+port produced, and each was shown to fail against the defect it guards.
 
-## The web, on Tamagui and TanStack Start
+## How the web half is put together
 
-Tamagui renders ordinary elements on the web, so the canvas, video, recorder
-and worker code keeps running against real `<canvas>` and `<video>` elements
-reached through references. What is rewritten is the interface around them.
+TanStack Start prerenders the root route once, at build time, into the
+document shell. Everything inside it renders in the browser. The routes sit in
+a `ClientOnly` boundary, because a shell prerendered with the route pending and
+a browser rendering the route at once disagree, and React reported that as a
+hydration mismatch on every load. `client.tsx` publishes the handoff object
+before hydration, which is when the old page published it.
 
-Costs accepted with the decision. The four stage screens are rewritten as
-components. The server gains a build step, where it currently runs directly. The
-standalone binary must wrap TanStack Start's server output rather than Express,
-which is believed possible and has not been tried. The strict configuration,
-which rejects `any`, type assertions and non-null assertions, has to hold
-against the published React and Tamagui types, and the friction is unmeasured.
-The page becomes heavier, on hardware the product brief calls modest.
+The four media stages are memoized components with no props. They render once
+and their controllers own the subtree after, toggling classes and rewriting
+contents, which a re-render would undo. This is the shape the native plan
+needs: on a phone each becomes an Expo DOM component, keeping its browser
+implementation. The chrome and the settings panel are Tamagui and React state
+throughout, which is the shape that runs natively.
 
-On its own this half offers desktop users little. Its value is the component
-structure the native application shares, so it is not begun before the spike
-has shown that the native application is viable.
+Three web-only rules that Tamagui's types cannot express, grid layout,
+gradient text and a last-child margin, live in `src/entry-browser/ui/web-only.ts`
+rather than in Tamagui components, for the reason given there.
 
-## iOS and Android, on Tamagui and Expo
+## Where the work departed from the plan
+
+**The spike did not come first.** The operator directed the web port before
+it. The plan's warning stands, measured now rather than predicted: the web half
+alone gives desktop users the same page, heavier.
+
+**The server was not moved into TanStack Start.** The plan had the proxy
+becoming server routes. It stays the Express server, which serves the
+single-page build as static files. TanStack Start's server output was never
+packaged as a single executable, and nothing about the page needs a server
+render, while the proxy is covered by 57 tests against the Express app and the
+binary was already built from it. Moving it would have been a change for its
+own sake.
+
+**Third-party declarations are not checked for the entry layer.** The strict
+configuration held against the frameworks' types for this project's code, with
+two settings relaxed for the entry layer only and argued in
+`tsconfig.app.json`. That answers one of the plan's open questions.
+
+## The native half, still ahead: iOS and Android on Tamagui and Expo
 
 | Stage | Difficulty on a phone |
 |---|---|
@@ -73,10 +104,12 @@ implementation of the media work, rather than two, is the point.
    used as early indications of what WebKit's recorder supports, recorded as
    indications and not as results, because media encoding on a device can
    differ from both. No branch below that depends on iOS is chosen on them.
-2. **If it passes,** restructure into the core unchanged, a web entry on
-   TanStack Start, an Expo entry, and the media screens shared as DOM
-   components. The browser specifications remain the regression check for the
-   desktop, and are ported rather than discarded.
+2. **If it passes,** add an Expo entry beside the web entry, which now exists.
+   The core is shared unchanged, the chrome and settings as Tamagui components,
+   and the four media stages as DOM components, which their current shape, a
+   component that renders once and hands its subtree to a controller, was kept
+   for. The browser specifications remain the regression check for the
+   desktop.
 3. **If it fails on iOS,** ship a narrower native application covering
    generation only, and hand clips to the desktop tool for preparation and
    export.
@@ -87,7 +120,10 @@ implementation of the media work, rather than two, is the point.
 ## What this plan does not claim
 
 That WebKit's recorder can produce WebM. That a web view on modest hardware
-can export in acceptable time. That TanStack Start's output can be packaged as a
-single executable. That the strict configuration is compatible with the
-framework types. Each is open, and each is something the spike or the first
-increment is meant to settle by execution rather than by reading.
+can export in acceptable time. Both are open, and both are what the spike is
+meant to settle by execution rather than by reading.
+
+Two questions the plan listed are answered by the web port. The strict
+configuration holds against the framework types, with the two exemptions
+above. And the packaging question did not arise, because the binary serves the
+built page as files and never runs TanStack Start's server.

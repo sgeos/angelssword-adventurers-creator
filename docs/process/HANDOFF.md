@@ -2,7 +2,7 @@
 
 > **Navigation**: [Process](./README.md) | [Documentation Root](../README.md)
 
-**Refreshed 2026-10-24. The anchor is `86c7850`, the last commit before this
+**Refreshed 2026-10-24. The anchor is `cc05bbd`, the last commit before this
 refresh.** Read this block, run the validity check, then read the task below.
 
 ---
@@ -16,11 +16,11 @@ itself.
 
 ### Ancestry
 
-`main` should **contain** `86c7850`, the last commit before this refresh. Test
+`main` should **contain** `cc05bbd`, the last commit before this refresh. Test
 containment rather than equality.
 
 ```sh
-git merge-base --is-ancestor 86c7850 HEAD
+git merge-base --is-ancestor cc05bbd HEAD
 ```
 
 If that fails, this file predates a history rewrite and is stale. If it
@@ -40,17 +40,18 @@ of the list rather than taking the next unused number, and renumber when
 inserting, because a list whose numbers skip reads as though checks are
 missing.
 
-1. `git ls-files` reports **104** TypeScript files and exactly **one**
-   JavaScript file, `eslint.config.mjs`, which is deliberate.
-2. **Five** projects exist at the repository root, `tsconfig.json` and four
+1. `git ls-files` reports **112** TypeScript files ending `.ts` or `.mts`,
+   **12** ending `.tsx`, and exactly **one** JavaScript file,
+   `eslint.config.mjs`, which is deliberate.
+2. **Seven** projects exist at the repository root, `tsconfig.json` and six
    `tsconfig.*.json` files, and `src/` holds exactly four directories,
    `core`, `platform-browser`, `platform-worker`, and `entry-browser`.
 3. `src/core/ports/` holds **three** capability interfaces, namely
    `storage.mts`, `http.mts`, and `clock.mts`, and `src/core/` holds
    **twenty** modules, counting `frame-rate.mts`.
-4. `npm test` reports **677** unit tests and **56** application programming
+4. `npm test` reports **677** unit tests and **57** application programming
    interface tests, all passing.
-5. `npm run test:browser` reports **82** passing browser specifications. Use
+5. `npm run test:browser` reports **88** passing browser specifications. Use
    that script rather than `npx playwright test`, which reuses a running
    server and therefore skips its own rebuild.
 6. `tsc -p tsconfig.core.json` succeeds, and adding `localStorage` to any file
@@ -188,20 +189,36 @@ required for a batch file since 20.12.
 The category is instructions about the code, held where nothing executes them.
 The remedy is a machine performing the act, not more careful prose.
 
+**The page is now a React application on Tamagui and TanStack Start.** The web
+half of the interface migration was done on 2026-10-24, ahead of the device
+spike, on the operator's direction. The core is unchanged to the line. The
+four media stages kept their controllers, moved to
+`src/platform-browser/stages/`, and mount onto markup that memoized components
+render once. The chrome and the settings panel are Tamagui and React state.
+Vite builds into `dist/client/`, which the unchanged proxy server serves. The
+port was checked against the previous build element by element, 167 bounding
+boxes agreeing within a pixel and a half, and by screenshot, which found two
+defects the measurement could not. What was done and why is in
+[MIGRATION.md](../architecture/MIGRATION.md) and `RESOLVED.md`.
+
 ## The next task
 
-**The interface migration, beginning with its spike.** The operator adopted the
-plan in [MIGRATION.md](../architecture/MIGRATION.md) on 2026-10-24. The
-interface moves to Tamagui, on TanStack Start for the web and Expo for iOS and
-Android, with the core unchanged and the media stages running as Expo DOM
-components. The first task is the disposable spike that plan describes, on a
-physical iPhone and a physical Android device. Its questions are listed in
-`OPEN.md`. **Do not rewrite application code before the spike's results are
-recorded and the operator has chosen the branch they select.** The operator has
-a physical Android phone and, as of 2026-10-24, no iPhone. Run the Android half
-of the spike first. Desktop Safari and the iOS Simulator may give early
-indications about WebKit, recorded as indications only, and they do not settle
-the iOS questions in `OPEN.md`, which wait for a device.
+**The native half of the interface migration, beginning with its spike.** The
+web half is done; see above. The native half is the disposable spike that
+[MIGRATION.md](../architecture/MIGRATION.md) describes, on a physical iPhone
+and a physical Android device, and its open questions are in `OPEN.md`. **Do
+not start the Expo application before the spike's results are recorded and the
+operator has chosen the branch they select.** The operator has a physical
+Android phone and, as of 2026-10-24, no iPhone. Run the Android half first.
+Desktop Safari and the iOS Simulator may give early indications about WebKit,
+recorded as indications only, and they do not settle the iOS questions.
+
+**When editing the page,** a stage component under `src/entry-browser/tabs/`
+must keep rendering once. Its controller owns the subtree after it mounts, and
+a prop or state that re-rendered it would undo the controller's changes. The
+settings panel and the chrome are ordinary React. The new pitfalls from the
+port, most of them about Tamagui's CSS, are in `AGENT_PITFALLS.md` under
+"Porting the interface to Tamagui".
 
 The two frame rate browser specifications that were queued are written, in
 `frame-rate.spec.ts`. The adoption specification removes
@@ -248,7 +265,9 @@ now assert sixty exactly.
   `esbuild`'s install script, and the build and the binary work without it.
 - **Interface migration**, 2026-10-24. Move the interface to Tamagui on
   TanStack Start and Expo, spike first. Recorded in `RESOLVED.md`, planned in
-  `MIGRATION.md`, open questions in `OPEN.md`. Not begun.
+  `MIGRATION.md`, open questions in `OPEN.md`.
+- **Web port first**, 2026-10-24. Complete the web port to Tamagui and TanStack
+  Start ahead of the spike. Done. The decisions it took are in `RESOLVED.md`.
 
 **Awaiting the operator.**
 
@@ -301,8 +320,9 @@ found this way lived in the wiring rather than the arithmetic.
 
 The core has **zero** references to a platform facility of any kind, which
 `tsconfig.core.json` refuses to compile. Storage and the network are each
-confined by lint to named adapter files. Twenty core modules carry what the
-application computes; 677 unit tests reach all of it.
+confined by lint to named adapter files, and the lint now reaches the React
+entry layer's `.tsx` files too. Twenty core modules carry what the application
+computes; 677 unit tests reach all of it.
 
 The entry-layer behaviour worth asserting is covered: the reference slots, the
 loop controls, the framing and art style selectors, the exporter's mode limits,

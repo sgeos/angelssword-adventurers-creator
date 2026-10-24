@@ -1,5 +1,5 @@
-# Two stages. The build stage needs the development dependencies to compile
-# the browser half; the runtime stage carries neither them nor the compiler.
+# Two stages. The build stage needs the development dependencies to build the
+# browser half; the runtime stage carries neither them nor the bundler.
 #
 # Node 22.18 is the floor, because the server is TypeScript and runs through
 # native type stripping with no build step. Upstream pull request 1 used
@@ -18,11 +18,14 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# Only what the browser build reads.
-COPY tsconfig.json tsconfig.browser.json tsconfig.worker.json ./
+# Only what the browser build reads: Vite's configuration, the sources, and
+# the static files it copies into its output.
+COPY vite.config.mts ./
 COPY src/ ./src/
+COPY public/ ./public/
 
-RUN npx tsc -p tsconfig.browser.json && npx tsc -p tsconfig.worker.json
+# TanStack Start on Vite. Writes the page and its assets to dist/client.
+RUN npx vite build
 
 
 FROM node:22.23-alpine AS runtime
@@ -46,10 +49,11 @@ COPY server.mts ./
 # so copying all of it costs a few hundred kilobytes and removes the trap.
 COPY src/core/ ./src/core/
 
-COPY public/ ./public/
-
-# The compiled browser modules, built in the stage above.
-COPY --from=build /app/public/js/ ./public/js/
+# The page and everything it loads, built in the stage above. The server serves
+# this directory, and test/integration/api/deployment.test.mts checks that the
+# two agree, since a page the image lacks is the same failure as a module it
+# lacks, found the same way: only by running the container.
+COPY --from=build /app/dist/client/ ./dist/client/
 
 # Run unprivileged. The base image provides this account.
 USER node

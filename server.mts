@@ -14,6 +14,7 @@ import { OPENAI_SPRITE_MODEL } from "./src/core/providers.mts";
 import FormData from "form-data";
 import path from "node:path";
 import { execFile } from "node:child_process";
+import { isSea } from "node:sea";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -234,6 +235,11 @@ export type FetchLike = HttpClient<string | FormData>;
 
 const PORT = parsePort(process.env["PORT"]);
 
+/** Where the page and its assets are served from. See the note at its use. */
+const STATIC_DIR: string = isSea()
+  ? path.join(import.meta.dirname, "public")
+  : path.join(import.meta.dirname, "dist", "client");
+
 export const createApp = (fetchImpl: FetchLike = nodeFetch): Express => {
 const app = express();
 
@@ -251,12 +257,13 @@ app.use((req, res, next) => {
   next();
 });
 
-// `process.pkg` is set by the pkg bundler and is absent from the Node
-// types. An `in` check reads it without an ambient declaration, which the
-// lint config bans as an unchecked claim about a value nothing verifies.
-const APP_DIR = "pkg" in process ? path.dirname(process.execPath) : import.meta.dirname;
-
-app.use(express.static(path.join(APP_DIR, "public")));
+// The page is the browser build's output, `dist/client`, beside this file in
+// a checkout or the container. The standalone binary carries the same files
+// in a `public/` folder beside the executable. Under Node's single executable
+// feature `import.meta.dirname`, bundled as `__dirname`, is the executable's
+// directory, so one expression finds both. A check for `process.pkg` stood
+// here and outlived the pkg build it was written for.
+app.use(express.static(STATIC_DIR));
 
 // ── OpenAI ───────────────────────────────────────────────────────────
 

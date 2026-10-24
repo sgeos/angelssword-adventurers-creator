@@ -65,20 +65,25 @@ hand.
 ```sh
 node build-exe.mts
 (cd dist/ASAdventurer && PORT=3999 AS_NO_OPEN=1 ./ASAdventurer)
-curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3999/
-curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3999/js/entry-browser/app.mjs
+curl -sf http://127.0.0.1:3999/ -o page.html
+module=$(grep -o 'src="/assets/[^"]*\.js"' page.html | head -n 1 | cut -d '"' -f 2)
+curl -s -o /dev/null -w '%{http_code} %{size_download}\n' "http://127.0.0.1:3999$module"
 ```
 
-Both requests should report 200. The second matters more than the first,
-because it proves the compiled browser modules were built and packaged rather
-than merely that the server started.
+The module request should report 200 and a non-zero size. It matters more than
+the page, because it proves the page's scripts were built and packaged rather
+than merely that the server started. Its name is hashed by the build, so it is
+read from the page rather than written here, which is the lesson of the next
+paragraph.
 
 That second path used to read `js/app.mjs`, which the layering work moved. The
 instruction therefore returned 404 on a perfectly good binary for as long as it
 stood, which is the same failure as the Dockerfile's copy list and the handoff's
 container assertion: a path written by hand, outside the reach of anything that
-runs it. The `binary` job in continuous integration now fetches this path on
-Linux and on Windows, so the next time it moves, something says so.
+runs it. The `binary` job in continuous integration now fetches the page's
+module on Linux and on Windows, so the next time it moves, something says so.
+The port to Tamagui and TanStack Start moved it again, to a hashed name under
+`assets/`, and the job and this procedure now read it from the page.
 
 ## Verifying the container
 

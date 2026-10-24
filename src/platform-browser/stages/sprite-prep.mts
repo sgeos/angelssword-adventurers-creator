@@ -13,12 +13,12 @@ import {
     notificationSound,
     showToast,
     switchTab,
-} from "../platform-browser/shell.mts";
-import { base64ToBlob, blobToBase64, bytesToDataUri, debounce } from "../platform-browser/app-utils.mts";
-import { colorName } from "../core/color.mts";
-import { closestFrom, fieldValue, queryAll, require2d, requireEl } from "../platform-browser/dom.mts";
-import * as Core from "../core/sprite-prep-core.mts";
-import { buildWorkflowFor, loadComfySettings } from "../core/comfyui-core.mts";
+} from "../shell.mts";
+import { base64ToBlob, blobToBase64, bytesToDataUri, debounce } from "../app-utils.mts";
+import { colorName } from "../../core/color.mts";
+import { closestFrom, fieldValue, queryAll, require2d, requireEl } from "../dom.mts";
+import * as Core from "../../core/sprite-prep-core.mts";
+import { buildWorkflowFor, loadComfySettings } from "../../core/comfyui-core.mts";
 import {
     PROVIDERS,
     asProviderId,
@@ -27,7 +27,7 @@ import {
     loadProvider,
     saveProvider,
     type Provider,
-} from "../core/providers.mts";
+} from "../../core/providers.mts";
 import {
     loadFraming,
     loadSpriteStyle,
@@ -38,19 +38,19 @@ import {
     saveCharacterName,
     saveSpriteOffset,
     saveSpriteZoom,
-} from "../core/preferences.mts";
-import { browserStore } from "../platform-browser/local-storage.mts";
-import { browserHttp } from "../platform-browser/http.mts";
-import { browserClock } from "../platform-browser/clock.mts";
-import { drawSeed } from "../platform-browser/random.mts";
-import { runWorkflow, uploadReference } from "../core/comfyui-run.mts";
-import { isOk, readJson } from "../core/ports/http.mts";
+} from "../../core/preferences.mts";
+import { browserStore } from "../local-storage.mts";
+import { browserHttp } from "../http.mts";
+import { browserClock } from "../clock.mts";
+import { drawSeed } from "../random.mts";
+import { runWorkflow, uploadReference } from "../../core/comfyui-run.mts";
+import { isOk, readJson } from "../../core/ports/http.mts";
 
 /** ComfyUI offers no completion callback, so the history is polled. */
 const COMFY_POLL_INTERVAL_MS = 2_000;
 const COMFY_MAX_POLLS = 150;
-import { channel } from "../core/pixels.mts";
-import { reasonText, responseErrorMessage } from "../core/api.mts";
+import { channel } from "../../core/pixels.mts";
+import { reasonText, responseErrorMessage } from "../../core/api.mts";
 
 
 // ============================================
@@ -1148,10 +1148,20 @@ function displayAdvKeyResults(results: readonly Core.KeyScore[]): void {
 }
 
 
-// Init on DOM ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initSpritePrep);
-} else {
+/**
+ * Attach this stage to its markup, once.
+ *
+ * The markup is rendered by the interface and must be in the document before
+ * this runs, because every element is found by identifier. This replaced a
+ * listener for the document finishing parsing, which no longer marks the
+ * moment the markup exists. A second call does nothing, since the listeners it
+ * attaches are not designed to be attached twice.
+ */
+let mounted = false;
+
+export function mountSpritePrep(): void {
+    if (mounted) return;
+    mounted = true;
     initSpritePrep();
 }
 

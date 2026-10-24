@@ -12,7 +12,6 @@ tmp/
 # for a different platform.
 node_modules/
 dist/
-public/js/
 
 # Not needed at runtime and large.
 .git/

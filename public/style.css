@@ -1,13 +1,19 @@
 /**
- * ⚔️ AS Adventurer — Design System
+ * ⚔️ AS Adventurer — the stage stylesheet
  * Angel's Sword Studios
- * 
- * Merged from editor.css palette + ASArtTool glassmorphism/fonts/animations
- * Design → Generate → Prepare → Export
+ *
+ * What remains here styles the insides of the four media stages: the
+ * controls, canvases and generated markup their controllers drive. The page
+ * chrome, panels, layout, settings and toasts are Tamagui components in
+ * src/entry-browser/, and their rules were removed from this file as each
+ * component took over. Grid layout and gradient text that Tamagui cannot
+ * type live in src/entry-browser/ui/web-only.ts.
+ *
+ * The design tokens below are duplicated in src/entry-browser/ui/config.ts.
+ * The two must agree while both exist.
  */
 
-
-/* Fonts loaded via <link> in index.html to avoid render-blocking */
+/* Fonts are linked by the document head; see public/fonts/README.md. */
 
 /* ============================================
    DESIGN TOKENS
@@ -136,254 +142,6 @@ body::before {
 * {
     scrollbar-width: thin;
     scrollbar-color: rgba(219, 184, 88, 0.2) transparent;
-}
-
-/* ============================================
-   APP SHELL
-   ============================================ */
-.app-container {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    max-width: 1600px;
-    margin: 0 auto;
-    padding: 0 1.5rem;
-}
-
-/* --- Header --- */
-.app-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: var(--header-h);
-    flex-shrink: 0;
-    padding: 0 0.5rem;
-    border-bottom: 1px solid var(--border);
-}
-
-.brand {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.brand-logo {
-    height: 36px;
-    width: auto;
-    filter: drop-shadow(0 0 8px rgba(219, 184, 88, 0.3));
-}
-
-.brand-name {
-    font-family: var(--font-display);
-    font-size: 1.1rem;
-    font-weight: 700;
-    background: linear-gradient(135deg, var(--accent-gold), #f0d878);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    letter-spacing: 0.5px;
-}
-
-.brand-tagline {
-    font-family: var(--font-body);
-    font-size: 0.7rem;
-    color: var(--text-dim);
-    letter-spacing: 2px;
-    text-transform: uppercase;
-}
-
-/* Pipeline breadcrumb */
-.pipeline-steps {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    color: var(--text-dim);
-}
-
-.pipeline-steps .step {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 8px;
-    border-radius: var(--radius-sm);
-    transition: var(--ease);
-    cursor: pointer;
-}
-
-.pipeline-steps .step:hover {
-    color: var(--text-muted);
-    background: rgba(255, 255, 255, 0.04);
-}
-
-.pipeline-steps .step.active {
-    color: var(--accent-gold);
-    background: var(--accent-gold-dim);
-}
-
-.pipeline-steps .step-badge {
-    font-size: 0.65rem;
-    opacity: 0.7;
-}
-
-.pipeline-steps .step-arrow {
-    color: var(--text-dim);
-    font-size: 0.6rem;
-    opacity: 0.5;
-}
-
-/* --- Tab Bar --- */
-.tab-bar {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    padding: 8px 0;
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-    overflow-x: auto;
-}
-
-.tab-btn {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 20px;
-    border: none;
-    background: transparent;
-    color: var(--text-muted);
-    font-family: var(--font-heading);
-    font-size: 0.8rem;
-    font-weight: 500;
-    letter-spacing: 0.5px;
-    cursor: pointer;
-    border-radius: var(--radius) var(--radius) 0 0;
-    transition: var(--spring);
-    white-space: nowrap;
-}
-
-.tab-btn:hover {
-    color: var(--text);
-    background: rgba(255, 255, 255, 0.04);
-}
-
-.tab-btn.active {
-    color: var(--accent-gold);
-}
-
-.tab-btn.active::after {
-    content: '';
-    position: absolute;
-    bottom: -1px;
-    left: 16px;
-    right: 16px;
-    height: 2px;
-    background: var(--accent-gold);
-    border-radius: 2px 2px 0 0;
-    box-shadow: 0 0 8px var(--accent-gold-glow);
-}
-
-.tab-btn .tab-icon {
-    font-size: 1rem;
-}
-
-/* --- Tab Content --- */
-.tab-content {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 1.5rem 0;
-}
-
-.tab-panel {
-    display: none;
-    animation: fadeIn 0.25s ease;
-}
-
-.tab-panel.active {
-    display: block;
-}
-
-/* ============================================
-   GLASS PANELS
-   ============================================ */
-.glass-panel {
-    background: var(--bg-card);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid var(--border-gold);
-    border-radius: var(--radius-lg);
-    padding: 1.5rem;
-    box-shadow: var(--shadow);
-    margin-bottom: 1.25rem;
-    transition: border-color var(--ease);
-}
-
-.glass-panel:hover {
-    border-color: var(--border-gold-med);
-}
-
-.panel-title {
-    font-family: var(--font-heading);
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--text-bright);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 1rem;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.panel-title .title-icon {
-    color: var(--accent-gold);
-}
-
-.panel-subtitle {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    margin-bottom: 1rem;
-    line-height: 1.5;
-}
-
-/* ============================================
-   LAYOUT GRIDS
-   ============================================ */
-.main-layout {
-    display: grid;
-    grid-template-columns: 1fr 380px;
-    gap: 1.5rem;
-    align-items: start;
-}
-
-.two-col {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-}
-
-.three-col {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-}
-
-.config-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-}
-
-.form-row {
-    margin-bottom: 1rem;
-}
-
-.form-row:last-child {
-    margin-bottom: 0;
 }
 
 /* ============================================
@@ -622,33 +380,6 @@ select {
     background-position: right 12px center;
     padding-right: 36px;
     cursor: pointer;
-}
-
-/* Password toggle wrapper */
-.input-password {
-    position: relative;
-}
-
-.input-password input {
-    padding-right: 42px;
-}
-
-.input-password .toggle-vis {
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: none;
-    border: none;
-    color: var(--text-dim);
-    cursor: pointer;
-    padding: 4px;
-    font-size: 1rem;
-    transition: var(--ease);
-}
-
-.input-password .toggle-vis:hover {
-    color: var(--text-muted);
 }
 
 /* ============================================
@@ -975,65 +706,6 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* ============================================
-   TOAST NOTIFICATIONS
-   ============================================ */
-.toast-container {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 10000;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    pointer-events: none;
-}
-
-.toast {
-    padding: 12px 20px;
-    border-radius: var(--radius);
-    font-size: 0.8rem;
-    font-weight: 500;
-    box-shadow: var(--shadow-lg);
-    pointer-events: auto;
-    transform: translateX(120%);
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    max-width: 360px;
-    backdrop-filter: blur(12px);
-}
-
-.toast.show {
-    transform: translateX(0);
-}
-
-.toast.exit {
-    transform: translateX(120%);
-}
-
-.toast.success {
-    background: rgba(123, 159, 110, 0.9);
-    border: 1px solid rgba(123, 159, 110, 0.5);
-    color: #fff;
-}
-
-.toast.error {
-    background: rgba(199, 80, 80, 0.9);
-    border: 1px solid rgba(199, 80, 80, 0.5);
-    color: #fff;
-}
-
-.toast.warning {
-    background: rgba(219, 184, 88, 0.9);
-    border: 1px solid rgba(219, 184, 88, 0.5);
-    color: #1a1a2e;
-}
-
-.toast.info {
-    background: rgba(91, 181, 166, 0.9);
-    border: 1px solid rgba(91, 181, 166, 0.5);
-    color: #1a1a2e;
-}
-
-/* ============================================
    STATUS MESSAGES
    ============================================ */
 .status-msg {
@@ -1281,97 +953,6 @@ input[type="range"]::-moz-range-thumb {
 .crop-handle.br { bottom: -5px; right: -5px; cursor: se-resize; }
 
 /* ============================================
-   SETTINGS TAB
-   ============================================ */
-.settings-section {
-    max-width: 640px;
-}
-
-.api-key-row {
-    display: flex;
-    align-items: flex-end;
-    gap: 8px;
-    margin-bottom: 0.75rem;
-}
-
-.api-key-row .input-password {
-    flex: 1;
-}
-
-.settings-info {
-    background: var(--bg-panel);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1rem 1.25rem;
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    line-height: 1.6;
-    margin-top: 0.75rem;
-}
-
-.settings-info .info-icon {
-    color: var(--accent-teal);
-    margin-right: 6px;
-}
-
-.about-section {
-    text-align: center;
-    padding: 2rem 0;
-}
-
-.about-section .about-icon {
-    font-size: 2.5rem;
-    margin-bottom: 0.5rem;
-}
-
-.about-section .about-title {
-    font-family: var(--font-display);
-    font-size: 1.2rem;
-    background: linear-gradient(135deg, var(--accent-gold), #f0d878);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin-bottom: 0.25rem;
-}
-
-.about-section .about-tagline {
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    color: var(--text-dim);
-    letter-spacing: 1px;
-    margin-bottom: 1.5rem;
-}
-
-.about-section .about-motto {
-    font-size: 0.8rem;
-    color: var(--text-dim);
-    font-style: italic;
-}
-
-.product-links {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-    margin-top: 1.5rem;
-    flex-wrap: wrap;
-}
-
-.product-links a {
-    color: var(--accent-gold);
-    text-decoration: none;
-    font-size: 0.8rem;
-    padding: 6px 14px;
-    border: 1px solid var(--border-gold);
-    border-radius: var(--radius);
-    transition: var(--ease);
-}
-
-.product-links a:hover {
-    background: var(--accent-gold-dim);
-    border-color: var(--accent-gold);
-}
-
-/* ============================================
    ONION SKIN TOGGLE
    ============================================ */
 .onion-skin-row {
@@ -1415,29 +996,6 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* ============================================
-   INFO BANNER
-   ============================================ */
-.info-banner {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 12px 16px;
-    background: rgba(91, 181, 166, 0.08);
-    border: 1px solid rgba(91, 181, 166, 0.15);
-    border-radius: var(--radius);
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    line-height: 1.5;
-    margin-bottom: 1.25rem;
-}
-
-.info-banner .banner-icon {
-    font-size: 1rem;
-    flex-shrink: 0;
-    color: var(--accent-teal);
-}
-
-/* ============================================
    ESTIMATED EXPORT INFO
    ============================================ */
 .export-estimate {
@@ -1472,42 +1030,8 @@ input[type="range"]::-moz-range-thumb {
 /* ============================================
    STAGE SECTIONS
    ============================================ */
-.stage {
-    margin-bottom: 1.5rem;
-}
-
-.stage-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 1rem;
-}
-
-.stage-number {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    background: var(--accent-gold-dim);
-    color: var(--accent-gold);
-    font-family: var(--font-heading);
-    font-size: 0.75rem;
-    font-weight: 700;
-    border-radius: 50%;
-    border: 1px solid var(--border-gold);
-    flex-shrink: 0;
-}
-
-.stage-title {
-    font-family: var(--font-heading);
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text-bright);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
+/* The section itself is a Tamagui component. Its controller marks a step
+   that cannot be used yet by adding this class, so the rule stays here. */
 .stage.disabled {
     opacity: 0.4;
     pointer-events: none;
@@ -1572,66 +1096,9 @@ input[type="range"]::-moz-range-thumb {
 /* ============================================
    RESPONSIVE
    ============================================ */
-@media (max-width: 1100px) {
-    .main-layout {
-        grid-template-columns: 1fr;
-    }
-}
-
-@media (max-width: 768px) {
-    .app-container {
-        padding: 0 0.75rem;
-    }
-
-    .pipeline-steps {
-        display: none;
-    }
-
-    .tab-btn {
-        padding: 8px 12px;
-        font-size: 0.7rem;
-    }
-
-    .two-col,
-    .three-col {
-        grid-template-columns: 1fr;
-    }
-
-    .config-grid {
-        grid-template-columns: 1fr 1fr;
-    }
-}
-
+/* Only the stage interiors. The layout's breakpoints are Tamagui media
+   queries and the rules in src/entry-browser/ui/web-only.ts. */
 @media (max-width: 640px) {
-    .app-header {
-        flex-direction: column;
-        height: auto;
-        padding: 12px 0;
-        gap: 8px;
-    }
-
-    .tab-bar {
-        gap: 0;
-    }
-
-    .tab-btn {
-        padding: 8px 10px;
-        font-size: 0.65rem;
-        gap: 4px;
-    }
-
-    .tab-btn .tab-label {
-        display: none;
-    }
-
-    .glass-panel {
-        padding: 1rem;
-    }
-
-    .config-grid {
-        grid-template-columns: 1fr;
-    }
-
     .results-grid {
         grid-template-columns: 1fr;
     }
@@ -1662,15 +1129,6 @@ input[type="range"]::-moz-range-thumb {
 .justify-between { justify-content: space-between; }
 .w-full { width: 100%; }
 .flex-1 { flex: 1; }
-
-/* Decorative gold divider */
-.gold-divider {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, var(--accent-gold-soft) 20%, var(--accent-gold) 50%, var(--accent-gold-soft) 80%, transparent);
-    box-shadow: 0 0 8px var(--accent-gold-glow);
-    margin: 1.5rem 0;
-    border: none;
-}
 
 /* ============================================
    MODAL OVERLAY

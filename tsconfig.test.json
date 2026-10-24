@@ -24,7 +24,6 @@
     "test/**/*.mts",
     "test/**/*.ts",
     "src/platform-browser/**/*.mts",
-    "src/entry-browser/**/*.mts",
     "src/core/**/*.mts",
     "playwright.config.ts"
   ],

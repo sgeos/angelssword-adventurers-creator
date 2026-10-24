@@ -12,14 +12,11 @@
     "types": [],
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "noEmit": false,
-    "outDir": "public/js",
-    "rootDir": "src",
-    "sourceMap": true,
-    "declaration": true,
+    // Checks only. Vite bundles each worker from the `new URL` that
+    // constructs it in the exporter.
+    "noEmit": true,
     "allowJs": false,
-    "checkJs": false,
-    "rewriteRelativeImportExtensions": true
+    "checkJs": false
   },
   // The two workers are platform adapters and live with the browser half. The
   // encoder they drive is core, and tsconfig.core.json is now what proves it

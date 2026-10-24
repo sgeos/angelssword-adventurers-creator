@@ -5,6 +5,57 @@
 Decisions taken and the reasoning behind them, so that a later session
 inherits the argument rather than only the outcome. Newest first.
 
+## The web port to Tamagui and TanStack Start, done ahead of the spike
+
+Directed by the operator on 2026-10-24, after the plan had put a device spike
+first. Done the same day. What the port did is in
+[MIGRATION.md](../architecture/MIGRATION.md); the decisions it took on the way
+are these.
+
+**Versions.** TanStack Start 1.169.4, Router 1.170.46, Vite 8.3.4,
+`@vitejs/plugin-react` 6.1.2, Tamagui 2.4.2, React 19.3.0, React Native for Web
+0.21.4. The newest releases at least two weeks old were chosen first, and two
+were then replaced: Start 1.168.27 carries a critical advisory, cross-site
+scripting in server-function responses, and Vite 7.3.6 several. A security fix
+outranks the age rule. Tamagui stays at 2.4.2 rather than the two week old 3.0,
+and 2.4.2 is the line known to work with Expo 58, which the native half needs.
+
+**`@tamagui/core`, not `tamagui`.** Importing the full package loads its
+Slider, which starts a timer at module level that never stops, so the build's
+prerender step finished and the process never exited. This page uses none of
+the full package's components, and the core primitives were what the design
+needed.
+
+**Express still serves the page.** TanStack Start builds in single-page mode
+and prerenders only the document shell, so the output is files, which the
+existing server serves beside the proxy routes, and the binary carries. The plan
+had the proxy becoming server routes. That would have changed the tested proxy
+and the binary's construction for nothing the page needs.
+
+**The media stages render once and are handed to their controllers.** The
+controllers were not rewritten as React. Their markup became memoized
+components with no props, and the controllers moved to the platform layer and
+mount onto it. This kept the behaviour exactly, which the specifications
+confirm, and it is the shape an Expo DOM component takes. The chrome and the
+settings panel, which are the parts that would be native, became React state.
+
+**Two TypeScript projects added, two settings relaxed in them.**
+`tsconfig.app.json` for the entry layer and `tsconfig.tools.json` for Vite's
+configuration. Both skip third-party declaration checks, which fail inside
+Tamagui, React Native and the TanStack plugins and nowhere in this code. The
+application project also turns off `isolatedDeclarations`, which protects
+modules others import, and nothing imports this layer. React Native is a
+development dependency for its types alone; without it Tamagui's props would
+resolve to `any` under the relaxed check, silently.
+
+**Some CSS stays CSS.** The stage interiors keep the stylesheet, because their
+controllers generate markup that only a class can style. Grid layout, gradient
+text and a last-child margin, which Tamagui's types or selectors cannot express,
+are an inline stylesheet beside the components that use them.
+
+**The handoff is published by the client entry**, before hydration, because the
+specifications read it at the load event and the old page published it then.
+
 ## The interface moves to Tamagui, on TanStack Start and Expo, spike first
 
 Decided by the operator on 2026-10-24. The interface is to be rebuilt on

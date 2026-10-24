@@ -7,7 +7,7 @@
  *
  * Output goes to: dist/ASAdventurer/
  *   ├── ASAdventurer[.exe]
- *   ├── public/          (UI, including js/ compiled from src/)
+ *   ├── public/          (the page: dist/client from the browser build)
  *   └── Start AS Adventurer.[bat|command|sh]
  *
  * ── How the binary is produced ──────────────────────────────────────────
@@ -91,7 +91,8 @@ const runNpx = (args: readonly string[], quiet = false): void => {
   execFileSync("npx.cmd", quoted, { stdio, cwd: ROOT, shell: true });
 };
 const DIST = path.join(ROOT, "dist", "ASAdventurer");
-const PUBLIC_SRC = path.join(ROOT, "public");
+/** The browser build's output. The server serves it from `public/` in a binary. */
+const PUBLIC_SRC = path.join(ROOT, "dist", "client");
 const PUBLIC_DEST = path.join(DIST, "public");
 /** The CommonJS bundle pkg consumes. Build output, not a source file. */
 const BUNDLE = path.join(ROOT, "dist", "server.bundle.cjs");
@@ -124,9 +125,9 @@ console.log("   ⚔️  AS Adventurer — Binary Builder");
 console.log("  ============================================");
 console.log();
 
-// 1. Compile the browser half. The binary ships public/js, which is build
-//    output; without this the packaged app would serve a stale bundle or none.
-log("Building browser modules...");
+// 1. Build the browser half. The binary ships the build's output; without this
+//    the packaged app would serve a stale page or none.
+log("Building the page...");
 execSync("npm run build:browser", { stdio: "inherit", cwd: ROOT });
 
 // 2. Clean dist
@@ -220,8 +221,8 @@ if (process.platform === "win32") {
   log("Note: the executable carries the default Node icon. See docs/decisions/OPEN.md.");
 }
 
-// 6. Copy public/, which now includes the compiled js/ from step 1
-log("Copying public/ files...");
+// 6. Copy the page built in step 1, to the folder the server reads in a binary
+log("Copying the page...");
 copyDirSync(PUBLIC_SRC, PUBLIC_DEST);
 
 // 7. Launcher for the host platform

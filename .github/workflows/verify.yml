@@ -81,7 +81,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
 
       # playwright.config.ts starts the server itself, and its command builds
-      # src/browser first, so the specs cannot pass against a stale bundle.
+      # the page first, so the specs cannot pass against a stale bundle.
       - run: npx playwright test
 
       - if: failure()
@@ -117,11 +117,14 @@ jobs:
             sleep 1
           done
 
-          # The page alone would pass even if nothing were compiled, so fetch a
-          # module built in the first stage and require it to be non-empty.
-          curl -sf http://127.0.0.1:3001/ -o /dev/null
-          curl -sf http://127.0.0.1:3001/js/entry-browser/app.mjs -o module.mjs
-          test -s module.mjs
+          # The page alone would pass even if nothing were built, so fetch the
+          # module script the page itself names and require it to be non-empty.
+          # The name is hashed by the build, so it is read, never written out.
+          curl -sf http://127.0.0.1:3001/ -o page.html
+          module=$(grep -o 'src="/assets/[^"]*\.js"' page.html | head -n 1 | cut -d '"' -f 2)
+          test -n "$module"
+          curl -sf "http://127.0.0.1:3001$module" -o module.js
+          test -s module.js
 
           # 401 rather than 404: the proxy routes registered. A missing module
           # at startup used to leave the server dead, and a wrong route name
@@ -181,11 +184,13 @@ jobs:
             sleep 1
           done
 
-          curl -sf http://127.0.0.1:3999/ -o /dev/null
-          # Matters more than the page: it proves the compiled modules were
-          # built and packaged rather than only that the server started.
-          curl -sf http://127.0.0.1:3999/js/entry-browser/app.mjs -o module.mjs
-          test -s module.mjs
+          curl -sf http://127.0.0.1:3999/ -o page.html
+          # Matters more than the page: it proves the page's scripts were built
+          # and packaged rather than only that the server started.
+          module=$(grep -o 'src="/assets/[^"]*\.js"' page.html | head -n 1 | cut -d '"' -f 2)
+          test -n "$module"
+          curl -sf "http://127.0.0.1:3999$module" -o module.js
+          test -s module.js
 
           code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
             -H 'Content-Type: application/json' -d '{}' \

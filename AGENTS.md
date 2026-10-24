@@ -49,9 +49,10 @@ TypeScript throughout, a hard fork of a JavaScript upstream that is dormant.
   around it does not work.
 - **Narrow by returning a value, not a predicate.** Type predicates are
   banned. A narrowing helper returns the narrowed value or `undefined`.
-- **Element types come from the markup.** Read the tag in
-  `public/index.html`. Inferring an element type from an identifier has
-  already produced five runtime failures here.
+- **Element types come from the markup.** Read the tag in the component that
+  renders the element, under `src/entry-browser/tabs/`, where the stage
+  controllers' elements are still found by identifier. Inferring an element
+  type from an identifier has already produced five runtime failures here.
 - **Three layers, and the direction is enforced.** `src/core/` is portable and
   compiles without the Document Object Model and without the node types. A
   capability it needs is an interface in `src/core/ports/` that a platform
@@ -59,10 +60,16 @@ TypeScript throughout, a hard fork of a JavaScript upstream that is dormant.
   compiler setting can. `localStorage` and `fetch` are reachable only from their
   named adapters in `src/platform-browser/`. Nothing imports
   `src/entry-browser/`. Pure logic belongs in the core, where tests reach it.
-- **The server needs no build. The browser half does.** `src/<layer>/*.mts`
-  compiles to `public/js/<layer>/*.mjs`. Editing the compiled output is
-  pointless, and a path written by hand into documentation or a build file is
-  the most common way this repository has broken.
+- **The page is a React application on Tamagui and TanStack Start.** The entry
+  layer, `src/entry-browser/`, renders it. The four media stages are memoized
+  components that render once and hand their subtree to a controller in
+  `src/platform-browser/stages/`, which finds elements by identifier, so a
+  stage component must not re-render. Settings is React throughout.
+- **The server needs no build. The browser half does.** Vite builds the page
+  into `dist/client/`, and the server serves that directory. Anything left in
+  `public/` is copied into the build unchanged, which once shipped a stale copy
+  of the previous build's output. A path written by hand into documentation or
+  a build file is the most common way this repository has broken.
 - **Node 22.18 or newer**, which is what native type stripping requires.
 - **Verify by exit code.** Grepping output for the word error has already
   reported a broken configuration as clean.
@@ -85,7 +92,8 @@ TypeScript throughout, a hard fork of a JavaScript upstream that is dormant.
 ```sh
 npm install
 npm start              # builds the browser half, then serves on port 3001
-npm run check          # typecheck across five projects, then lint
+npm run dev            # Vite's dev server; start the server on 3001 for /api
+npm run check          # typecheck across seven projects, then lint
 npm test               # unit and application programming interface tests
 npm run test:browser   # browser specifications, rebuilding first
 npm run test:all       # all of the above

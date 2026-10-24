@@ -1,23 +1,13 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  // The browser platform and entry layers. Separate from the root project
-  // because they need the DOM lib, which the server must not have, and because
-  // they emit: no browser strips types the way Node 24 does.
+  // The browser platform layer. Separate from the root project because it
+  // needs the DOM lib, which the server must not have.
   //
-  // Both layers share this project, because both see exactly the same globals.
-  // What separates them is the direction imports may run, which is not a thing
-  // a tsconfig can express. eslint.config.mjs carries that rule.
-  //
-  // `rootDir` is `src` rather than a single layer because these modules import
-  // the core and each other across layers. A rootDir naming one layer would
-  // refuse those imports outright. The consequence is that emitted paths carry
-  // a layer segment, so `public/js/entry-browser/` beside `public/js/core/`
-  // rather than a flat `public/js/`, and index.html names them accordingly.
-  //
-  // This project compiles the core sources it imports, and so does the worker
-  // project. The two overlap on what they share and emit identical output for
-  // it, which is the arrangement that already held for the encoder before the
-  // core existed.
+  // It checks and does not emit. Vite builds the browser half now, from the
+  // entry layer down, so this project's job is the claim no other project
+  // makes: that the platform compiles with the DOM and nothing else, no node
+  // types and no framework types, with third-party declarations checked. The
+  // entry layer, which has React and Tamagui in scope, is tsconfig.app.json.
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
@@ -25,20 +15,11 @@
     "types": [],
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "noEmit": false,
-    "outDir": "public/js",
-    "rootDir": "src",
-    "sourceMap": true,
-    // Inherits isolatedDeclarations, so declaration emit stays on; the
-    // root config sends the .d.ts to dist/types, clear of outDir.
-    "declaration": true,
+    "noEmit": true,
     "allowJs": false,
-    "checkJs": false,
-    // Emit is on, so imports must be rewritten to the .js the browser will
-    // actually fetch.
-    "rewriteRelativeImportExtensions": true
+    "checkJs": false
   },
-  "include": ["src/platform-browser/**/*.mts", "src/entry-browser/**/*.mts"],
+  "include": ["src/platform-browser/**/*.mts"],
   // Worker code belongs to tsconfig.worker.json; it needs the WebWorker lib,
   // which cannot be loaded alongside DOM. It is excluded by living outside the
   // includes above rather than by being named here.

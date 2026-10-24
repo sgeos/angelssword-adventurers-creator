@@ -44,14 +44,18 @@ exist, which makes the boundary a compile error rather than a convention.
 | Core | `src/core/` | `tsconfig.core.json` | ECMAScript only |
 | Platform, browser | `src/platform-browser/` | `tsconfig.browser.json` | ECMAScript and the Document Object Model |
 | Platform, worker | `src/platform-worker/` | `tsconfig.worker.json` | ECMAScript and the Web Worker scope |
-| Entry, browser | `src/entry-browser/` | `tsconfig.browser.json` | ECMAScript and the Document Object Model |
+| Entry, browser | `src/entry-browser/` | `tsconfig.app.json` | The Document Object Model, JSX, and the React, Tamagui and TanStack types |
 | Platform and entry, node | `server.mts`, `build-exe.mts` | `tsconfig.json` | ECMAScript and node |
 | Tests | `test/` | `tsconfig.test.json` | Everything |
 
-The browser platform and entry layers share one project, because both see
-exactly the same globals. What separates them is not what they may see but the
-direction imports may run, which no `tsconfig` can express. That half of the
-rule lives in `eslint.config.mjs` and is described below.
+The browser platform and entry layers shared one project until the port to
+Tamagui and TanStack Start, because both saw exactly the same globals. They no
+longer do. The entry layer is a React application and sees the frameworks'
+types; the platform must not, so that its modules stay usable by a native
+shell. Its project checks it with the Document Object Model alone. What also
+separates them is the direction imports may run, which no `tsconfig` can
+express. That half of the rule lives in `eslint.config.mjs` and is described
+below.
 
 The core project is the analogue of `no_std`. It withholds both the Document
 Object Model library and the node types, so a core module reaching for
@@ -72,13 +76,23 @@ That property was false. All four stage modules imported `app.mts` for the
 shared handoff object and the page chrome, which made the entry point a
 dependency of everything that depended on it. Separating the layers meant
 splitting that module: the shared surface became `platform-browser/shell.mts`
-at 790 lines, and what remained is a 54 line entry point that publishes the
-handoff and calls four initialisers on `DOMContentLoaded`.
+at 790 lines, and what remained was a 54 line entry point that published the
+handoff and called four initialisers on `DOMContentLoaded`.
 
-Two `no-restricted-imports` zones keep it that way. The platform layer may not
-import an entry point, and an entry point may not import another entry point,
-each of the five being loaded independently by its own script tag. Both zones
-have been exercised against a deliberately failing file.
+The port to Tamagui and TanStack Start replaced the five script-tag entry
+points with one application. The stage modules became controllers in
+`platform-browser/stages/` exporting a mount function, and the entry layer
+became the React component tree that renders the page and mounts them.
+`client.tsx` publishes the handoff before hydration, which is the moment the
+old entry point published it. Tabs and toasts became stores in the platform
+layer, so that a controller can still move the user between stages and report
+an outcome without knowing React exists.
+
+A `no-restricted-imports` zone keeps the direction: the platform layer may not
+import the entry layer. It has been exercised against a deliberately failing
+file. A second zone stopped one entry point importing another while there were
+five; the components of one application import each other, and that zone went
+with the script tags.
 
 The core needs no zone. Importing a platform module would pull that file into
 the core program, where the globals it uses do not exist, so the core project

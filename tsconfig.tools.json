@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  // ===================================================================
+  // Build tool configuration: vite.config.mts.
+  //
+  // It runs on Node, so it has the node types, and the plugins it imports
+  // describe themselves with DOM types, so it has the DOM lib too. It joins no
+  // other project: the server must not see the DOM, and the browser layers
+  // must not see Node.
+  //
+  // skipLibCheck, confined to this one file's program. The TanStack plugins'
+  // declarations import optional bundler peers that are not installed, such
+  // as Rollup, Rspack and Bun, and Babel packages that ship no types. Those
+  // failures are inside the vendors' files and cannot be fixed here. The
+  // configuration file itself is checked in full.
+  // ===================================================================
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": ["vite.config.mts"],
+  "exclude": []
+}

@@ -4,9 +4,10 @@ import { toggleSwitch } from './helpers';
 /**
  * B — The settings panel, and the boundary it is trusted to hold.
  *
- * Settings live in `platform-browser/shell.mts`, which the handoff has called
- * the least examined module in the tree, so this reaches that as well as the
- * panel.
+ * Settings were imperative code in `platform-browser/shell.mts` and are now a
+ * React component, `entry-browser/tabs/SettingsTab.tsx`, with its connection
+ * tests in `platform-browser/settings.mts`. Every assertion here held across
+ * that change unedited, which is the evidence the panel kept its behaviour.
  *
  * The file previously covered two of the four credentials and nothing else.
  * What it did not cover at all is the property the documentation actually

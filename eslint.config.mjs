@@ -43,10 +43,23 @@ export default defineConfig(
     // Add your own entries only with a reason you would defend: anything
     // ignored here is unlinted, and unlinted is where an agent that cannot
     // satisfy the rules will put the file.
-    // public/ is now build output (public/js/*.mjs, compiled from
-    // src/browser) plus static assets. The sources are linted; linting their
-    // emitted form would only report on the compiler's formatting.
-    ignores: ["**/node_modules/**", "**/dist/**", "public/**", "tmp/**", "secret/**", "tools/probe/**"],
+    // public/ holds static assets copied unchanged by the browser build.
+    //
+    // routeTree.gen.ts is named exactly, never by a glob. TanStack Router
+    // writes it from the files in routes/ on every build, and its first lines
+    // are its own `eslint-disable` and `@ts-nocheck`. It is the generator's
+    // text: linting it would report on TanStack's output, and the only fix
+    // would be an edit the next build overwrites. A new `.gen.ts` anywhere
+    // else is linted as usual.
+    ignores: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "public/**",
+      "tmp/**",
+      "secret/**",
+      "tools/probe/**",
+      "src/entry-browser/routeTree.gen.ts",
+    ],
   },
 
   {
@@ -71,6 +84,7 @@ export default defineConfig(
       "**/*.mts",
       "**/*.cts",
       "**/*.ts",
+      "**/*.tsx",
       "**/*.d.ts",
       "**/*.js",
       "**/*.mjs",
@@ -401,7 +415,7 @@ export default defineConfig(
   // its own handling of an absent value and none with any handling of a store
   // that throws.
   {
-    files: ["src/platform-browser/**/*.mts", "src/entry-browser/**/*.mts"],
+    files: ["src/platform-browser/**/*.mts", "src/entry-browser/**/*.{ts,tsx}"],
     ignores: ["src/platform-browser/local-storage.mts"],
     rules: {
       "no-restricted-globals": [
@@ -427,7 +441,7 @@ export default defineConfig(
   // are not scattered. Its own header argues why they do not belong behind
   // the HttpClient port.
   {
-    files: ["src/platform-browser/**/*.mts", "src/entry-browser/**/*.mts"],
+    files: ["src/platform-browser/**/*.mts", "src/entry-browser/**/*.{ts,tsx}"],
     ignores: ["src/platform-browser/http.mts", "src/platform-browser/binary.mts"],
     rules: {
       "no-restricted-globals": [
@@ -484,39 +498,52 @@ export default defineConfig(
     },
   },
 
-  // An entry point may not import another entry point either, for the same
-  // reason. Each of the five is loaded independently by a script tag, and one
-  // importing another would make the importee a shared module wearing an
-  // entry point's name.
-  {
-    files: ["src/entry-browser/**/*.mts"],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            {
-              group: ["./*", "../entry-browser/*"],
-              message:
-                "An entry point may not import another entry point. Shared code belongs in the platform layer or the core.",
-            },
-          ],
-        },
-      ],
-    },
-  },
+  // The entry layer used to be five entry points, one per script tag, and a
+  // rule here stopped any of them importing another. It is now one
+  // application, a tree of components rendered by TanStack Start, whose files
+  // import each other as any component tree does. What made a layer an entry
+  // point was that nothing outside it imports it, and the platform rule above
+  // still states that. The core cannot import it for the reason given there.
 
-  // The browser platform and entry layers live in a second TypeScript
-  // project, which supplies the DOM lib and withholds the node types. The
+  // The browser platform lives in a second TypeScript project, which supplies
+  // the DOM lib and withholds the node types and every framework's types. The
   // project service resolves against the root config alone, so these files
   // name theirs explicitly. Every rule still applies; only the type
   // information differs.
   {
-    files: ["src/platform-browser/**/*.mts", "src/entry-browser/**/*.mts"],
+    files: ["src/platform-browser/**/*.mts"],
     languageOptions: {
       parserOptions: {
         projectService: false,
         project: "./tsconfig.browser.json",
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
+
+  // The entry layer lives in tsconfig.app.json, the one project with JSX and
+  // the React, Tamagui and TanStack types. That project's two exemptions from
+  // the root config are argued in its header. Every lint rule here applies to
+  // it unchanged.
+  {
+    files: ["src/entry-browser/**/*.{ts,tsx}"],
+    languageOptions: {
+      parserOptions: {
+        projectService: false,
+        project: "./tsconfig.app.json",
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
+
+  // Vite's configuration lives in tsconfig.tools.json, for the reason given
+  // in that file.
+  {
+    files: ["vite.config.mts"],
+    languageOptions: {
+      parserOptions: {
+        projectService: false,
+        project: "./tsconfig.tools.json",
         tsconfigRootDir: import.meta.dirname,
       },
     },

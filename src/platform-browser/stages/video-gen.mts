@@ -12,21 +12,21 @@ import {
     notificationSound,
     showToast,
     switchTab,
-} from "../platform-browser/shell.mts";
-import { base64ToBlob, blobToBase64 } from "../platform-browser/app-utils.mts";
+} from "../shell.mts";
+import { base64ToBlob, blobToBase64 } from "../app-utils.mts";
 
-import { reasonText, responseErrorMessage } from "../core/api.mts";
-import { closestFrom, findEl, queryAll, require2d, requireEl } from "../platform-browser/dom.mts";
+import { reasonText, responseErrorMessage } from "../../core/api.mts";
+import { closestFrom, findEl, queryAll, require2d, requireEl } from "../dom.mts";
 import {
     buildWanI2VWorkflow,
     computeLetterbox,
     loadComfySettings,
     loadWanSettings,
-} from "../core/comfyui-core.mts";
-import { runWorkflow, uploadReference } from "../core/comfyui-run.mts";
-import { runGrokVideo } from "../core/grok-video-run.mts";
-import { isOk, readJson } from "../core/ports/http.mts";
-import * as VideoGenCore from "../core/video-gen-core.mts";
+} from "../../core/comfyui-core.mts";
+import { runWorkflow, uploadReference } from "../../core/comfyui-run.mts";
+import { runGrokVideo } from "../../core/grok-video-run.mts";
+import { isOk, readJson } from "../../core/ports/http.mts";
+import * as VideoGenCore from "../../core/video-gen-core.mts";
 import {
     VIDEO_PROVIDERS,
     asVideoProviderId,
@@ -38,12 +38,12 @@ import {
     loadVideoProvider,
     saveVideoProvider,
     type VideoProviderId,
-} from "../core/providers.mts";
-import { browserStore } from "../platform-browser/local-storage.mts";
-import { browserHttp } from "../platform-browser/http.mts";
-import { browserClock } from "../platform-browser/clock.mts";
-import { drawSeed } from "../platform-browser/random.mts";
-import { buildGrokVideoRequest } from "../core/grok-video-core.mts";
+} from "../../core/providers.mts";
+import { browserStore } from "../local-storage.mts";
+import { browserHttp } from "../http.mts";
+import { browserClock } from "../clock.mts";
+import { drawSeed } from "../random.mts";
+import { buildGrokVideoRequest } from "../../core/grok-video-core.mts";
 
 /** Wan renders slowly, so this polls less often and waits far longer. */
 const WAN_POLL_INTERVAL_MS = 3_000;
@@ -828,10 +828,20 @@ function initVideoGen(): void {
     }
 }
 
-// Init on DOM ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initVideoGen);
-} else {
+/**
+ * Attach this stage to its markup, once.
+ *
+ * The markup is rendered by the interface and must be in the document before
+ * this runs, because every element is found by identifier. This replaced a
+ * listener for the document finishing parsing, which no longer marks the
+ * moment the markup exists. A second call does nothing, since the listeners it
+ * attaches are not designed to be attached twice.
+ */
+let mounted = false;
+
+export function mountVideoGen(): void {
+    if (mounted) return;
+    mounted = true;
     initVideoGen();
 }
 

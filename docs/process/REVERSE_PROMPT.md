@@ -12,17 +12,98 @@ file is arranged this way rather than being rewritten wholesale.
 
 ## Last Updated
 
+2026-10-24. The web port to Tamagui and TanStack Start is complete and verified
+locally. It is not committed, because committing was not authorised for this
+goal.
+
+## Verification
+
+`npm run check` passes across seven TypeScript projects and the lint. 677 unit
+tests and 57 application programming interface tests pass. 88 browser
+specifications pass outside the sandbox, the six new layout specifications
+among them. The standalone binary builds on macOS, serves the page, its main
+module and the proxy route, and its page renders with an empty console.
+
+Against the previous build, served from a worktree of `cc05bbd`: every
+identified element on every tab, 167, was measured in both and agrees within a
+pixel and a half, and the chrome's hover and active colours match. Screenshots
+of every tab were compared by eye. Each new or rewritten test was shown to fail
+against the defect it guards, except the prompt and console tests, whose
+defects were observed directly before they were fixed.
+
+Not verified: the container, because Docker is not running here, and the Linux
+and Windows binaries. Continuous integration builds and serves all three, and
+has not seen this work.
+
+## Summary
+
+**The page is a React application.** TanStack Start prerenders the document
+shell; the routes render in the browser inside a `ClientOnly` boundary. The
+chrome and settings are Tamagui and React state. The four media stages render
+their markup once from memoized components and are driven by their existing
+controllers, moved to `src/platform-browser/stages/`. Tabs and toasts became
+platform stores the controllers still call. Express serves the build.
+
+**What it took.** A secure version set, after the first choice carried a
+critical advisory. `@tamagui/core` rather than `tamagui`, whose Slider hung the
+build. Two new TypeScript projects, with third-party declaration checks
+skipped where the frameworks' own declarations fail, argued in each file. Web-only
+CSS Tamagui cannot type, kept in one module.
+
+**What it found.** A hydration mismatch on every load. Tamagui rules beating the
+layout on specificity and order. Margins that no longer collapsed. Text sizes
+resolved against the spacing scale. Tabs that collapsed under a group. A prompt
+re-indented by the converter. And a stale copy of the old build's output in
+`public/js/`, shipped beside the new one, which let the worker specifications
+pass against files nothing used. All fixed, and the layout ones pinned.
+
+## Questions for Human Pilot
+
+**May this be committed and pushed?** It is staged and not committed.
+Continuous integration's container and binary jobs are the only check of the
+Dockerfile and the Linux and Windows builds, and they run on push.
+
+The device question stands: the native spike's Android half can run on the
+operator's phone; the iOS half waits for an iPhone.
+
+## Technical Concerns
+
+The stage components must never re-render, and nothing enforces it beyond their
+having no props. The design tokens exist twice, in Tamagui and in the stage
+stylesheet. The page's scripts grew from 113 to 192 kilobytes gzipped, and the
+parse cost on modest hardware is unmeasured. All three are recorded in
+`OPEN.md`.
+
+## Intended Next Step
+
+Commit and push on authorisation, then read continuous integration. Then the
+native spike, Android first.
+
+## Session Context
+
+`main` at `cc05bbd` before this work.
+
+---
+
+## Superseded history
+
+Nothing below this line describes the present.
+
+### Superseded 2026-10-24 — the migration plan recorded
+
+#### Last Updated
+
 2026-10-24. The interface migration plan is adopted and recorded. Nothing has
 been built.
 
-## Verification
+#### Verification
 
 Documentation only. The plan's measurements were taken from the tree at
 `0e2682a`: 6,109 lines of core, 5,855 lines of platform and entry code, 1,169
 lines of markup with 227 element identifiers, and a 726 line server. No
 framework has been installed and no device has been used.
 
-## Summary
+#### Summary
 
 The interface is to move to Tamagui, with TanStack Start for the web and Expo
 for iOS and Android. The core carries over unchanged. The media stages run on
@@ -33,7 +114,7 @@ binary remain the desktop product, and no hosted backend is adopted.
 Recorded in `RESOLVED.md`, planned in `docs/architecture/MIGRATION.md`, and the
 spike's questions listed in `OPEN.md`.
 
-## Questions for Human Pilot
+#### Questions for Human Pilot
 
 **Devices.** The operator has a physical Android phone and, for now, no iPhone.
 The Android half of the spike can run. The iOS half, including whether WebKit's
@@ -41,28 +122,22 @@ recorder produces WebM, waits for an iPhone and an Apple developer account.
 Desktop Safari and the iOS Simulator can give indications in the meantime, not
 results.
 
-## Technical Concerns
+#### Technical Concerns
 
 My assessment before adoption was that the web half alone offers desktop users
 little and that the native half is viable only through the web view route. The
 plan is ordered so that the spike tests that before any rewrite. If the spike
 fails on iOS, the plan narrows the native application to generation.
 
-## Intended Next Step
+#### Intended Next Step
 
 The Android half of the spike, on the operator's phone. The iOS half when an
 iPhone is available. No application code changes before the results are
 recorded and the operator chooses a branch.
 
-## Session Context
+#### Session Context
 
 `main` at `0e2682a` before this work.
-
----
-
-## Superseded history
-
-Nothing below this line describes the present.
 
 ### Superseded 2026-10-24 — dependencies updated, Express 5 adopted
 

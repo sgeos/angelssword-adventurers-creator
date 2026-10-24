@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  // ===================================================================
+  // The entry layer: the React application on Tamagui and TanStack Start.
+  //
+  // A sixth project, because this layer needs JSX and the types of three
+  // frameworks the platform layer must never see. The platform modules it
+  // imports are checked here too, and checked again, without any framework
+  // types in scope, by tsconfig.browser.json.
+  //
+  // TWO EXEMPTIONS FROM THE ROOT CONFIG, EACH CONFINED TO THIS PROJECT.
+  //
+  // skipLibCheck. The root checks third-party declarations for internal
+  // consistency. Here that check fails inside the vendors' own files and
+  // nowhere in ours: Tamagui's theme types contradict themselves under
+  // exactOptionalPropertyTypes; React Native's global declarations, which
+  // Tamagui's types pull in, are written for an environment without the DOM
+  // and redeclare its Blob, File, Request and Response; and TanStack Router's
+  // types name Node's http2 module in a browser bundle. None can be fixed from
+  // this repository, and the root config itself records that this check never
+  // verified a declaration against its JavaScript, only against itself. Every
+  // file of this project's own is still checked in full. What is lost is the
+  // vendors' self-consistency, for these vendors, in this project only.
+  //
+  // React Native is installed as a development dependency for its types
+  // alone. Without it Tamagui's references to it would resolve to `any` under
+  // skipLibCheck, silently weakening every component's props, which is worse
+  // than the conflict above.
+  //
+  // isolatedDeclarations. It guarantees that a module's exports carry types a
+  // declaration could be written from, which protects the modules others
+  // import. Nothing imports this layer, the lint enforces that, and it
+  // publishes no declarations. TanStack's file routes must export a `Route`
+  // whose type the framework infers, and the route tree is generated code
+  // that declares its own. So the guarantee has nothing to protect here and
+  // cannot be met. explicit-module-boundary-types in the lint still applies.
+  // ===================================================================
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": [],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedDeclarations": false
+  },
+  "include": ["src/entry-browser/**/*.tsx", "src/entry-browser/**/*.ts"],
+  "exclude": []
+}

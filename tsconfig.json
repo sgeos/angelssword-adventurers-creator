@@ -138,8 +138,10 @@
     // rather than being half-checked under this one.
     "public",
     // Playwright's config and specs belong to tsconfig.test.json, which has
-    // the DOM lib their page callbacks need.
+    // the DOM lib their page callbacks need. Vite's config belongs to
+    // tsconfig.tools.json, for the reason given there.
     "playwright.config.ts",
+    "vite.config.mts",
     // Tests belong to tsconfig.test.json, which adds the DOM lib so they
     // can exercise browser modules directly.
     "test",
@@ -147,6 +149,8 @@
     // DOM lib and withholds the node types. Checking them here too would
     // report every DOM global as missing.
     "src/platform-browser",
+    // The entry layer belongs to tsconfig.app.json, the one project with JSX
+    // and the framework types.
     "src/entry-browser",
     "src/platform-worker",
     // The core belongs to tsconfig.core.json, which withholds BOTH the DOM lib

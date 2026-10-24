@@ -14,10 +14,10 @@ import {
     initUploadZone,
     showToast,
     switchTab,
-} from "../platform-browser/shell.mts";
-import { require2d, requireEl } from "../platform-browser/dom.mts";
-import { fetchBlob } from "../platform-browser/binary.mts";
-import * as VideoPrepCore from "../core/video-prep-core.mts";
+} from "../shell.mts";
+import { require2d, requireEl } from "../dom.mts";
+import { fetchBlob } from "../binary.mts";
+import * as VideoPrepCore from "../../core/video-prep-core.mts";
 import {
     clampSeekTime,
     frameCountFromDuration,
@@ -25,9 +25,9 @@ import {
     isAtTime,
     seekDuration,
     stepFrame,
-} from "../core/video-time.mts";
-import { ASSUMED_SOURCE_FPS, describeSourceRate, type FrameRateOrigin } from "../core/frame-rate.mts";
-import { probeSourceRate } from "../platform-browser/frame-rate-probe.mts";
+} from "../../core/video-time.mts";
+import { ASSUMED_SOURCE_FPS, describeSourceRate, type FrameRateOrigin } from "../../core/frame-rate.mts";
+import { probeSourceRate } from "../frame-rate-probe.mts";
 
 /**
  * Start playback, reporting the rejection the browser raises when an
@@ -801,9 +801,19 @@ function init(): void {
     console.log('🎬 Video Prep module initialized');
 }
 
-// ── Bootstrap ──
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-} else {
+/**
+ * Attach this stage to its markup, once.
+ *
+ * The markup is rendered by the interface and must be in the document before
+ * this runs, because every element is found by identifier. This replaced a
+ * listener for the document finishing parsing, which no longer marks the
+ * moment the markup exists. A second call does nothing, since the listeners it
+ * attaches are not designed to be attached twice.
+ */
+let mounted = false;
+
+export function mountVideoPrep(): void {
+    if (mounted) return;
+    mounted = true;
     init();
 }

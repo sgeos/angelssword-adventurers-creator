@@ -531,14 +531,41 @@ Each is to be settled by running it on a physical device, not by reading.
   measured, against the same export in a desktop browser.
 - **The boundary cost.** How long moving a clip and an exported file between the
   web view and the native side takes, and whether large files are practical.
-- **The strict configuration against framework types.** Whether React, Tamagui
-  and Expo types can be used without `any`, assertions or suppressions, and
-  what narrowing helpers that requires.
-- **Packaging.** Whether TanStack Start's server output can be built into the
-  single executable as the Express server is now.
+- **The strict configuration against Expo's types.** Answered for React,
+  Tamagui and TanStack by the web port: this project's code uses them without
+  `any`, assertions or suppressions, with third-party declaration checks
+  skipped for the entry layer, as `tsconfig.app.json` argues. Expo's own types
+  are untried.
 
-**What would decide it.** The spike's measurements, recorded here, then the
-branch in MIGRATION.md's order of work that they select.
+**Answered by the web port, 2026-10-24.** Packaging, whether TanStack Start's
+server output could be built into the single executable. It did not need to
+be: the page is built as files, which the existing server and the binary serve.
+
+**What would decide the rest.** The spike's measurements, recorded here, then
+the branch in MIGRATION.md's order of work that they select.
+
+## What the web port left as it was, deliberately
+
+**Recorded 2026-10-24.** Three consequences of keeping the media stages'
+controllers rather than rewriting them, each a choice rather than an oversight.
+
+- **Two styling systems.** The chrome, panels, layout and settings are Tamagui.
+  The controls inside the four stages are styled by `public/style.css`, because
+  their controllers generate markup at run time that only a class can style. The
+  design tokens are therefore written twice, in `ui/config.ts` and in the
+  stylesheet's `:root`, and must agree until the stages are rewritten.
+- **A stage component must never re-render.** Its controller owns its subtree
+  after it mounts. The components take no props and are memoized, which holds
+  the invariant today; nothing enforces it against a future edit that gives one
+  a prop. A browser specification would likely catch the breakage, since the
+  stage would lose its state, but none asserts it directly.
+- **The page is heavier.** Its scripts went from 113 to 192 kilobytes gzipped,
+  for React, Tamagui and the router. It is served from the same machine, so
+  what this costs is parse time on modest hardware, which has not been measured.
+
+**What would decide them.** Whether the stages are rewritten as React, which is
+the native plan's question as much as the web's: on a phone they are meant to
+run as they are, inside a web view.
 
 ## The Windows executable has never carried the project icon
 

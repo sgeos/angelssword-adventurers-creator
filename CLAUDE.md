@@ -36,33 +36,48 @@ complete.
 |---|---|
 | `server.mts` | Express server and the proxy. Runs directly, no build |
 | `src/core/*.mts` | The portable core. No platform at all. Where tests reach |
-| `src/platform-browser/*.mts` | Browser platform. The shell and the element helpers |
+| `src/platform-browser/*.mts` | Browser platform. The shell, tab and toast stores, element helpers |
+| `src/platform-browser/stages/*.mts` | The four media stages' controllers |
 | `src/platform-worker/*.mts` | The two Web Workers |
-| `src/entry-browser/*.mts` | The five entry points. Nothing imports these |
+| `src/entry-browser/` | The React application on Tamagui and TanStack Start. Nothing imports it |
 | `test/unit/` | Unit tests |
 | `test/integration/` | Server and browser tests |
 | `build-exe.mts` | Standalone binary build |
 | `docs/` | Knowledge graph |
 
-Five TypeScript projects separate which globals each layer may see. See
+Seven TypeScript projects separate which globals each layer may see. See
 [`docs/architecture/PROJECT_STRUCTURE.md`](./docs/architecture/PROJECT_STRUCTURE.md)
-and [`docs/architecture/LAYERING.md`](./docs/architecture/LAYERING.md).
+and [`docs/architecture/LAYERING.md`](./docs/architecture/LAYERING.md). The port
+to Tamagui and TanStack Start is described in
+[`docs/architecture/MIGRATION.md`](./docs/architecture/MIGRATION.md).
 
 ## Conventions
 
 **The configuration is deliberately strict.** `any`, type assertions,
 non-null assertions, and `eslint-disable` comments are rejected.
 `isolatedDeclarations` requires exported symbols to state their types. Two
-narrow exemptions exist and each states its reasoning where declared. A rule
-that obstructs is to be argued with rather than routed around, and routing
-around it does not work.
+narrow exemptions exist and each states its reasoning where declared. The port
+to Tamagui and TanStack Start added four, confined to where they are needed and
+argued in the file that declares each: `tsconfig.app.json` skips third-party
+declaration checks and `isolatedDeclarations` for the entry layer,
+`tsconfig.tools.json` skips third-party declaration checks for the Vite
+configuration, and `eslint.config.mjs` excludes the generated route tree by its
+exact name. A rule that obstructs is to be argued with rather than routed
+around, and routing around it does not work.
 
 **Narrowing returns a value.** Type predicates are banned, because a predicate
 asserts a relationship the compiler must take on trust. A narrowing helper
 returns the narrowed value or `undefined`.
 
 **Types come from the source of truth.** Element types come from the tag in
-`public/index.html`, never from what an identifier suggests.
+the component that renders the element, under `src/entry-browser/tabs/`, never
+from what an identifier suggests.
+
+**A stage component renders once.** The four media stages are memoized
+components with no props. After they mount, a controller in
+`src/platform-browser/stages/` owns their subtree, toggling classes and
+rewriting contents, which a re-render would undo. Interface that is meant to
+change belongs in React state, as the settings panel and the chrome are.
 
 **Pure logic belongs in the core.** If it needs no platform, it goes in
 `src/core/`, which compiles without the Document Object Model and without the
@@ -81,8 +96,9 @@ has an adapter has to be argued for.
 a retry schedule goes in `src/core/*-run.mts` behind `HttpClient` and `Clock`,
 never inline beside the progress bar it updates.
 
-**Nothing imports an entry point.** `src/entry-browser/` is the top of the
-graph. Shared code belongs in the platform layer or the core.
+**Nothing imports an entry point.** `src/entry-browser/`, the React
+application, is the top of the graph. Its components import each other; nothing
+outside it imports them. Shared code belongs in the platform layer or the core.
 
 **Verification is by exit code**, and a claim states what was not covered. See
 [`docs/process/VERIFICATION.md`](./docs/process/VERIFICATION.md).
@@ -93,6 +109,7 @@ graph. Shared code belongs in the platform layer or the core.
 
 ```sh
 npm start              # build the browser half, serve on port 3001
+npm run dev            # Vite's dev server; run the server on 3001 for /api
 npm run check          # typecheck, then lint
 npm test               # unit and application programming interface tests
 npm run test:browser   # browser specifications, rebuilding first
@@ -115,8 +132,8 @@ than a hypothetical one.
 ## Open matters
 
 Tracked in [`docs/decisions/OPEN.md`](./docs/decisions/OPEN.md). In brief,
-five entry modules have no unit tests because they are coupled to a live
-canvas, though their wiring is now covered by browser specifications and their
+the four stage controllers have no unit tests because they are coupled to a
+live canvas, though their wiring is covered by browser specifications and their
 arithmetic lives in the core. Continuous integration builds the container and
 the binary for Linux and Windows on every push, and macOS is built by hand.
 OpenAI sprites and Gemini video have been run against live keys by the

@@ -232,11 +232,11 @@ ASAdventurer/
 ├── Start AS Adventurer.[bat|command|sh]  ← Launcher with console output
 ├── README.md                         ← This file
 ├── icon.ico                          ← Application icon (Windows builds only)
-└── public/                           ← UI files (do not modify)
-    ├── index.html
-    ├── style.css
-    ├── js/                           ← Compiled from src/, one directory per layer
-    └── assets/
+└── public/                           ← The page, as built (do not modify)
+    ├── index.html                    ← The document shell
+    ├── style.css                     ← Styles for the stage controls
+    ├── fonts/
+    └── assets/                       ← The application's scripts, and images and sounds
 ```
 
 ---
@@ -247,9 +247,9 @@ ASAdventurer/
 docker compose up --build
 ```
 
-Serves on port 3001. The image is built in two stages, so the browser modules
-are compiled with the development dependencies and the runtime image carries
-neither them nor the compiler.
+Serves on port 3001. The image is built in two stages, so the page is built
+with the development dependencies and the runtime image carries neither them
+nor the bundler.
 
 API keys may be supplied to the container so that one deployment serves
 several people without each of them holding a key.
@@ -279,8 +279,9 @@ index.
 | If the question is | Start here |
 |---|---|
 | How the stages fit together | [Pipeline](./docs/architecture/PIPELINE.md) |
-| Why there are five TypeScript projects | [Project Structure](./docs/architecture/PROJECT_STRUCTURE.md) |
+| Why there are seven TypeScript projects | [Project Structure](./docs/architecture/PROJECT_STRUCTURE.md) |
 | How the core, platform, and entry layers are separated | [Layering](./docs/architecture/LAYERING.md) |
+| How the page moved to Tamagui and TanStack Start | [Interface Migration](./docs/architecture/MIGRATION.md) |
 | Why something is the way it is | [Resolved Decisions](./docs/decisions/RESOLVED.md) |
 | What is still unresolved | [Open Questions](./docs/decisions/OPEN.md) |
 
@@ -296,32 +297,39 @@ differently, because they have to be:
 
 - **Server** (`server.mts`) runs directly. Node strips the types as it loads
   the file, so there is no build step and nothing to keep in sync.
-- **Browser** (`src/core`, `src/platform-browser`, `src/platform-worker` and
-  `src/entry-browser`) is compiled to `public/js/`, because
-  no browser strips types. `index.html` loads that output as ES modules.
+- **Browser** is a React application on Tamagui, built by TanStack Start on
+  Vite into `dist/client/`, which the server serves. The page's chrome and
+  settings are Tamagui components; the four media stages render their markup
+  as components and are driven by controllers in `src/platform-browser/stages/`.
   `npm start` builds it first, so running the app never serves a stale bundle.
 
 ```sh
 npm install
 npm start              # builds the browser half, then serves on :3001
+npm run dev            # Vite's dev server; run `npm start` on :3001 for /api
 
 npm run check          # typecheck every project, then lint
 npm test               # unit and API tests
-npx playwright test    # browser tests (needs: npx playwright install chromium)
+npm run test:browser   # browser tests, rebuilding first (needs: npx playwright install chromium)
 npm run test:all       # all of the above
 ```
 
-### Why four tsconfig projects
+Use `npm run test:browser` rather than a bare `npx playwright test`, which
+reuses a server that is already running and so can test an old build.
 
-They differ in which global types each half is allowed to see, and that
+### Why seven tsconfig projects
+
+They differ in which global types each part is allowed to see, and that
 separation is enforced rather than assumed:
 
 | Project | Covers | Sees |
 |---|---|---|
 | `tsconfig.json` | server and build scripts | Node, no DOM |
 | `tsconfig.core.json` | `src/core` | Neither. ECMAScript alone |
-| `tsconfig.browser.json` | `src/platform-browser`, `src/entry-browser` | DOM, no Node |
+| `tsconfig.browser.json` | `src/platform-browser` | DOM, no Node, no framework |
+| `tsconfig.app.json` | `src/entry-browser`, the React application | DOM, JSX, React, Tamagui, TanStack |
 | `tsconfig.worker.json` | the two Web Workers | WebWorker, neither DOM nor Node |
+| `tsconfig.tools.json` | `vite.config.mts` | Node and DOM |
 | `tsconfig.test.json` | tests and the Playwright config | both |
 
 The worker project exists because the `WebWorker` and `DOM` libs both declare

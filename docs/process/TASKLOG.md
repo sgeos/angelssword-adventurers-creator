@@ -109,6 +109,14 @@ dropped.
 | Container image moved to Node 22.23 | Complete | Five security releases since 22.18 |
 | Held majors and `jsdom` floor recorded | Recorded | TypeScript 7, node-fetch 3, `@types/node` 26 |
 | Interface migration plan adopted | Recorded | Tamagui on TanStack Start and Expo; spike first, not begun |
+| Web port to Tamagui and TanStack Start | Complete | 167 element boxes match the previous build; 88 browser specifications |
+| Stage controllers moved to the platform layer | Complete | Mount onto memoized components; behaviour unchanged |
+| Settings and chrome rewritten as React | Complete | Settings specifications pass unedited |
+| Hydration mismatch on every load fixed | Complete | Routes inside `ClientOnly`; console empty, pinned by a specification |
+| Stale build output shipped from `public/js/` | Complete | Removed; ignore rule dropped so it cannot hide |
+| Worker specification reads addresses from the bundle | Complete | Fails with the worker file removed |
+| Container test covers the served page directory | Complete | Fails on the old copy line |
+| Layout regressions from the port pinned | Complete | Six specifications, four shown to fail against their defect |
 
 ## Open Items
 

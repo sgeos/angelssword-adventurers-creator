@@ -11,19 +11,19 @@ import {
     initUploadZone,
     notificationSound,
     showToast,
-} from "../platform-browser/shell.mts";
-import { debounce } from "../platform-browser/app-utils.mts";
-import { detectKeyColor, hexToRgb, rgbToHex } from "../core/color.mts";
+} from "../shell.mts";
+import { debounce } from "../app-utils.mts";
+import { detectKeyColor, hexToRgb, rgbToHex } from "../../core/color.mts";
 import {
     clampSeekTime,
     frameCountFromDuration,
     frameTime,
     isAtTime,
-} from "../core/video-time.mts";
-import { exportRangeFromHandoff, type ExportRange, type HandoffPayload } from "../core/video-prep-core.mts";
-import { ChromaKey } from "../core/chroma-key.mts";
-import { closestFrom, queryAll, require2d, requireEl } from "../platform-browser/dom.mts";
-import { channel } from "../core/pixels.mts";
+} from "../../core/video-time.mts";
+import { exportRangeFromHandoff, type ExportRange, type HandoffPayload } from "../../core/video-prep-core.mts";
+import { ChromaKey } from "../../core/chroma-key.mts";
+import { closestFrom, queryAll, require2d, requireEl } from "../dom.mts";
+import { channel } from "../../core/pixels.mts";
 import {
     MODE_LIMITS,
     asCropRatio,
@@ -59,14 +59,14 @@ import {
     type ExportMode,
     type PersistedSliders,
     type PreviewMode,
-} from "../core/exporter-math.mts";
-import { ColorQuantizer } from "../core/gif-codec.mts";
-import { browserStore } from "../platform-browser/local-storage.mts";
-import { fetchBlob } from "../platform-browser/binary.mts";
-import type { EncodeRequest, EncodeResponse, WorkerFrame } from "../core/gif-worker-core.mts";
-import type { TimerCommand } from "../platform-worker/timer-worker.mts";
-import { ASSUMED_SOURCE_FPS, describeSourceRate, type FrameRateOrigin, type SourceFrameRate } from "../core/frame-rate.mts";
-import { probeSourceRate } from "../platform-browser/frame-rate-probe.mts";
+} from "../../core/exporter-math.mts";
+import { ColorQuantizer } from "../../core/gif-codec.mts";
+import { browserStore } from "../local-storage.mts";
+import { fetchBlob } from "../binary.mts";
+import type { EncodeRequest, EncodeResponse, WorkerFrame } from "../../core/gif-worker-core.mts";
+import type { TimerCommand } from "../../platform-worker/timer-worker.mts";
+import { ASSUMED_SOURCE_FPS, describeSourceRate, type FrameRateOrigin, type SourceFrameRate } from "../../core/frame-rate.mts";
+import { probeSourceRate } from "../frame-rate-probe.mts";
 
 /**
  * Read an integer from a numeric input, falling back when the field is blank
@@ -1257,7 +1257,7 @@ export class ModelExporter {
             const frameDelay = 1000 / exportFps;
 
             // Worker-based timer (immune to background tab throttling)
-            const timerWorker = new Worker(new URL('../platform-worker/timer-worker.mjs', import.meta.url), {
+            const timerWorker = new Worker(new URL('../../platform-worker/timer-worker.mts', import.meta.url), {
                 type: 'module',
             });
             let frameIdx = 0;
@@ -1511,7 +1511,7 @@ export class ModelExporter {
                 // The encoder is a real module (gif-worker.mts), compiled by
                 // tsconfig.worker.json. It used to be a template literal built
                 // into a blob URL, which put it outside the type checker.
-                const worker = new Worker(new URL('../platform-worker/gif-worker.mjs', import.meta.url), {
+                const worker = new Worker(new URL('../../platform-worker/gif-worker.mts', import.meta.url), {
                     type: 'module',
                 });
 
@@ -1633,7 +1633,20 @@ let instance: ModelExporter | undefined;
 /** The live exporter, once the document is ready. */
 export const modelExporter = (): ModelExporter | undefined => instance;
 
-document.addEventListener('DOMContentLoaded', () => {
+/**
+ * Attach this stage to its markup, once.
+ *
+ * The markup is rendered by the interface and must be in the document before
+ * this runs, because every element is found by identifier. This replaced a
+ * listener for the document finishing parsing, which no longer marks the
+ * moment the markup exists. A second call does nothing, since the listeners it
+ * attaches are not designed to be attached twice.
+ */
+let mounted = false;
+
+export function mountModelExporter(): void {
+    if (mounted) return;
+    mounted = true;
     instance = new ModelExporter();
     console.log('📦 Model Exporter initialized');
-});
+}
