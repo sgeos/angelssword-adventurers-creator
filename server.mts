@@ -240,7 +240,16 @@ const STATIC_DIR: string = isSea()
   ? path.join(import.meta.dirname, "public")
   : path.join(import.meta.dirname, "dist", "client");
 
-export const createApp = (fetchImpl: FetchLike = nodeFetch): Express => {
+/**
+ * Build the app. Both collaborators are parameters so a test can supply them.
+ *
+ * `staticDir` is where the page is served from. A test passes a directory it
+ * created, because the real one is build output: an earlier version of the
+ * test served whatever `dist/client` happened to hold, passed on a machine
+ * that had built the page, and failed in continuous integration, where the
+ * test job builds nothing.
+ */
+export const createApp = (fetchImpl: FetchLike = nodeFetch, staticDir: string = STATIC_DIR): Express => {
 const app = express();
 
 app.use(express.json({ limit: "50mb" }));
@@ -263,7 +272,7 @@ app.use((req, res, next) => {
 // feature `import.meta.dirname`, bundled as `__dirname`, is the executable's
 // directory, so one expression finds both. A check for `process.pkg` stood
 // here and outlived the pkg build it was written for.
-app.use(express.static(STATIC_DIR));
+app.use(express.static(staticDir));
 
 // ── OpenAI ───────────────────────────────────────────────────────────
 

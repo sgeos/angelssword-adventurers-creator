@@ -1,4 +1,7 @@
 import { describe, it, beforeEach } from 'node:test';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 
@@ -22,7 +25,14 @@ import {
 
 // The mock is a constructor argument, not a global. Nothing is patched and
 // the production module has no seam to patch.
-const app = createApp(mockFetch);
+/**
+ * The page the server serves, created here rather than built. The real page is
+ * build output, and a test that read it passed only where a build had run.
+ */
+const PAGE_DIR: string = mkdtempSync(join(tmpdir(), 'as-adventurer-page-'));
+writeFileSync(join(PAGE_DIR, 'index.html'), '<!DOCTYPE html><html><body>test page</body></html>');
+
+const app = createApp(mockFetch, PAGE_DIR);
 
 /**
  * Run a block with the given environment variables absent.
@@ -311,9 +321,9 @@ describe('AS Adventurer API characterization', () => {
         assert.equal(res.headers['access-control-allow-origin'], '*');
     });
 
-    // --- 13: GET / serves public/index.html ---
+    // --- 13: GET / serves the page directory's index ---
 
-    it('GET / serves public/index.html (200, HTML)', async () => {
+    it('GET / serves the page directory index (200, HTML)', async () => {
         const res = await request(app).get('/');
 
         assert.equal(res.status, 200);
