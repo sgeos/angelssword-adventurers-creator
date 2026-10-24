@@ -5,6 +5,26 @@
 Decisions taken and the reasoning behind them, so that a later session
 inherits the argument rather than only the outcome. Newest first.
 
+## The interface moves to Tamagui, on TanStack Start and Expo, spike first
+
+Decided by the operator on 2026-10-24. The interface is to be rebuilt on
+Tamagui, with TanStack Start for the web and Expo for iOS and Android. The core
+is carried over unchanged. The local server and the standalone binary remain the
+desktop product, and no hosted backend is adopted. The plan is in
+[MIGRATION.md](../architecture/MIGRATION.md).
+
+The argument against was weighed and recorded rather than dismissed. The heavy
+work is canvas, video seeking and recording, which React Native does not
+provide. The assets are used on a desktop. The web half alone gives desktop
+users little. What made the plan viable is Expo's DOM components, which let the
+existing browser implementation of the media stages run inside a web view on the
+device, so the hardest code is not written twice.
+
+The decision is therefore conditional in its order. A disposable spike on
+physical iOS and Android devices comes first, and no application code is
+rewritten until it passes. If it fails on iOS, the native application is
+narrowed to generation, and the desktop tool keeps preparation and export.
+
 ## Node single executable applications in place of pkg
 
 `pkg` is archived, its final release rejects `import.meta`, and its newest base

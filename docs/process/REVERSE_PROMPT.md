@@ -12,10 +12,66 @@ file is arranged this way rather than being rewritten wholesale.
 
 ## Last Updated
 
+2026-10-24. The interface migration plan is adopted and recorded. Nothing has
+been built.
+
+## Verification
+
+Documentation only. The plan's measurements were taken from the tree at
+`0e2682a`: 6,109 lines of core, 5,855 lines of platform and entry code, 1,169
+lines of markup with 227 element identifiers, and a 726 line server. No
+framework has been installed and no device has been used.
+
+## Summary
+
+The interface is to move to Tamagui, with TanStack Start for the web and Expo
+for iOS and Android. The core carries over unchanged. The media stages run on
+the phone as Expo DOM components, keeping their browser implementation inside a
+web view, so the hardest code is not written twice. The local server and the
+binary remain the desktop product, and no hosted backend is adopted.
+
+Recorded in `RESOLVED.md`, planned in `docs/architecture/MIGRATION.md`, and the
+spike's questions listed in `OPEN.md`.
+
+## Questions for Human Pilot
+
+**Devices.** The operator has a physical Android phone and, for now, no iPhone.
+The Android half of the spike can run. The iOS half, including whether WebKit's
+recorder produces WebM, waits for an iPhone and an Apple developer account.
+Desktop Safari and the iOS Simulator can give indications in the meantime, not
+results.
+
+## Technical Concerns
+
+My assessment before adoption was that the web half alone offers desktop users
+little and that the native half is viable only through the web view route. The
+plan is ordered so that the spike tests that before any rewrite. If the spike
+fails on iOS, the plan narrows the native application to generation.
+
+## Intended Next Step
+
+The Android half of the spike, on the operator's phone. The iOS half when an
+iPhone is available. No application code changes before the results are
+recorded and the operator chooses a branch.
+
+## Session Context
+
+`main` at `0e2682a` before this work.
+
+---
+
+## Superseded history
+
+Nothing below this line describes the present.
+
+### Superseded 2026-10-24 — dependencies updated, Express 5 adopted
+
+#### Last Updated
+
 2026-10-24. Deprecation warnings addressed and dependencies updated, with two
 regressions from Express 5 found and fixed before they shipped.
 
-## Verification
+#### Verification
 
 `npm run check` passes. 677 unit tests and 56 application programming interface
 tests pass, the two new ones included. 82 browser specifications pass outside
@@ -26,7 +82,7 @@ where it passed, and on Express 5 before the fix, where it failed. Docker is
 not running on this machine, so the new image is checked only by the
 `container` job. Continuous integration is read after the push.
 
-## Summary
+#### Summary
 
 **Deprecations.** The workflow's three actions moved from v4 to v7, which run
 on Node 24. `multer` was deprecated over vulnerabilities and imported nowhere,
@@ -48,32 +104,26 @@ routes would have forwarded no body at all. Both are fixed and each has a test.
 node-fetch 3, because it dropped the `timeout` option the proxy relies on, and
 silently. `@types/node` 26, because it is ahead of the supported runtime.
 
-## Questions for Human Pilot
+#### Questions for Human Pilot
 
 Three decisions in `OPEN.md`. The Gemini key test, unchanged. Whether the
 Windows executable should carry the icon. And whether to raise the development
 Node floor to 22.22.2, which `jsdom` 30.1 declares and continuous integration
 does not use.
 
-## Technical Concerns
+#### Technical Concerns
 
 The Node 22.18 floor is tested only by continuous integration, and the binaries
 it builds embed 22.18. They are smoke tests rather than releases, but a release
 built the same way would ship that runtime.
 
-## Intended Next Step
+#### Intended Next Step
 
 Nothing is queued for an agent.
 
-## Session Context
+#### Session Context
 
 `main` at `86c7850` before this work.
-
----
-
-## Superseded history
-
-Nothing below this line describes the present.
 
 ### Superseded 2026-10-24 — the frame rate specifications
 

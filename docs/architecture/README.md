@@ -10,3 +10,4 @@ How the application is put together.
 | [PIPELINE.md](./PIPELINE.md) | The four stages and the handoff object between them |
 | [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md) | The two halves, five TypeScript projects, strictness, and the binary |
 | [LAYERING.md](./LAYERING.md) | Core, platform, and entry point, and how the boundary is enforced |
+| [MIGRATION.md](./MIGRATION.md) | The adopted move to Tamagui on TanStack Start and Expo, spike first |

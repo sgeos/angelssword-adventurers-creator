@@ -514,6 +514,32 @@ log. Google also accepts the key in an `x-goog-api-key` header.
 other providers' tests are, and whether to move the key from the query string
 to the header on the server's calls. Both are small. Neither was asked for.
 
+## What the migration spike has to establish
+
+**Opened 2026-10-24**, with the adoption of the plan in
+[MIGRATION.md](../architecture/MIGRATION.md). None of the following is known.
+Each is to be settled by running it on a physical device, not by reading.
+
+- **WebKit's recorder and WebM.** Android's web view is Chromium and records
+  WebM. Whether the iOS web view's `MediaRecorder` can, and with what codecs, is
+  not established. If it cannot, iOS exports are Graphics Interchange Format or
+  another container, and the adventurer mode needs a different output there.
+- **Frame-accurate seeking and the rate probe in a web view.** Expected to work,
+  since both engines implement `requestVideoFrameCallback`, but untested inside
+  Expo's web view.
+- **Performance on modest devices.** Export time for the two second fixtures,
+  measured, against the same export in a desktop browser.
+- **The boundary cost.** How long moving a clip and an exported file between the
+  web view and the native side takes, and whether large files are practical.
+- **The strict configuration against framework types.** Whether React, Tamagui
+  and Expo types can be used without `any`, assertions or suppressions, and
+  what narrowing helpers that requires.
+- **Packaging.** Whether TanStack Start's server output can be built into the
+  single executable as the Express server is now.
+
+**What would decide it.** The spike's measurements, recorded here, then the
+branch in MIGRATION.md's order of work that they select.
+
 ## The Windows executable has never carried the project icon
 
 **Found 2026-10-24, not fixed.** The binary build called `npx rcedit` to embed

@@ -108,6 +108,7 @@ dropped.
 | Archived `rcedit` removed | Complete | Its step had failed on every Windows build |
 | Container image moved to Node 22.23 | Complete | Five security releases since 22.18 |
 | Held majors and `jsdom` floor recorded | Recorded | TypeScript 7, node-fetch 3, `@types/node` 26 |
+| Interface migration plan adopted | Recorded | Tamagui on TanStack Start and Expo; spike first, not begun |
 
 ## Open Items
 

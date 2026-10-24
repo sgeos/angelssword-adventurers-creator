@@ -190,7 +190,18 @@ The remedy is a machine performing the act, not more careful prose.
 
 ## The next task
 
-**Nothing is queued for an agent.** Everything below is the operator's.
+**The interface migration, beginning with its spike.** The operator adopted the
+plan in [MIGRATION.md](../architecture/MIGRATION.md) on 2026-10-24. The
+interface moves to Tamagui, on TanStack Start for the web and Expo for iOS and
+Android, with the core unchanged and the media stages running as Expo DOM
+components. The first task is the disposable spike that plan describes, on a
+physical iPhone and a physical Android device. Its questions are listed in
+`OPEN.md`. **Do not rewrite application code before the spike's results are
+recorded and the operator has chosen the branch they select.** The operator has
+a physical Android phone and, as of 2026-10-24, no iPhone. Run the Android half
+of the spike first. Desktop Safari and the iOS Simulator may give early
+indications about WebKit, recorded as indications only, and they do not settle
+the iOS questions in `OPEN.md`, which wait for a device.
 
 The two frame rate browser specifications that were queued are written, in
 `frame-rate.spec.ts`. The adoption specification removes
@@ -235,6 +246,9 @@ now assert sixty exactly.
   the npm cache in the home directory is not writable, so set
   `npm_config_cache` to a temporary directory. Locally npm 12 blocks
   `esbuild`'s install script, and the build and the binary work without it.
+- **Interface migration**, 2026-10-24. Move the interface to Tamagui on
+  TanStack Start and Expo, spike first. Recorded in `RESOLVED.md`, planned in
+  `MIGRATION.md`, open questions in `OPEN.md`. Not begun.
 
 **Awaiting the operator.**
 
