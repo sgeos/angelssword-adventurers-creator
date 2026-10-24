@@ -89,8 +89,6 @@ headless and on systems without `xdg-open`.
 - **Loop Building** — Create seamless loops using:
   - **Ping-Pong** — Plays forward then backward for a natural bounce
   - **Reverse** — Plays the video in reverse
-  - **Crossfade** — Blend the start and end frames for smooth transitions
-- **Concatenation** — Combine multiple video clips together
 - **Onion Skinning** — Overlay frame 0 at 50% opacity to help align loop points
 - **Preview** — Scrub through frames and preview the final loop before exporting
 
@@ -391,5 +389,10 @@ rather than `import.meta.url`.
 ## Credits
 
 **AS Adventurer Creator** by Angel's Sword Studios
+
+The interface uses the Cinzel, Cinzel Decorative, Outfit and Share Tech Mono
+typefaces, each under the SIL Open Font License 1.1 and hosted with the
+application so that it makes no request to a font service. Their authors and
+licences are listed in [`public/fonts/README.md`](./public/fonts/README.md).
 
 Built with ❤️ for the VTuber community.

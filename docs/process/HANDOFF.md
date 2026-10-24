@@ -2,7 +2,7 @@
 
 > **Navigation**: [Process](./README.md) | [Documentation Root](../README.md)
 
-**Refreshed 2026-10-23. The anchor is `dc70dba`, the last commit before this
+**Refreshed 2026-10-24. The anchor is `bddf5ec`, the last commit before this
 refresh.** Read this block, run the validity check, then read the task below.
 
 ---
@@ -16,11 +16,11 @@ itself.
 
 ### Ancestry
 
-`main` should **contain** `dc70dba`, the last commit before this refresh. Test
+`main` should **contain** `bddf5ec`, the last commit before this refresh. Test
 containment rather than equality.
 
 ```sh
-git merge-base --is-ancestor dc70dba HEAD
+git merge-base --is-ancestor bddf5ec HEAD
 ```
 
 If that fails, this file predates a history rewrite and is stale. If it
@@ -48,9 +48,9 @@ missing.
 3. `src/core/ports/` holds **three** capability interfaces, namely
    `storage.mts`, `http.mts`, and `clock.mts`, and `src/core/` holds
    **nineteen** modules.
-4. `npm test` reports **675** unit tests and **54** application programming
+4. `npm test` reports **677** unit tests and **54** application programming
    interface tests, all passing.
-5. `npm run test:browser` reports **78** passing browser specifications. Use
+5. `npm run test:browser` reports **79** passing browser specifications. Use
    that script rather than `npx playwright test`, which reuses a running
    server and therefore skips its own rebuild.
 6. `tsc -p tsconfig.core.json` succeeds, and adding `localStorage` to any file
@@ -209,19 +209,24 @@ The remedy is a machine performing the act, not more careful prose.
 - **Frame rate**, 2026-10-08. Detect the source rate, keep it apart from the
   export rate, pass it explicitly, and never use this machine's playback rate in
   its place. Done in `573ee9b`.
+- **Web fonts**, 2026-10-24. Host them. Done: the original files and their
+  licences are in `public/fonts/`, and the page requests nothing from another
+  origin on load.
+- **Keyframe mode**, 2026-10-24. Gemini is sent both keyframes, Grok and Wan the
+  start frame. The requests already did this. The panel now says so for the
+  selected provider.
+- **The second clip**, 2026-10-24. Remove it. Done.
+- **`gh`**, by 2026-10-24. The operator added `"gh *"` to the sandbox's excluded
+  commands in `.claude/settings.local.json`. A command beginning with `gh` runs
+  outside the sandbox and works. A `gh` inside a compound command does not
+  match the pattern and stays sandboxed. `git` over SSH still needs the sandbox
+  lifted, deliberately.
 
 **Awaiting the operator.**
 
-- **Web fonts.** The answer arrived as "Hist", read as "host" and not acted on
-  until confirmed. Hosting means carrying the four families, under the SIL Open
-  Font License, in the repository, the image and the binary.
-- **Keyframe mode.** Whether "send only the first" covers it. It currently still
-  sends its start and end frames.
-- **The second clip.** The exporter ignores it entirely. Wire it up, or stop
-  offering it. See `OPEN.md`.
-- **Whether to add `"gh *"` to the sandbox's excluded commands.** Offered and
-  not taken. It would run `gh` wholly outside the sandbox, which is broader than
-  a network allowance.
+- **The Gemini key test.** It calls Google directly from the browser with the
+  key in the query string, bypassing the proxy. Recorded in `OPEN.md`, not
+  fixed, since it was not asked for.
 
 And the four recorded earlier: whether the Graphics Interchange Format decode
 path should exist when nothing imports it, and whether its two divergences from

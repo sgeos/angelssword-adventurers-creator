@@ -212,6 +212,10 @@ full path, which matched no process, printed nothing alarming, and was reported
 as done. Five of them ran for weeks holding two ports. Confirm a stop by
 checking the port or the process afterwards, never by the stop command's exit.
 
+**`document.fonts.check` reports true for a family that has no face at all.** A
+test of self-hosted fonts written with it would pass with every font file
+missing. Load each face with `document.fonts.load` and require a match.
+
 **A port in use is not a fault in the artefact.** The first container run
 could not bind 3001 because a development server held it. Bind a different
 host port for a check rather than reading the collision as a defect, and say

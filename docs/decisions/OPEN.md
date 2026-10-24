@@ -161,8 +161,8 @@ file. The `_intro`, `_outro` and `_speaking` filename presets imply a
 convention for switching between them, and nothing generates, relates or
 validates those files against each other.
 
-Video Prep's concat with crossfade joins two clips inside a SINGLE export, so
-that transition is baked into one file rather than handled between files.
+Video Prep's concatenation, which would have baked a transition into one file,
+never worked and was removed on 2026-10-24.
 
 Whether a seam jump when an application switches sources is acceptable depends
 on what that application can do, which is outside this repository. Recorded
@@ -435,6 +435,16 @@ Not decided, because it is a change to what three artefacts carry.
 later fix will show up as those assertions failing, which is the intended
 behaviour of pinning a defect rather than a feature.
 
+**Resolved 2026-10-24 by the operator's decision: hosted.** The four families
+are in `public/fonts/`, as the original files from `github.com/google/fonts`,
+unmodified, beside their licences, about 401 kilobytes. The originals were
+chosen over Google's 138 kilobytes of subsets because two of the licences
+reserve a font name for modified versions, and whether a subset is a
+modification was not settled. `settings.spec.ts` now asserts that loading the
+page requests nothing from another origin, a test that fails on the page as it
+was, and that every family loads from the local files. The README's offline
+statement is now true of the traffic as well as the function.
+
 ## The exporter never reads the second clip
 
 Video Preparation can concatenate a second clip with an optional crossfade. It
@@ -452,6 +462,12 @@ sequence with the crossfade, which is real work in the frame selection and the
 seek loop, or Video Preparation stops offering the feature until it does. Leaving
 both halves as they are is the one option that misleads.
 
+**Resolved 2026-10-24 by the operator's decision: removed.** The controls, the
+second clip's state, its handoff fields and the unused crossfade helper are
+gone from Video Preparation, the core and the page. A test asserts the handoff
+carries nothing about a second clip. The README had also advertised a
+"crossfade" loop mode that never existed; that line is gone too.
+
 ## The browser specifications cannot run inside Claude Code's macOS sandbox
 
 **Observed 2026-10-08.** With local port binding allowed for this project, the
@@ -463,6 +479,32 @@ They pass outside the sandbox and in continuous integration.
 
 Not a defect in the code. Recorded so that a sandboxed session does not mistake
 seventy-eight launch failures for seventy-eight regressions.
+
+## Keyframe mode sends each provider what its request can carry
+
+**Decided 2026-10-24 by the operator.** Gemini is sent both keyframes, the start
+and then the end. Grok and Wan are sent the start frame. That was already what
+the requests did, since Grok's body and Wan's graph each carry one image by
+shape. What was missing was the telling: both accepted an end frame and dropped
+it without a word. The keyframe panel now says, for the selected provider, which
+frames it is sent, and a missing start frame is reported as such.
+
+Not established: whether Gemini honours the end frame. Keyframe mode has not
+been run against the live service.
+
+## The Gemini key test bypasses the proxy and puts the key in a URL
+
+**Found 2026-10-24, not fixed.** The Settings test button for the Gemini key
+calls `generativelanguage.googleapis.com` directly from the browser, with the
+key in the query string. Every other call goes through the local proxy, and the
+documentation says the proxy carries every outbound call. The server's own
+Gemini calls also pass the key as a query parameter, which Google documents as
+one accepted method, but a URL is more likely than a header to be written to a
+log. Google also accepts the key in an `x-goog-api-key` header.
+
+**What would decide it.** Whether to route the test through the proxy as the
+other providers' tests are, and whether to move the key from the query string
+to the header on the server's calls. Both are small. Neither was asked for.
 
 ## No release has been cut
 

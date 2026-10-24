@@ -12,10 +12,71 @@ file is arranged this way rather than being rewritten wholesale.
 
 ## Last Updated
 
+2026-10-24. Three of the operator's decisions acted on: web fonts hosted,
+keyframe use stated per provider, the second clip removed. Committed in
+`bddf5ec` and pushed on the operator's authorisation.
+
+## Verification
+
+`npm run check` passes. 677 unit tests, 54 application programming interface
+tests and 79 browser specifications pass, the browser specifications outside the
+sandbox. The new test that the page requests nothing from another origin was run
+against the page as it was and failed, naming all six Google requests.
+Continuous integration has not seen these changes.
+
+## Summary
+
+**Web fonts.** The four families are hosted in `public/fonts/` as the original
+files from Google's font repository, unmodified, beside their licences. Google's
+subsets would have been 138 kilobytes against about 401, but two licences
+reserve a font name for modified versions and I was not certain a subset is not
+one, so I took the option that does not depend on the answer.
+
+**Keyframe mode.** Already sent Gemini both frames and Grok and Wan the start
+frame. The keyframe panel now says which, per provider, and a missing start
+frame is reported as such rather than as a missing reference image.
+
+**The second clip.** Removed from the page, Video Preparation, the core handoff
+and the stylesheet, with the unused crossfade helper. The README had also
+advertised a crossfade loop mode that never existed, and no longer does.
+
+## Questions for Human Pilot
+
+**The Gemini key test**, found while removing the font links. It calls Google
+directly from the browser with the key in the query string, bypassing the proxy
+every other call uses. Recorded in `OPEN.md`, not fixed.
+
+## Technical Concerns
+
+The licence reasoning is mine, not a lawyer's. Shipping the unmodified originals
+is the conservative reading. Converting them to WOFF2 or subsetting them to save
+weight would reopen the question.
+
+Whether Gemini honours a keyframe end frame is still not established.
+
+## Intended Next Step
+
+The two browser specifications for the frame rate change remain queued.
+Otherwise nothing until the Gemini key test is decided.
+
+## Session Context
+
+`main` at `bddf5ec` before this refresh.
+
+---
+
+## Superseded history
+
+Nothing below this line describes the present.
+
+### Superseded 2026-10-24 — prepared for a power cycle
+
+#### Last Updated
+
 2026-10-23. Prepared for a power cycle. The frame rate work is verified,
 recorded and pushed.
 
-## Verification
+#### Verification
 
 `npm run check` passes. 675 unit tests and 54 application programming interface
 tests pass, and 78 browser specifications pass outside the sandbox. The browser
@@ -23,7 +84,7 @@ specifications cannot run inside Claude Code's macOS sandbox, because Chromium
 is refused a Mach port at startup. Continuous integration is read after the
 push.
 
-## Summary
+#### Summary
 
 The source frame rate is now detected from the timestamps of displayed frames
 and kept apart from the export rate. The rate this machine can play at is not
@@ -35,7 +96,7 @@ Tracing every consumer of the rate turned up one more defect, recorded and not
 fixed. The exporter never reads the concatenated second clip that Video
 Preparation offers, measures and hands over.
 
-## State that survives a power cycle
+#### State that survives a power cycle
 
 - `main` is pushed and the working tree is clean. There is no stash.
 - Two local branches, `pr1` and `pr2`, are copies of upstream pull requests from
@@ -50,31 +111,25 @@ Preparation offers, measures and hands over.
   because the command that was meant to stop them matched nothing and I reported
   them stopped. They are stopped now, and that was confirmed by checking.
 
-## Questions for Human Pilot
+#### Questions for Human Pilot
 
 The web fonts, keyframe mode, the second clip, and whether to exclude `gh` from
 the sandbox. Each is set out in [HANDOFF.md](./HANDOFF.md).
 
-## Technical Concerns
+#### Technical Concerns
 
 The probe has been exercised in headless Chromium on macOS and through
 continuous integration on Linux. It has not been run in Firefox or Safari, nor
 against a variable frame rate clip from a real generator.
 
-## Intended Next Step
+#### Intended Next Step
 
 Two browser specifications for the frame rate change, listed in the handoff.
 Otherwise nothing until the questions are answered.
 
-## Session Context
+#### Session Context
 
 `main` at `dc70dba` before this refresh.
-
----
-
-## Superseded history
-
-Nothing below this line describes the present.
 
 ### Superseded 2026-10-23 — the operator's decisions, and the export rate regression
 

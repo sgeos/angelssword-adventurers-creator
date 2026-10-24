@@ -93,6 +93,10 @@ dropped.
 | Exporter loaders merged | Complete | The handed rate was ignored on the normal route |
 | Second clip never read by the exporter | Recorded | Collected and handed over, then dropped |
 | Chromium blocked by the macOS sandbox | Recorded | Browser specifications need the sandbox lifted |
+| Web fonts hosted locally | Complete | Original files and licences, no request to another origin on load |
+| Second clip removed | Complete | Never read by the exporter, here or upstream |
+| Keyframe use stated per provider | Complete | Gemini both frames, Grok and Wan the start frame |
+| Gemini key test bypasses the proxy | Recorded | Direct call with the key in the query string |
 
 ## Open Items
 

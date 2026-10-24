@@ -221,7 +221,9 @@ const response = await fetch(
   - **Loop (Ping-Pong)**: forward + reverse (0 → N → 0)
   - **Reverse on Export**: reversed frames only
 
-**NEW FEATURE — Video Concatenation**:
+**NEW FEATURE — Video Concatenation** (removed 2026-10-24, see
+[OPEN.md](../decisions/OPEN.md)). It was built in Video Preparation and never
+read by the exporter, here or upstream, so it is no longer offered:
 - **"Add 2nd Video"** button — upload a second video
 - Second video is immediately appended seamlessly to the first
 - Preview plays both back-to-back
