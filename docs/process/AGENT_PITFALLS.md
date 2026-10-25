@@ -409,6 +409,11 @@ view up by tag to deliver every result and prop, and a hidden one was not
 found, so a request's answer never arrived. Draw over a web view rather than
 hiding it.
 
+**A cancelled run reads as a failure on the badge.** Two pushes minutes
+apart cancelled the first run, and GitHub drew the README's badge as failing
+though nothing had failed. Runs on `main` are no longer cancelled; elsewhere,
+read a run's conclusion before reporting it as red.
+
 **A launcher outside the gate rots silently.** The Windows launcher ran a
 `server.js` that the conversion had removed, and `bin/start` skipped the page
 build the port introduced. Every test passed throughout, because none runs a

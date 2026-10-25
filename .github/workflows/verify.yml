@@ -19,10 +19,13 @@ on:
   push:
   pull_request:
 
-# A second push to the same branch makes the first run's answer irrelevant.
+# A second push to the same branch makes the first run's answer irrelevant,
+# except on main. There a cancelled run is the latest result the README's
+# badge reads, and GitHub draws a cancellation as "failing", so main's runs
+# queue and each finishes instead.
 concurrency:
   group: verify-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
