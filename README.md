@@ -298,6 +298,12 @@ Assistants working on this repository should begin with
 
 ---
 
+## Contributing and security
+
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the workflow and
+[`SECURITY.md`](./SECURITY.md) for the trust model and how to report a
+vulnerability privately.
+
 ## Working on the Source
 
 The application is TypeScript throughout. The two halves are built and run

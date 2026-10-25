@@ -24,8 +24,10 @@ now needs the ruleset disabled first. Issues are enabled, and the wiki and
 projects are disabled, since `docs/` is the knowledge graph. Merged branches
 are deleted automatically. Dependabot alerts are enabled, and its automatic
 security pull requests are not, because a project on hold would accumulate
-them unreviewed. Secret scanning and push protection were already enabled,
-and workflow tokens default to read only.
+them unreviewed. Private vulnerability reporting is enabled, so the
+advisory link in `SECURITY.md` works for anyone. Secret scanning and push
+protection were already enabled, and workflow tokens default to read only.
+Issue and pull request templates are in `.github/`.
 
 Enabling the alerts raised two, both high, both left open on purpose. `zod`
 below 4.6.6 and `node-forge` up to 1.4.0 arrive only through `@expo/cli`, the

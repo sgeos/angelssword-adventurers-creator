@@ -96,7 +96,15 @@ validity checks were all rerun, and one, the TypeScript file count, had been
 stale since the port. At the operator's request, `secret/` is now ignored
 entirely and tracks nothing, as in their keleusma repository, rather than
 tracking a `.gitkeep`; `tmp/` is unchanged. The remote was configured, as recorded in
-GIT_STRATEGY.md, and the README given badges.
+GIT_STRATEGY.md, and the README given badges. Then brought to parity with the
+operator's keleusma repository where sensible: a security policy, a
+contributing guide, issue and pull request templates, and private
+vulnerability reporting. Writing the policy found that the local server
+listens on every interface without authentication, which OPEN.md records as
+the operator's decision, and that it granted every origin cross-origin
+access, inherited from upstream, which let any site the user visited drive
+the proxy. That was fixed: the headers and the form parser are removed, and
+two tests that had pinned the wildcard now assert its absence.
 
 Not verified: an iOS device; a real ComfyUI server; a request with a valid key, which would spend the
 operator's money and was not authorised; a clip larger than 300 megabytes and
