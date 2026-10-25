@@ -29,6 +29,25 @@ advisory link in `SECURITY.md` works for anyone. Secret scanning and push
 protection were already enabled, and workflow tokens default to read only.
 Issue and pull request templates are in `.github/`.
 
+**Synchronised with `sgeos/project-template` on 2026-10-25.** Only merge
+commits are allowed, matching the `--no-ff` rule above, so squash and rebase
+merging are disabled. `.github/rulesets/main.json` records the ruleset as
+applied, and `.github/CODEOWNERS` requests the maintainer's review on every
+pull request. Dependabot proposes updates to the pinned actions monthly,
+grouped into one pull request, and deliberately not to the npm packages,
+whose held majors and override are recorded decisions. The workflow pins
+every action to a commit hash, gives no job more than read access, persists
+no credential in a checkout, and lints itself with actionlint and zizmor.
+From the template's files, the code of conduct, the hygiene gate
+`scripts/check.sh`, the opt-in pre-push hook, `scripts/worktree.sh`,
+`.editorconfig`, `.gitattributes` and its ignore rules were adopted, with
+the code of conduct's licence sentence changed to the MIT licence and the
+editor configuration's indentation left out, since the TypeScript is
+indented two ways. Not adopted, for want of releases or citations: the
+changelog, `CITATION.cff` and the release notes configuration. The
+template's documentation layout was not adopted either, because `docs/`
+already has its own knowledge graph.
+
 Enabling the alerts raised two, both high, in packages that arrive only
 through `@expo/cli`, the development and build tooling, not the application's
 bundle. Neither has a fix within Expo 58, whose newest command-line tool still

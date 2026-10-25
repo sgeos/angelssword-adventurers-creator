@@ -16,7 +16,7 @@ Reference a related issue with `Fixes #N` to link it.
 
 ## Checklist
 
-- [ ] `npm run check` passes, with no lint warnings
+- [ ] `./scripts/check.sh` passes, with no lint warnings
 - [ ] `npm test` passes
 - [ ] `npm run test:browser` passes, if the page or a stage changed
 - [ ] New logic that needs no platform is in `src/core/` with unit tests

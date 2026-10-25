@@ -184,7 +184,7 @@ const VideoGenTabView = (): ReactNode => (
                             <Panel>
                                 <PanelTitle><PanelTitleIcon>ℹ️</PanelTitleIcon><PanelTitleText>About Gemini Omni Flash</PanelTitleText></PanelTitle>
                                 <PanelSubtitle>
-                                    Google's Gemini Omni Flash generates short animated videos from reference images and text prompts. 
+                                    Google's Gemini Omni Flash generates short animated videos from reference images and text prompts.
                                     Perfect for creating idle animations, talking motions, and simple character movements.
                                 </PanelSubtitle>
                                 <InfoNote>

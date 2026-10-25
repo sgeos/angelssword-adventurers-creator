@@ -113,7 +113,14 @@ no longer promises a prebuilt binary and now describes the mobile
 application. Both Dependabot alerts were then addressed: `zod` overridden to a
 patched major after testing Expo's own schemas and tooling under it, and
 `node-forge`, which has no patched release, dismissed as not used, since only
-Expo Updates code signing reaches the flawed verification.
+Expo Updates code signing reaches the flawed verification. The repository was
+then synchronised with `sgeos/project-template`: its code of conduct, with
+the licence sentence made the MIT licence's, its hygiene gate, now run by
+continuous integration before the typecheck, its hook, worktree script,
+editor and attribute files, ignore rules, code owners, Dependabot for
+actions, and a workflow hardened to its standard and linted by actionlint
+and zizmor. GIT_STRATEGY.md records what was adopted, what was adapted and
+what was not.
 
 Not verified: an iOS device; a real ComfyUI server; a request with a valid key, which would spend the
 operator's money and was not authorised; a clip larger than 300 megabytes and

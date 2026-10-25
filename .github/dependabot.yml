@@ -1,0 +1,21 @@
+# Proposes updates to the pinned actions, from sgeos/project-template. Each proposal is
+# a pull request that continuous integration checks and the operator reviews. The
+# cooldown keeps a release out until it has had a week to be noticed if it is bad, and
+# grouping puts every action update into a single pull request.
+#
+# Monthly rather than the template's weekly, because the project is on hold and a
+# weekly pull request would accumulate unreviewed. The npm packages, in the root and in
+# mobile/, are deliberately left out and updated by hand: the held majors and the zod
+# override are recorded decisions, in docs/decisions/OPEN.md and
+# docs/process/GIT_STRATEGY.md, that an automatic proposal would contradict.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]

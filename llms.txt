@@ -1,8 +1,9 @@
 # AS Adventurer Creator
 
 > A VTuber and PNGtuber asset creation pipeline. Four stages in a single page,
-> backed by a local server that proxies two external services. This repository
-> is a TypeScript fork of a JavaScript original.
+> backed by a local server that proxies the generation providers, and an Expo
+> application for Android and iOS that runs the same stages. This repository
+> is a TypeScript fork of a JavaScript original, and the project is on hold.
 
 The application converts a static sprite into a transparent looping animated
 model. Stages communicate through a shared handoff object rather than a router
@@ -22,7 +23,9 @@ the architecture documents first, then confirm details against the source.
 
 - [Documentation Root](https://github.com/sgeos/angelssword-adventurers-creator/blob/main/docs/README.md): Knowledge graph index.
 - [Pipeline](https://github.com/sgeos/angelssword-adventurers-creator/blob/main/docs/architecture/PIPELINE.md): The four stages and the handoff object.
-- [Project Structure](https://github.com/sgeos/angelssword-adventurers-creator/blob/main/docs/architecture/PROJECT_STRUCTURE.md): Four TypeScript projects, strictness, and the binary build.
+- [Project Structure](https://github.com/sgeos/angelssword-adventurers-creator/blob/main/docs/architecture/PROJECT_STRUCTURE.md): Eight TypeScript projects, strictness, and the binary build.
+- [Layering](https://github.com/sgeos/angelssword-adventurers-creator/blob/main/docs/architecture/LAYERING.md): The core, platform and entry layers, and how each boundary is enforced.
+- [Interface Migration](https://github.com/sgeos/angelssword-adventurers-creator/blob/main/docs/architecture/MIGRATION.md): The port to Tamagui, TanStack Start and Expo, with device results.
 - [Product Brief](https://github.com/sgeos/angelssword-adventurers-creator/blob/main/docs/architecture/PRODUCT_BRIEF.md): Product intent, inherited from upstream.
 
 ## Process
@@ -36,3 +39,9 @@ the architecture documents first, then confirm details against the source.
 
 - [Resolved](https://github.com/sgeos/angelssword-adventurers-creator/blob/main/docs/decisions/RESOLVED.md): Decisions taken and why.
 - [Open](https://github.com/sgeos/angelssword-adventurers-creator/blob/main/docs/decisions/OPEN.md): Unresolved matters.
+
+## Policies
+
+- [Security](https://github.com/sgeos/angelssword-adventurers-creator/blob/main/SECURITY.md): The trust model and private vulnerability reporting.
+- [Contributing](https://github.com/sgeos/angelssword-adventurers-creator/blob/main/CONTRIBUTING.md): Workflow and the local gate.
+- [Code of Conduct](https://github.com/sgeos/angelssword-adventurers-creator/blob/main/CODE_OF_CONDUCT.md): How participants treat each other.

@@ -122,6 +122,8 @@ and tracks nothing. `tmp/` tracks only its `.gitkeep`.
 npm start              # build the browser half, serve on port 3001
 npm run dev            # Vite's dev server; run the server on 3001 for /api
 npm run check          # typecheck, then lint
+./scripts/check.sh     # repository hygiene, then npm run check; CI runs this
+scripts/worktree.sh new feat/x   # an isolated worktree for a parallel line
 npm test               # unit and application programming interface tests
 npm run test:browser   # browser specifications, rebuilding first
 npm run test:all       # everything
@@ -142,6 +144,12 @@ Requires Node 22.18 or newer, which is what native type stripping demands.
 Use `npm run test:browser` rather than `npx playwright test`. Playwright reuses
 a server that is already running and then skips its own rebuild, so the bare
 command can test a stale bundle and report regressions that are not there.
+
+**One writer per checkout.** When more than one line works on the repository
+at once, each works in its own worktree on its own branch, created with
+`scripts/worktree.sh`, because two lines in one checkout share an index and a
+dirty tree. `git config core.hooksPath scripts/hooks` opts a clone into running
+`scripts/check.sh` before every push.
 
 ## Before editing many files
 

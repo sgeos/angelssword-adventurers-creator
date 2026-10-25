@@ -216,8 +216,8 @@ export function initKeyboard(): void {
             // Video Prep frame navigation
             if (activePanel.id === 'tab-video-prep') {
                 e.preventDefault();
-                const btn = e.key === 'ArrowLeft' ? 
-                    document.getElementById('vpPrevFrame') : 
+                const btn = e.key === 'ArrowLeft' ?
+                    document.getElementById('vpPrevFrame') :
                     document.getElementById('vpNextFrame');
                 if (btn !== null) btn.click();
             }
@@ -225,8 +225,8 @@ export function initKeyboard(): void {
             // Model Exporter frame navigation
             if (activePanel.id === 'tab-exporter') {
                 e.preventDefault();
-                const btn = e.key === 'ArrowLeft' ? 
-                    document.getElementById('exPrevFrame') : 
+                const btn = e.key === 'ArrowLeft' ?
+                    document.getElementById('exPrevFrame') :
                     document.getElementById('exNextFrame');
                 if (btn !== null) btn.click();
             }

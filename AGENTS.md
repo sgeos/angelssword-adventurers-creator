@@ -100,6 +100,8 @@ npm install
 npm start              # builds the browser half, then serves on port 3001
 npm run dev            # Vite's dev server; start the server on 3001 for /api
 npm run check          # typecheck across eight projects, then lint
+./scripts/check.sh     # repository hygiene, then npm run check; CI runs this
+scripts/worktree.sh new feat/x   # an isolated worktree for a parallel line
 npm test               # unit and application programming interface tests
 npm run test:browser   # browser specifications, rebuilding first
 npm run test:all       # all of the above

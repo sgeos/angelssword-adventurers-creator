@@ -13,31 +13,44 @@
 # They also close a recorded open item. Neither the Linux nor the Windows
 # binary had ever been built, which was treated as blocked on hardware nobody
 # had. The runners are that hardware.
+#
+# Supply chain, following sgeos/project-template. Actions are pinned to full
+# commit hashes with the release tag in a comment, so a moved or compromised
+# tag cannot change what runs, and Dependabot proposes newer pins. Checkouts
+# do not persist the token, and no job is given more than read access to the
+# repository or any secret. The workflows job lints this file.
 name: verify
 
 on:
   push:
+    branches: [main]
   pull_request:
+  workflow_dispatch:
 
-# A second push to the same branch makes the first run's answer irrelevant,
-# except on main. There a cancelled run is the latest result the README's
-# badge reads, and GitHub draws a cancellation as "failing", so main's runs
-# queue and each finishes instead.
+# A second push to a pull request supersedes its in-flight run. Every other
+# run is grouped by its own identifier, so a run on main is never cancelled:
+# a cancelled run is the latest result the README's badge reads, and GitHub
+# draws a cancellation as "failing".
 concurrency:
-  group: verify-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
 
-permissions:
-  contents: read
+# No permissions by default. Each job grants only what it needs.
+permissions: {}
 
 jobs:
   check:
     name: typecheck and lint
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           # The lowest version the project claims to support. Testing the
           # floor rather than the newest release is the point: the server runs
@@ -56,16 +69,22 @@ jobs:
       # node_modules, so the check needs both installs.
       - run: npm ci --prefix mobile
 
-      # Typechecks every tsconfig project, the mobile one included, then lints.
-      - run: npm run check
+      # Repository hygiene from sgeos/project-template, then the typecheck of
+      # every tsconfig project, the mobile one included, and the lint.
+      - run: ./scripts/check.sh
 
   mobile:
     name: mobile bundles
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22.18.0'
           cache: npm
@@ -87,10 +106,15 @@ jobs:
   test:
     name: unit and API tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22.18.0'
           cache: npm
@@ -102,10 +126,15 @@ jobs:
   browser:
     name: browser tests
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22.18.0'
           cache: npm
@@ -121,7 +150,7 @@ jobs:
       - run: npx playwright test
 
       - if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report
           path: |
@@ -132,8 +161,13 @@ jobs:
   container:
     name: container builds and serves
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # No setup-node: the image builds its own toolchain, and using the
       # runner's Node here would test something the image does not contain.
@@ -181,6 +215,9 @@ jobs:
   binary:
     name: binary builds and serves (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
     strategy:
       # A Windows failure must not hide the Linux result, nor the reverse.
       fail-fast: false
@@ -195,9 +232,11 @@ jobs:
         # Git Bash on the Windows runner, so one script serves both hosts.
         shell: bash
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22.18.0'
           cache: npm
@@ -236,3 +275,29 @@ jobs:
       - name: What the binary said, if any of that failed
         if: failure()
         run: cat dist/ASAdventurer/server.log || true
+
+  # Lints the workflows themselves, as sgeos/project-template does. actionlint
+  # checks syntax, expressions and the shell in run steps, and zizmor checks
+  # for known weaknesses such as injection through untrusted input, excessive
+  # permissions and unpinned actions. The actionlint image is pinned by
+  # digest, and zizmor's version explicitly.
+  workflows:
+    name: workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: actionlint
+        run: >-
+          docker run --rm --volume "$PWD:/repo" --workdir /repo
+          rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+          -color
+      - name: zizmor
+        uses: zizmorcore/zizmor-action@85b2b9fb8e3325e7a23d7d0a9d7ba5ae0f999e3e # v0.7.1
+        with:
+          version: 1.31.1
+          advanced-security: false

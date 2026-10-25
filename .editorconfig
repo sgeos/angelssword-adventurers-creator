@@ -1,0 +1,21 @@
+# From sgeos/project-template, without its indentation settings. The TypeScript is
+# indented with four spaces in most files and two in a few, such as server.mts, and a
+# global setting would reindent new lines in the files that differ. The encoding, line
+# ending and whitespace settings match what scripts/check.sh enforces.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{json,jsonl,toml,yaml,yml}]
+indent_style = space
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[Makefile]
+indent_style = tab

@@ -1,7 +1,6 @@
 node_modules/
 dist/
 backup/
-.env
 *.log
 *.lnk
 test-results/
@@ -19,3 +18,21 @@ tmp/*
 # so the directory is absent from a fresh clone until someone creates it.
 secret/
 
+# From sgeos/project-template. Environment files usually hold credentials, such as
+# the provider keys the server reads, so commit an example with placeholder values
+# instead.
+.env
+.env.*
+!.env.example
+
+# Agent runtime state, such as session lock files and host-specific settings. Local to
+# each contributor's session and not project content.
+.claude/
+.codex/
+
+# Operating system and editor droppings.
+.DS_Store
+Thumbs.db
+*.swp
+*~
+nvim.log

@@ -63,7 +63,7 @@ missing.
 7. `test/fixtures/media` holds **four** fixtures, two of them small generated
    clips at different frame rates which the loop, exporter and frame rate
    specifications require, and `test/fixtures` holds no other directory.
-8. `.github/workflows/verify.yml` declares **six** jobs. Read the most recent
+8. `.github/workflows/verify.yml` declares **seven** jobs. Read the most recent
    run rather than taking it on trust:
 
    ```sh
@@ -79,7 +79,10 @@ missing.
    the image and fetches from a running container, and `binary`, which builds
    the standalone executable on Linux and on Windows and fetches from each.
    The `check` job now installs the mobile package too, because the gate
-   typechecks it. Run 40170313151, on `dd5c9dc`, the commit that added the
+   typechecks it, and runs `scripts/check.sh`, which adds the repository
+   hygiene checks of `sgeos/project-template` before `npm run check`. The
+   seventh, `workflows`, lints the workflow with actionlint and zizmor. With
+   the binary job's two platforms, a run shows eight jobs. Run 40170313151, on `dd5c9dc`, the commit that added the
    mobile application, passed all seven jobs, the `mobile` job and the
    changed `check` job included.
 

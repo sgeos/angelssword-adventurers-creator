@@ -19,13 +19,16 @@ git clone https://github.com/sgeos/angelssword-adventurers-creator
 cd angelssword-adventurers-creator
 npm ci
 npm ci --prefix mobile    # the gate typechecks the mobile application too
-npm run check             # typecheck eight projects, then lint
+./scripts/check.sh        # repository hygiene, then typecheck eight projects and lint
 npm test                  # unit and server tests
 npm run test:browser      # browser specifications, rebuilding first
 ```
 
-Use `npm run test:browser` rather than `npx playwright test`, which can test a
-stale bundle. The full procedure, including what the gate does not cover, is
+`scripts/check.sh` is the gate continuous integration runs. It checks the
+repository's hygiene first, needing `python3` and `shellcheck`, then runs
+`npm run check`. `git config core.hooksPath scripts/hooks` runs it before every
+push. Use `npm run test:browser` rather than `npx playwright test`, which can
+test a stale bundle. The full procedure, including what the gate does not cover, is
 in [`docs/process/VERIFICATION.md`](docs/process/VERIFICATION.md).
 
 ## The rules most likely to surprise
@@ -62,6 +65,12 @@ Continuous integration runs the gate, the unit, server and browser tests,
 bundles the mobile application, builds and runs the container, and builds the
 standalone binary on Linux and Windows. A pull request should pass all of it.
 State in the description what was verified and what was not.
+
+## Conduct
+
+Participation in the project's spaces follows the
+[`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md). Contributions are judged on their
+technical merits.
 
 ## Security
 
