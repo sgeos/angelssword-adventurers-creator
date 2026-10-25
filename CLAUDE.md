@@ -113,7 +113,8 @@ either. What both need belongs in `src/ui/`, the platform layer or the core.
 **Verification is by exit code**, and a claim states what was not covered. See
 [`docs/process/VERIFICATION.md`](./docs/process/VERIFICATION.md).
 
-**`secret/` and `tmp/` are never committed** beyond their tracked `.gitkeep`.
+**`secret/` and `tmp/` are never committed.** `secret/` is ignored entirely
+and tracks nothing. `tmp/` tracks only its `.gitkeep`.
 
 ## Commands
 

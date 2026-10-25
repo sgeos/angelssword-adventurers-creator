@@ -87,8 +87,9 @@ TypeScript throughout, a hard fork of a JavaScript upstream that is dormant.
   macOS, Chromium also needs a system service that Claude Code's sandbox
   withholds even when port binding is allowed, so the browser specifications
   need the sandbox lifted there.
-- **Never commit `secret/` or `tmp/` contents.** Both carry a tracked
-  `.gitkeep` and ignore everything else.
+- **Never commit `secret/` or `tmp/` contents.** `secret/` is ignored
+  entirely and tracks nothing. `tmp/` carries a tracked `.gitkeep` and
+  ignores everything else.
 - **No commits or pushes without explicit authorisation**, even when the work
   is finished.
 
