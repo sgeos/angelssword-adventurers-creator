@@ -705,6 +705,27 @@ development dependency only, and the runtime floor is unaffected.
 which would also bring the security releases since 22.18, or to hold `jsdom`
 at a version whose declared range includes 22.18.
 
+## The source launchers are covered by nothing
+
+**Recorded 2026-10-25.** Two launchers were found broken while correcting the
+README's Quick Start, and nothing had noticed either. `Start ASAdventurer.bat`
+still ran `node server.js` after the server became `server.mts`, so it could
+not have started since the conversion. `bin/start`, which `Start
+ASAdventurer.command` calls, ran `node server.mts` without building the page,
+which since the port to TanStack Start is build output, so on a fresh clone it
+served "Cannot GET /". That was reproduced with the build hidden.
+
+**Fixed the same day.** Both build the page on every start, as `npm start`
+does through `prestart`, and the batch file runs `server.mts`. `bin/start` was
+then run with the build absent and served the page. The batch file has not
+been run, because no Windows machine was available, and continuous
+integration builds the Windows binary but never runs this launcher. It also
+checks only that Node is present, not that it is 22.18 or newer.
+
+What remains is the gap. A continuous integration step that runs `bin/start`
+on a fresh checkout and fetches the page, and the batch file likewise on
+Windows, would have caught both.
+
 ## The local server listens on every interface, without authentication
 
 **Recorded 2026-10-25, while writing `SECURITY.md`.** Writing the policy also

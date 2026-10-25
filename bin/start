@@ -78,6 +78,19 @@ if [ ! -d node_modules ]; then
     npm install
 fi
 
+# The page is build output, so a fresh clone has none and the server would
+# answer "Cannot GET /". Build it on every start, as `npm start` does, so a
+# pull is never served from a stale build. Without npm an existing build is
+# served as it is.
+if command -v npm >/dev/null 2>&1; then
+    printf '  Building the page...\n'
+    npm run --silent build:browser || exit 1
+elif [ ! -f dist/client/index.html ]; then
+    printf 'The page has not been built and npm is not on PATH.\n' >&2
+    printf 'Install npm, then run:  npm run build:browser\n\n' >&2
+    exit 1
+fi
+
 # server.mts, not .js: Node strips types natively, so TypeScript runs directly
 # with no build step. The version check above is what guarantees that works.
 #

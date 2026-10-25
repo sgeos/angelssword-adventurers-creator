@@ -52,5 +52,17 @@ echo.
 echo   Starting server...
 echo   (Press Ctrl+C to stop)
 echo.
-node server.js
+:: The page is build output, so a fresh copy has none and the server would
+:: answer "Cannot GET /". Build it on every start, as npm start does.
+echo   Building the page...
+call npm run --silent build:browser
+if errorlevel 1 (
+    echo.
+    echo   [ERROR] Building the page failed.
+    pause
+    exit /b 1
+)
+
+:: server.mts, not server.js: Node 22.18 or newer runs TypeScript directly.
+node server.mts
 pause

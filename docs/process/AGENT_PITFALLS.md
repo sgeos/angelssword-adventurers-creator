@@ -409,6 +409,12 @@ view up by tag to deliver every result and prop, and a hidden one was not
 found, so a request's answer never arrived. Draw over a web view rather than
 hiding it.
 
+**A launcher outside the gate rots silently.** The Windows launcher ran a
+`server.js` that the conversion had removed, and `bin/start` skipped the page
+build the port introduced. Every test passed throughout, because none runs a
+launcher. When the server's entry or the build changes, run each launcher on
+a fresh checkout.
+
 **A web view debugging socket is not necessarily this application's.**
 Every installed application with a debuggable web view publishes a
 `webview_devtools_remote_<pid>` socket. A check that forwarded the first one
