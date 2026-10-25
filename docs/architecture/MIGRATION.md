@@ -153,10 +153,34 @@ to their canvas anyway.
 phone with less memory, Expo reloads it and the user is now told that the
 stages restarted and what was lost, rather than seeing them reset.
 
-**Not verified on a device.** iOS, on any device. A production build, because
-Expo Go loads development bundles and there is no Android SDK here for a
-native build; continuous integration bundles the production export for Android
-on every push, which proves it bundles and not that it runs. A provider
+## A standalone build, on the same phone
+
+On 2026-10-25, with the operator's agreement, a release APK was built and
+installed on the phone, then removed. The JDK, the Android SDK and its NDK
+were downloaded into a temporary directory, and the build ran on a copy of the
+committed tree, `npx expo prebuild` then `./gradlew assembleRelease`, with a
+temporary package name, `com.sgeos.asadventurer.devtest`, since the real one
+is undecided. Nothing native is committed.
+
+It loads its production bundle from `file:///android_asset/`, and that exposed
+two defects development could not, both in starting the workers. The web
+view refuses a worker from a `file:` address, and Expo's production build
+addressed each worker with its directory twice. In development Metro served
+everything over HTTP from correct addresses. The DOM component now, on
+`file:` pages only, starts a worker from a `blob:` copy of its script, read
+through `readBundledTextSync` in the binary adapter, trying the collapsed
+address first.
+
+Verified on the standalone build: the page in a secure context with all five
+fonts and every media capability; frame rate detection at 15 and 30 frames per
+second; a GIF export and a WebM export, each to the share sheet, the WebM in
+3.9 seconds; the notification sound; the handoff to the exporter, which
+received 30 frames at 15 per second; the key test with a fake key, through the
+native transport to OpenAI and back; the system file picker; and a stage's
+preference surviving a restart. The production page's heap is 11 megabytes,
+against 78 in development.
+
+**Not verified on a device.** iOS, on any device. A provider
 request with a valid key, which would spend money, as opposed to the rejected
 one. A clip larger than 200 megabytes and 40 seconds at 720p, the largest
 exported. Export time on hardware slower than this phone, which at 0.85

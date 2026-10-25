@@ -386,6 +386,18 @@ megabytes after loading large clips, which looked like the clip's bytes being
 held. After a forced collection it matched a fresh page's 78. Collect through
 the protocol, `HeapProfiler.collectGarbage`, before calling memory retained.
 
+**Development mode hides what a release build loads from `file:`.** Expo Go
+served every script over HTTP from Metro. The standalone build loads from
+`file:///android_asset/`, where the web view will not start a worker from a
+`file:` address, and where Expo's production build addressed each worker with
+its directory twice. Both exports failed only there. Build a release once
+before calling a feature done on a phone.
+
+**`sdkmanager --licenses` no longer accepts anything.** The current
+command-line tools deprecate it, print a notice, and write no licence file, so
+Gradle then refused to install the NDK. The replacement is `android sdk
+install`, which also collects usage data unless given `--no-metrics`.
+
 **A tap during a scroll animation is swallowed.** The tab bar had just
 scrolled, and a tap on a tab did nothing. Wait for the motion to end.
 

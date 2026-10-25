@@ -79,12 +79,9 @@ missing.
    the image and fetches from a running container, and `binary`, which builds
    the standalone executable on Linux and on Windows and fetches from each.
    The `check` job now installs the mobile package too, because the gate
-   typechecks it. **The `mobile` job and the changed `check` job had not run
-   in continuous integration at this refresh.** Their steps, and the `test`,
-   `browser` and `binary` jobs', were run on a clean copy of the tree, from
-   the committed file list, under Node 22.18.0 with fresh `npm ci` installs,
-   on macOS rather than Linux, and all passed. The `container` job was not:
-   Docker was not available.
+   typechecks it. Run 40170313151, on `dd5c9dc`, the commit that added the
+   mobile application, passed all seven jobs, the `mobile` job and the
+   changed `check` job included.
 
    Without an authenticated `gh`, report assertion 8 as **unverified**, not as
    failed, and say why. The same holds for assertions 4 and 5 under a sandbox
@@ -232,10 +229,13 @@ inputs did nothing, because Expo's web view has no file chooser.
 Android phone can show in Expo Go has been shown, up to a 40 second 720p clip
 of 200 megabytes loaded, cached, handed off and exported as WebM on the phone.
 That took the export streaming one frame at a time and Video Prep's scrubbing
-cache bounded; `OPEN.md` and MIGRATION.md have the measurements. A standalone build needs the
-Android SDK or Xcode's simulators, and an icon and identifier; see `OPEN.md`.
-iOS needs a device. A key test with a deliberately wrong key exercises the
-native transport without spending anything, and was how it was verified.
+cache bounded; `OPEN.md` and MIGRATION.md have the measurements. A standalone
+release APK was also built locally, with the operator's agreement, and
+verified on the phone, which found two worker defects only a `file:` page
+shows. What a real release needs, a package name, an icon set and a signing
+key, is the operator's to decide; see `OPEN.md`. iOS needs a device. A key
+test with a deliberately wrong key exercises the native transport without
+spending anything, and was how it was verified.
 
 **Running it on the phone.** Set `ANDROID_SERIAL` to the phone's serial on
 every command, since another project's emulator shares this machine's `adb`

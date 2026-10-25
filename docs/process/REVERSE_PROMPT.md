@@ -12,10 +12,11 @@ file is arranged this way rather than being rewritten wholesale.
 
 ## Last Updated
 
-2026-10-24. The mobile port to Tamagui and Expo runs on the Android phone in
-Expo Go, and the web page passes its full gate after the refactoring it
-needed. Nothing is committed, because committing was not authorised for this
-goal.
+2026-10-25. The mobile port to Tamagui and Expo runs on the Android phone, in
+Expo Go and as a standalone release build. The port was committed and pushed
+as `dd5c9dc` on the operator's authorisation, and continuous integration
+passed all seven jobs. The fixes the standalone build needed were committed
+after it, under the same authorisation.
 
 ## Verification
 
@@ -49,15 +50,21 @@ minutes. A 40 second clip of 200 megabytes then exported too. The user is
 also told if the web view is ever reclaimed. The clips were removed from the
 phone.
 
-Continuous integration's jobs were simulated on a clean copy of the tree, the
-files that would be committed, under Node 22.18.0 with fresh installs: check,
-test, browser, mobile and binary all passed, on macOS. The container job was
-not run, as Docker is unavailable here.
+Continuous integration, run 40170313151 on `dd5c9dc`: typecheck and lint,
+unit and API tests, browser tests, mobile bundles, the container, and the
+binary on Ubuntu and Windows, all passed.
 
-Not verified: iOS; a production build on a device; a request with a valid
-key; a clip larger than 200 megabytes and 40 seconds at 720p; the container and the Linux and Windows
-binaries on their own platforms, and the container, which only continuous
-integration runs.
+A standalone release APK was built locally, with the operator's agreement to
+the Android SDK licence and to installing it on the phone, then removed. It
+found two defects: the web view will not start a worker from the `file:` page
+a release build loads from, and Expo addressed each worker with its directory
+twice. Both exports failed until the DOM component started workers from blob
+copies of their scripts. Then verified on the release build: both exports to
+the share sheet, the sound, the handoff, the key test, the file picker, and a
+preference surviving a restart.
+
+Not verified: iOS; a request with a valid key; a clip larger than 200
+megabytes and 40 seconds at 720p; a signed release.
 
 ## Summary
 
@@ -91,15 +98,15 @@ changes the network port.
 
 ## Questions for Human Pilot
 
-**May this be committed and pushed?** Continuous integration's `mobile`,
-`container` and `binary` jobs run only on push, and the `check` job now
-installs the mobile package, which has not run there.
-
 **Should the desktop proxy's binary bodies be fixed?** See `OPEN.md`.
 
-**Is a native build wanted?** It needs the Android SDK or Xcode's simulators,
-an icon and a bundle identifier. Expo's placeholder icons are in
-`mobile/assets/`.
+**What should a real release be called and signed with?** A package name, an
+icon set in place of Expo's placeholders in `mobile/assets/`, and a signing
+key. The local build used `com.sgeos.asadventurer.devtest` and debug signing.
+
+**May the downloaded toolchains be deleted?** The JDK, the Android SDK and
+Gradle's cache, several gigabytes, are under the temporary directory, kept for
+a rebuild. Nothing was installed system wide.
 
 ## Technical Concerns
 
@@ -113,12 +120,14 @@ be removed if Expo fixes theirs, or it will hide the fix.
 
 ## Intended Next Step
 
-Commit and push on authorisation, then read continuous integration.
+Read continuous integration on the fixes commit, then wait for the operator.
 
 ## Session Context
 
-`main` at `b8778a3` before this work. Metro may still be running from
-`mobile/`, on port 8081.
+`main` at `b8778a3` before this work, `dd5c9dc` for the port. Metro may
+still be running from `mobile/`, on port 8081. The toolchains are under
+`/private/tmp/claude-501/`: `jdk/`, `android-sdk/`, `gradle-home/`, `node22/`,
+and the build copy `apk-build/`.
 
 ---
 

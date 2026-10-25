@@ -40,3 +40,26 @@ export const fetchArrayBuffer = async (url: string): Promise<ArrayBuffer> => {
     const response = await fetch(url);
     return response.arrayBuffer();
 };
+
+/**
+ * The text of a bundled file, read synchronously.
+ *
+ * For one caller: the mobile application's standalone build starts its
+ * workers from blob copies of their scripts, because its web view refuses a
+ * worker from a file: address, and a worker's construction is synchronous, so
+ * the script must be in hand when it returns. Synchronous because it has to
+ * be; a file of a few kilobytes from the application's own package is the
+ * only thing it is for. Fetch cannot read a file: address there; a request
+ * can, because the web view allows file access from file pages.
+ *
+ * Throws when the file cannot be read, which the caller reports as a worker
+ * that did not start.
+ */
+export const readBundledTextSync = (url: string): string => {
+    const request = new XMLHttpRequest();
+    request.open("GET", url, false);
+    request.send();
+    // A file: read reports status 0 on success, so success is judged by content.
+    if (request.responseText === "") throw new Error(`Could not read ${url}`);
+    return request.responseText;
+};

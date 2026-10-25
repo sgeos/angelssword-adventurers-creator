@@ -30,7 +30,7 @@ import { StagePanels } from "../../src/ui/StagePanels.tsx";
 import { setHttpTransport } from "../../src/platform-browser/http.mts";
 import { bytesFromBase64, inPageProxy } from "../../src/platform-browser/in-page-proxy.mts";
 import { setFileSaver } from "../../src/platform-browser/save-file.mts";
-import { fetchBlob } from "../../src/platform-browser/binary.mts";
+import { fetchBlob, readBundledTextSync } from "../../src/platform-browser/binary.mts";
 import { setWorkerFactory } from "../../src/platform-browser/workers.mts";
 import { ASAdventurer, notificationSound } from "../../src/platform-browser/shell.mts";
 import { asTabId, currentTab, subscribeTab, switchTab } from "../../src/platform-browser/navigation.mts";
@@ -73,6 +73,54 @@ const bytesToBase64 = (bytes: Uint8Array): string => {
         binary += String.fromCharCode(...bytes.subarray(i, i + step));
     }
     return btoa(binary);
+};
+
+/** The text of the first of `addresses` that can be read, or the last failure. */
+const readFirst = (addresses: readonly string[]): string => {
+    let failure: unknown = new Error("No address to read");
+    for (const address of new Set(addresses)) {
+        try {
+            return readBundledTextSync(address);
+        } catch (error: unknown) {
+            failure = error;
+        }
+    }
+    throw failure;
+};
+
+/**
+ * Replace the global Worker with one that starts a file: script from a blob:
+ * copy, read through `readBundledTextSync`, which argues why it is
+ * synchronous. The blob address is kept for the page's
+ * life rather than revoked, because the worker fetches it after construction
+ * returns; there are two scripts, so at most two are kept.
+ */
+const installFileSafeWorker = (): void => {
+    const NativeWorker = globalThis.Worker;
+    const blobs = new Map<string, string>();
+    const loadable = (script: string | URL): string | URL => {
+        const address = new URL(script, location.href);
+        if (address.protocol !== "file:") return script;
+        const cached = blobs.get(address.href);
+        if (cached !== undefined) return cached;
+        // Expo's production build names a worker relative to the chunk that
+        // starts it, which already sits in _expo/static/js/web/, so the
+        // address arrives with that directory twice and names no file. The
+        // collapsed address is tried first, since the repetition is never
+        // part of a real path; a fixed Expo produces none, and then the two
+        // are the same address.
+        const collapsed = address.href.replace(/(\/_expo\/static\/js\/web\/)(?:_expo\/static\/js\/web\/)+/, "$1");
+        const text = readFirst([collapsed, address.href]);
+        const blob = URL.createObjectURL(new Blob([text], { type: "text/javascript" }));
+        blobs.set(address.href, blob);
+        return blob;
+    };
+    class FileSafeWorker extends NativeWorker {
+        constructor(script: string | URL, options?: WorkerOptions) {
+            super(loadable(script), options);
+        }
+    }
+    Object.defineProperty(globalThis, "Worker", { value: FileSafeWorker, writable: true, configurable: true });
 };
 
 /**
@@ -154,6 +202,16 @@ const installSeams = (): void => {
             void hostOrThrow().showToast("Could not open that file", "error");
         });
     }, true);
+
+    // A standalone build loads this page from file:///android_asset/, and the
+    // web view refuses to start a worker from a file: address, although it
+    // will read the same file and will start a worker from a blob: address.
+    // Development serves everything over HTTP from Metro, which is why this
+    // only appeared in a release build, as "the worker did not start". Expo's
+    // worker helper calls the global constructor when it runs, so the global
+    // is replaced, on file: pages only, by one that loads a file: script as a
+    // blob first.
+    if (location.protocol === "file:") installFileSafeWorker();
 
     // Entry files beside this one, so that the bundler's addresses for them
     // resolve. See src/platform-browser/workers.mts.

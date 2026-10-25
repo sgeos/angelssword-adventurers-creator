@@ -602,9 +602,14 @@ services, then giving the port a bytes method and the relay a binary reply.
 **Recorded 2026-10-24.**
 
 - **iOS has never run it.** No device and no simulator are available.
-- **No native build exists.** It runs in Expo Go. A standalone Android or iOS
-  build needs the Android SDK or Xcode's simulators and signing, and no store
-  listing, icon set or bundle identifier has been decided.
+- **No release build is committed or signed.** A standalone Android release
+  APK was built locally on 2026-10-25 and verified on the phone; see
+  MIGRATION.md. It used a temporary package name and the template's debug
+  signing, and the generated `android/` directory was not committed. A real
+  release needs a package name, an icon set in place of Expo's placeholders,
+  a signing key and a store listing, which are the operator's to decide.
+  Continuous integration bundles the JavaScript but does not build an APK. iOS
+  needs Xcode's simulators or a device, and signing.
 - **The provider keys are held in the web view's memory.** They are kept
   natively in SecureStore and handed to the web view, which holds them in
   memory while it runs, because the stages read them through the storage
