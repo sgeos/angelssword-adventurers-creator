@@ -13,7 +13,8 @@ file is arranged this way rather than being rewritten wholesale.
 ## Last Updated
 
 2026-10-25. The mobile port to Tamagui and Expo runs on the Android phone, in
-Expo Go and as a standalone release build. The port was committed and pushed
+Expo Go and as a standalone release build. The scrolling and settings fixes
+are now verified on the phone as well. The port was committed and pushed
 as `dd5c9dc` on the operator's authorisation, and continuous integration
 passed all seven jobs. The fixes the standalone build needed were committed
 after it, under the same authorisation.
@@ -74,9 +75,13 @@ tests could not: the web view could not scroll, the settings screen's
 `display: none` cut the web view off from Expo on iOS, and the start report
 could precede its function prop. All fixed; verified on the simulator, and the
 scrolling fix in Chromium at the phone's viewport, where a touch swipe scrolled
-401 pixels with the fix and none without it; and on an Android 16 emulator in Expo Go,
-where a swipe scrolled the stages and the key test returned through the
-overlay; not on the physical phone, which was locked.
+401 pixels with the fix and none without it; on an Android 16 emulator in Expo Go;
+and then on the phone in Expo Go, where a swipe scrolled the stages 373 of 624
+pixels and the key test with a fake key returned OpenAI's rejection through
+the overlay. The phone's check first attached to another installed
+application's web view debugging socket, because it took the first socket
+listed. It was stopped before reading anything back, and now selects Expo
+Go's socket by process number.
 
 Not verified: an iOS device; a request with a valid key, which would spend the
 operator's money and was not authorised; a clip larger than 300 megabytes and
@@ -135,7 +140,8 @@ be removed if Expo fixes theirs, or it will hide the fix.
 
 ## Intended Next Step
 
-Read continuous integration on the fixes commit, then wait for the operator.
+Wait for the operator. What remains needs them: a request with a valid key, an
+iOS device, and the decisions a signed release needs.
 
 ## Session Context
 

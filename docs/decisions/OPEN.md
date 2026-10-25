@@ -585,14 +585,19 @@ run as they are, inside a web view.
 - **iOS has run only in the Simulator.** In Expo Go on iOS 27.0; see
   MIGRATION.md. No device is available, and a simulator's media encoding may
   differ from a device's.
-- **The scrolling and settings fixes are verified on an Android emulator,
-  not on the phone.** The phone was locked overnight. On an Android 16
-  emulator, created for the purpose in Expo Go 58.0.5, the same version the
-  phone runs: a touch swipe scrolled the stages 266 of 493 pixels, and the key
-  test with a fake key returned OpenAI's rejection through the settings
-  overlay. In Chromium at the phone's viewport, a touch swipe scrolled 401 of
-  558 pixels, and nothing scrolled with the rule removed.
-  `tmp/android-fixes-check.sh` repeats both on the phone when it is unlocked.
+- **The scrolling and settings fixes are verified on the phone.** On
+  2026-10-25 in Expo Go, a touch swipe scrolled the stages 373 of 624 pixels,
+  and the key test with a fake key returned OpenAI's rejection through the
+  settings overlay. The same held on an Android 16 emulator, 266 of 493
+  pixels, and in Chromium at the phone's viewport, 401 of 558 pixels, where
+  nothing scrolled with the rule removed. Not established on the phone is
+  whether the web view stayed loaded behind Settings rather than reloading,
+  though the key test's result could only have arrived through it.
+  The check found its own defect first. It chose the first web view debugging
+  socket on the phone, which belonged to another installed application, and
+  was stopped before it read anything back. It now selects Expo Go's socket by
+  process number. A check that attaches to web views by socket must do the
+  same.
 - **An error on every iOS launch in development.** Expo's bridge reports that
   it cannot find its web view by tag at start-up. Nothing observed depends on
   it; whether it is Expo's or this application's was not established.

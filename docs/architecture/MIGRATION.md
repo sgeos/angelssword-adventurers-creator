@@ -216,8 +216,10 @@ be reached. The Android device tests had reached every element through the
 inspector and never scrolled. The settings screen hid the stages with
 `display: none`, which on iOS removed the web view from Expo's registry, so the
 key test's result never arrived. And the first render could precede Expo's
-delivery of the function props. The scrolling fix and the overlay have been
-verified on the simulator only; the phone was locked when they were made.
+delivery of the function props. The scrolling fix and the overlay were
+verified on the simulator, then on an Android 16 emulator, then on the phone,
+where a swipe scrolled the stages 373 of 624 pixels and the key test returned
+through the overlay.
 
 One error remains on every iOS launch in development, Expo's bridge failing to
 find its web view by tag at start-up. Nothing observed depends on it.
