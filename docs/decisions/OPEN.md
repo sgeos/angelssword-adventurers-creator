@@ -620,8 +620,9 @@ services, then giving the port a bytes method and the relay a binary reply.
   was tried.** With the WebM export streamed and Video Prep's scrubbing cache
   bounded to 256 megabytes, a 20 second 720p clip of 100 megabytes exports on
   the four gigabyte test phone in eight and a half minutes, and a 40 second one
-  of 200 megabytes exports too, in 18 minutes, after a cache of about as long. Nothing larger was
-  tried. Video Prep's cache taking 20 minutes for a long clip on a phone is
+  of 200 megabytes exports too, in 18 minutes, after a cache of about as long.
+  On a standalone build a 60 second clip of 300 megabytes exports in 27
+  minutes, after a 30 minute cache. Nothing larger was tried. Video Prep's cache taking 20 minutes for a long clip on a phone is
   itself a cost: scrubbing works by seeking meanwhile, and nothing waits on it
   but the loop preview. The Graphics Interchange Format export does not stream; its frames are
   one byte a pixel and its modes cap their count and size, so a normal export

@@ -181,11 +181,19 @@ preference surviving a restart. The production page's heap is 11 megabytes,
 against 78 in development. The 100 megabyte, 20 second 720p clip went end to
 end on it as well: loaded in 31.9 seconds, cached in 348, handed off in 1.7,
 and exported as WebM, 600 frames, in 510, the phone's free memory never below
-574 megabytes and the page never reloaded. The APK was uninstalled after.
+574 megabytes and the page never reloaded. A 60 second clip of 300
+megabytes, 1,800 frames, followed: loaded in 144 seconds, cached in 1,822,
+handed off in 3.0, and exported as WebM, 83.9 megabytes, in 1,621, free memory
+never below 448 megabytes and no reload. The APK was uninstalled after.
+
+The same 60 second clip was first tried in Expo Go and was interrupted, not
+by memory: the phone's USB link dropped mid-export, and when it returned
+Expo Go reloaded the whole experience from Metro, its native bundle included,
+which a reclaimed web view does not do. A standalone build has no such link.
 
 **Not verified on a device.** iOS, on any device. A provider
 request with a valid key, which would spend money, as opposed to the rejected
-one. A clip larger than 200 megabytes and 40 seconds at 720p, the largest
+one. A clip larger than 300 megabytes and 60 seconds at 720p, the largest
 exported. Export time on hardware slower than this phone, which at 0.85
 seconds a frame on this one is already minutes for a long clip.
 
