@@ -27,6 +27,14 @@ security pull requests are not, because a project on hold would accumulate
 them unreviewed. Secret scanning and push protection were already enabled,
 and workflow tokens default to read only.
 
+Enabling the alerts raised two, both high, both left open on purpose. `zod`
+below 4.6.6 and `node-forge` up to 1.4.0 arrive only through `@expo/cli`, the
+development and build tooling, not the application's bundle. The command-line
+tool requires `zod` 3, so forcing the patched 4.6.6 is a major-version
+override likely to break it, and `node-forge` has no patched version. They
+are the same findings `npm audit --prefix mobile` reports; see HANDOFF.md.
+Reconsider on the next Expo upgrade.
+
 GitHub still lists the repository as a fork of AngelsSwordStudios'. Only
 GitHub's support can detach a fork, which is the operator's decision.
 
