@@ -2,7 +2,7 @@
 
 > **Navigation**: [Process](./README.md) | [Documentation Root](../README.md)
 
-**Refreshed 2026-10-24. The anchor is `b8778a3`, the last commit before this
+**Refreshed 2026-10-25. The anchor is `e8a5ba2`, the last commit before this
 refresh.** Read this block, run the validity check, then read the task below.
 
 ---
@@ -16,11 +16,11 @@ itself.
 
 ### Ancestry
 
-`main` should **contain** `b8778a3`, the last commit before this refresh. Test
+`main` should **contain** `e8a5ba2`, the last commit before this refresh. Test
 containment rather than equality.
 
 ```sh
-git merge-base --is-ancestor b8778a3 HEAD
+git merge-base --is-ancestor e8a5ba2 HEAD
 ```
 
 If that fails, this file predates a history rewrite and is stale. If it
@@ -40,7 +40,7 @@ of the list rather than taking the next unused number, and renumber when
 inserting, because a list whose numbers skip reads as though checks are
 missing.
 
-1. `git ls-files` reports **135** TypeScript files ending `.ts` or `.mts`,
+1. `git ls-files` reports **136** TypeScript files ending `.ts` or `.mts`,
    **18** ending `.tsx`, and exactly **one** JavaScript file,
    `eslint.config.mjs`, which is deliberate.
 2. **Seven** projects exist at the repository root, `tsconfig.json` and six
@@ -225,9 +225,22 @@ inputs did nothing, because Expo's web view has no file chooser.
 
 ## The next task
 
-**The operator's decisions on a release.** The scrolling and settings fixes
-are verified on the phone, the iOS Simulator and an Android 16 emulator; see
-`OPEN.md`.
+**None. The project is in a holding state.** On 2026-10-25 the operator asked
+for everything that could sensibly be done without them to be finished before
+the project was put on ice, and it was. Every open matter in `OPEN.md` now
+needs the operator: a request with a valid key, which spends their money; an
+iOS device; a real ComfyUI server; and the package name, icon set, signing key
+and store listing a release needs. Nothing is half done. On resuming, run the
+validity check, then `npm ci`, `npm ci --prefix mobile`, `npm run check` and
+`npm test`, and read the most recent continuous integration run, since
+dependencies will have moved. Expect `npm audit --prefix mobile` to report
+five high severity findings in Expo's own tooling, whose only offered fix is a
+downgrade to `expo@44`; they were present before the holding state and are
+Expo's to fix.
+
+The local Android toolchain used for the release build was outside the
+repository, under the machine's temporary directory, and should be presumed
+gone. Rebuilding it is described in MIGRATION.md.
 
 **The operator's decision on a native build, and iOS.** Everything the
 Android phone can show in Expo Go has been shown, up to a 40 second 720p clip

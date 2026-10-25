@@ -11,6 +11,10 @@ bound.
 
 ## Active
 
+**Holding state, from 2026-10-25.** Everything that could be done without the
+operator is done. What remains is listed in [HANDOFF.md](./HANDOFF.md) under
+"The next task", and each item needs the operator.
+
 **Awaiting one experiment the operator must run.** Gemini returned a landscape
 clip from two reference images and a portrait clip from one. Those two images
 were also misaligned; that is fixed, so two properly anchored images now
@@ -115,6 +119,10 @@ dropped.
 | WebM export streamed one frame at a time | Complete | Sixty frames ending at 1.97 s read from the file; fails without the overrun carry; 10 s 720p clip exports on the phone |
 | Large picked files read in chunks; web view restarts announced | Complete | 100 MB clip loads in 34 s on the phone; one warning per reload, none on a fresh start |
 | iOS Simulator run; scrolling, settings overlay, start report fixed | Complete | Picker, handoff, WebM and GIF exports to the share sheet, key test, on iOS 27.0; on the phone a swipe scrolled 373 of 624 pixels and the key test returned through the overlay |
+| Holding state prepared; handoff refreshed | Complete | Every content check rerun; the TypeScript file count corrected from 135 to 136 |
+| ComfyUI reachable from the phone; plain HTTP permitted in release | Complete in Expo Go | Settings test reached a stand-in server on the phone; `usesCleartextTraffic="true"` in a regenerated merged release manifest; not installed |
+| iOS start-up error traced | Inferred | Expo's wrapper sends props before iOS registers the view; not established by experiment |
+| Phone check attached to another application's web view | Recorded | Stopped before reading anything; the check now selects Expo Go's socket by process number |
 | Both proxies read upstream bodies as bytes | Complete | Non-UTF-8 image and video bytes survive the relay and arrive as base64; route tests fail with the old decoding; fake key test on the phone |
 | Standalone release APK built and verified on the phone | Complete | Exports, handoff, sound, key test, picker and persistence on a release build; two `file:` worker defects found and fixed |
 | Video Prep's scrubbing cache bounded to 256 MB | Complete | 6 new unit tests; the 100 MB, 20 s 720p clip then exported on the phone, free memory never below 473 MB |

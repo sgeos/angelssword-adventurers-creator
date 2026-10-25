@@ -600,7 +600,28 @@ run as they are, inside a web view.
   same.
 - **An error on every iOS launch in development.** Expo's bridge reports that
   it cannot find its web view by tag at start-up. Nothing observed depends on
-  it; whether it is Expo's or this application's was not established.
+  it. Inferred from Expo's source, not established by experiment: Expo's DOM
+  component wrapper, `expo/src/dom/webview-wrapper.tsx`, sends the props to
+  the web view by injected script in an effect after every render, and the
+  first can precede the native view's registration on iOS, where
+  `ExpoModulesCore` raises `ViewNotFound` with exactly this message. The
+  initial props reach the page by `injectedJavaScriptObject` regardless, which
+  would explain why nothing is lost. If so, the error is Expo's.
+- **ComfyUI on the phone is reachable, by a local network address.** The
+  default address, `http://127.0.0.1:8188`, is the phone itself, so the user
+  must enter the computer's address, as the settings placeholder suggests.
+  On 2026-10-25 the settings test reached a stand-in server answering
+  `/system_stats` through the native transport, in Expo Go, over `adb
+  reverse`. A real ComfyUI server and a generation were not run. A release
+  build refused plain HTTP until `expo-build-properties` set
+  `usesCleartextTraffic`, confirmed in the merged release manifest but not by
+  installing a release build. That permits plain HTTP to any host at the
+  platform level; the boundary that keeps it to ComfyUI is the core proxy
+  planner, which addresses every provider by its fixed `https:` origin and
+  admits a ComfyUI address only on loopback or a private range. iOS was given
+  `NSAllowsLocalNetworking`, which relaxes App Transport Security for local
+  names and addresses. Whether a numeric address needed it was not
+  established, and it has not been run on iOS.
 - **No release build is committed or signed.** A standalone Android release
   APK was built locally on 2026-10-25 and verified on the phone; see
   MIGRATION.md. It used a temporary package name and the template's debug

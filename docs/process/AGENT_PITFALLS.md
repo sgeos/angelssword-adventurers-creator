@@ -409,6 +409,19 @@ view up by tag to deliver every result and prop, and a hidden one was not
 found, so a request's answer never arrived. Draw over a web view rather than
 hiding it.
 
+**A web view debugging socket is not necessarily this application's.**
+Every installed application with a debuggable web view publishes a
+`webview_devtools_remote_<pid>` socket. A check that forwarded the first one
+listed attached to another application on the operator's phone, and was
+stopped before it read anything back. Select the socket whose number is
+`pidof host.exp.exponent`, or the release package's, and refuse otherwise.
+
+**Expo Go and debug builds permit plain HTTP; a release build did not.** The
+merged release manifest for API level 36 carried no `usesCleartextTraffic`, so
+a ComfyUI server at a local `http:` address would have been refused only in
+release. `expo-build-properties` now sets it. Check a network permission in
+the release manifest, not by running in Expo Go.
+
 **A tap during a scroll animation is swallowed.** The tab bar had just
 scrolled, and a tap on a tab did nothing. Wait for the motion to end.
 

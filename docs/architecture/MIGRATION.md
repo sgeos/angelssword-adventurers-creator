@@ -160,7 +160,17 @@ installed on the phone, then removed. The JDK, the Android SDK and its NDK
 were downloaded into a temporary directory, and the build ran on a copy of the
 committed tree, `npx expo prebuild` then `./gradlew assembleRelease`, with a
 temporary package name, `com.sgeos.asadventurer.devtest`, since the real one
-is undecided. Nothing native is committed.
+is undecided. Nothing native is committed. The versions were JDK 17.0.21,
+Node 22.18, the Gradle wrapper's 9.4.1, and API level 36 as the target. Set
+`JAVA_HOME`, `ANDROID_HOME` and `GRADLE_USER_HOME` to the downloaded copies.
+The SDK's licences are accepted with `android sdk install`, not
+`sdkmanager --licenses`; see AGENT_PITFALLS.md.
+
+That build's merged manifest did not permit plain HTTP, which Expo Go and
+debug builds do, so a ComfyUI server at a local `http:` address would have
+been refused in release alone. `app.json` now sets `usesCleartextTraffic`
+through `expo-build-properties`, and a later regeneration's merged release
+manifest carries it. No release build has been installed since.
 
 It loads its production bundle from `file:///android_asset/`, and that exposed
 two defects development could not, both in starting the workers. The web
@@ -222,7 +232,8 @@ where a swipe scrolled the stages 373 of 624 pixels and the key test returned
 through the overlay.
 
 One error remains on every iOS launch in development, Expo's bridge failing to
-find its web view by tag at start-up. Nothing observed depends on it.
+find its web view by tag at start-up. Nothing observed depends on it, and
+Expo's source suggests the cause is Expo's; see `OPEN.md`.
 
 **Not verified on a device.** iOS, on any device. A provider
 request with a valid key, which would spend money, as opposed to the rejected

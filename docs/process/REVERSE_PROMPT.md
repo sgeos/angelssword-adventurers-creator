@@ -14,7 +14,9 @@ file is arranged this way rather than being rewritten wholesale.
 
 2026-10-25. The mobile port to Tamagui and Expo runs on the Android phone, in
 Expo Go and as a standalone release build. The scrolling and settings fixes
-are now verified on the phone as well. The port was committed and pushed
+are now verified on the phone as well. The project was then put in a holding
+state at the operator's request, after everything that could be done without
+them was done. The port was committed and pushed
 as `dd5c9dc` on the operator's authorisation, and continuous integration
 passed all seven jobs. The fixes the standalone build needed were committed
 after it, under the same authorisation.
@@ -83,7 +85,17 @@ application's web view debugging socket, because it took the first socket
 listed. It was stopped before reading anything back, and now selects Expo
 Go's socket by process number.
 
-Not verified: an iOS device; a request with a valid key, which would spend the
+For the holding state: the settings test for ComfyUI reached a stand-in
+server answering its health route, from the phone in Expo Go through the
+native transport. A release build's merged manifest was found not to permit
+plain HTTP, which a local ComfyUI address needs; `expo-build-properties` now
+sets it, confirmed in a regenerated manifest and not by installing a build.
+The iOS start-up error was traced in Expo's source to its DOM wrapper sending
+props before iOS registers the view, an inference not tested. The handoff's
+validity checks were all rerun, and one, the TypeScript file count, had been
+stale since the port.
+
+Not verified: an iOS device; a real ComfyUI server; a request with a valid key, which would spend the
 operator's money and was not authorised; a clip larger than 300 megabytes and
 60 seconds at 720p; a signed release.
 
@@ -140,15 +152,19 @@ be removed if Expo fixes theirs, or it will hide the fix.
 
 ## Intended Next Step
 
-Wait for the operator. What remains needs them: a request with a valid key, an
-iOS device, and the decisions a signed release needs.
+None while the project is on ice. On resuming, follow HANDOFF.md, which
+describes how to bring dependencies current first. What remains needs the
+operator: a request with a valid key, an iOS device, a real ComfyUI server,
+the Gemini reference image experiment in TASKLOG.md, and the decisions a
+signed release needs.
 
 ## Session Context
 
-`main` at `b8778a3` before this work, `dd5c9dc` for the port. Metro may
-still be running from `mobile/`, on port 8081. The toolchains are under
-`/private/tmp/claude-501/`: `jdk/`, `android-sdk/`, `gradle-home/`, `node22/`,
-and the build copy `apk-build/`.
+`main` at `b8778a3` before this work, `dd5c9dc` for the port. Metro was
+stopped for the holding state. The toolchains were left under
+`/private/tmp/claude-501/`, `jdk/`, `android-sdk/`, `gradle-home/`, `node22/`
+and the build copy `apk-build/`, and should be presumed gone by the time the
+project resumes.
 
 ---
 
