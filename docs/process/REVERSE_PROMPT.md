@@ -104,7 +104,13 @@ listens on every interface without authentication, which OPEN.md records as
 the operator's decision, and that it granted every origin cross-origin
 access, inherited from upstream, which let any site the user visited drive
 the proxy. That was fixed: the headers and the form parser are removed, and
-two tests that had pinned the wildcard now assert its absence.
+two tests that had pinned the wildcard now assert its absence. Correcting the
+README's Quick Start then found both source launchers broken: the Windows one
+ran a `server.js` that no longer exists, and `bin/start` served no page on a
+fresh clone. Both now build the page and start `server.mts`; `bin/start` was
+verified, the batch file was not, for want of a Windows machine. The README
+no longer promises a prebuilt binary and now describes the mobile
+application.
 
 Not verified: an iOS device; a real ComfyUI server; a request with a valid key, which would spend the
 operator's money and was not authorised; a clip larger than 300 megabytes and

@@ -16,24 +16,28 @@
 
 ## What Is This?
 
-AS Adventurer Creator is a standalone desktop tool that lets you create animated VTuber / PNGtuber assets from scratch. It walks you through a simple 4-step pipeline — from a static sprite all the way to a transparent, looping animated model ready for streaming.
+AS Adventurer Creator is a tool that lets you create animated VTuber / PNGtuber assets from scratch. It walks you through a simple 4-step pipeline — from a static sprite all the way to a transparent, looping animated model ready for streaming.
 
-No installation required for the prebuilt binary. Run it and open your browser. From source, Node.js 22.18 or newer is the only prerequisite.
+It runs on your computer and opens in your browser, either from source or as a standalone binary you build yourself. It also runs in a container, and as a mobile application for Android and iOS, described under [The mobile application](#the-mobile-application).
+
+No release has been published, so there is no prebuilt binary to download. Running from source needs only Node.js 22.18 or newer.
 
 ---
 
 ## Quick Start
 
+These run the application from a copy of this repository. Each launcher
+installs the dependencies on first run, starts the server, and opens your
+browser to `http://localhost:3001`. Then follow the 4-step pipeline below.
+
 **Windows**
 
-1. **Double-click** `ASAdventurer.exe` (or use `Start AS Adventurer.bat`)
-2. Your browser will open to `http://localhost:3001`
-3. Follow the 4-step pipeline below
+1. If Node.js is not installed, **double-click** `Setup.bat`, which installs it
+2. **Double-click** `Start ASAdventurer.bat`
 
 **macOS**
 
 1. **Double-click** `Start ASAdventurer.command`
-2. Your browser will open to `http://localhost:3001`
 
 **Linux and the BSDs**
 
@@ -41,8 +45,15 @@ No installation required for the prebuilt binary. Run it and open your browser. 
 ./bin/start          # or simply: npm start
 ```
 
-The launcher checks for Node.js and reports the install command for your
-platform if it is missing. It does not install anything itself.
+On macOS, Linux and the BSDs the launcher checks for Node.js and reports the
+install command for your platform if it is missing. It does not install
+anything itself.
+
+**A standalone binary** needs no Node.js on the machine that runs it, but has
+to be built first, as described under
+[Building a standalone binary](#building-a-standalone-binary). The build
+writes `ASAdventurer` or `ASAdventurer.exe` to `dist/ASAdventurer/`, with a
+launcher named `Start AS Adventurer` beside it; either may be double-clicked.
 
 Set `AS_NO_OPEN=1` to stop the server opening a browser, which is useful
 headless and on systems without `xdg-open`.
@@ -163,7 +174,7 @@ The exported WebM files also work with any OBS browser source, PNGtuber app, or 
 
 - **OS:** Windows 10/11, macOS, Linux, or FreeBSD/OpenBSD/NetBSD (64-bit)
 - **Node.js:** 22.18 or newer (24 recommended), required on every platform
-  except when running a prebuilt binary on Windows or macOS. The server is
+  except when running a standalone binary you have built. The server is
   TypeScript and runs through Node's native type stripping, with no build
   step; 22.18 is the first release where that works without a flag. Node 23
   needs 23.6 for the same reason.
@@ -278,6 +289,36 @@ The container runs unprivileged and mounts nothing from the host.
 
 ---
 
+## The mobile application
+
+The same four stages run on Android and iOS, in an application built with
+Expo, in [`mobile/`](./mobile/). The tabs and Settings are native, and the
+stages run in a web view that shares its code with the web page. Keys are
+held in the platform's secure store, and requests go straight to each
+provider from the device, so no server is involved. A ComfyUI server must be
+given its address on your local network, since `127.0.0.1` on a phone is the
+phone itself.
+
+It is not in an app store, and no signed build has been published. To run it
+in [Expo Go](https://expo.dev/go), with the phone and the computer on the
+same network:
+
+```sh
+npm ci --prefix mobile
+cd mobile && npx expo start --lan     # then scan the code with Expo Go
+```
+
+**How far it has been tested.** On one Android phone, a Galaxy A16, in Expo
+Go and as a standalone release build made locally: every stage, both exports
+to the share sheet, the handoff between stages, the file picker, settings
+that persist, and clips up to 60 seconds and 300 megabytes at 720p. On iOS,
+only in the Simulator. Generation with a valid key has not been run on a
+phone, nor on any iOS device. The details are in
+[Interface Migration](./docs/architecture/MIGRATION.md) and
+[Open Questions](./docs/decisions/OPEN.md).
+
+---
+
 ## Documentation
 
 Fuller documentation lives in [`docs/`](./docs/README.md), structured as a
@@ -289,7 +330,7 @@ index.
 | How the stages fit together | [Pipeline](./docs/architecture/PIPELINE.md) |
 | Why there are seven TypeScript projects | [Project Structure](./docs/architecture/PROJECT_STRUCTURE.md) |
 | How the core, platform, and entry layers are separated | [Layering](./docs/architecture/LAYERING.md) |
-| How the page moved to Tamagui and TanStack Start | [Interface Migration](./docs/architecture/MIGRATION.md) |
+| How the page moved to Tamagui, TanStack Start and Expo | [Interface Migration](./docs/architecture/MIGRATION.md) |
 | Why something is the way it is | [Resolved Decisions](./docs/decisions/RESOLVED.md) |
 | What is still unresolved | [Open Questions](./docs/decisions/OPEN.md) |
 
