@@ -9,7 +9,26 @@ cut from it and merges back with `--no-ff`, so that the merge records when a
 body of work arrived.
 
 Upstream is tracked by the `upstream` remote and is dormant. Nothing is
-expected from it.
+expected from it. Its push address is set to `DISABLED` in this clone, so a
+push there fails rather than reaching another owner's repository. A fresh
+clone does not inherit that; set it with
+`git remote set-url --push upstream DISABLED`.
+
+## The remote's settings
+
+Configured on 2026-10-25 and recorded here because none of them live in the
+repository. An active ruleset, "Protect main", forbids deleting the default
+branch and pushing to it anything but a fast-forward. It requires no pull
+request, so direct pushes to `main` still work; history rewriting on `main`
+now needs the ruleset disabled first. Issues are enabled, and the wiki and
+projects are disabled, since `docs/` is the knowledge graph. Merged branches
+are deleted automatically. Dependabot alerts are enabled, and its automatic
+security pull requests are not, because a project on hold would accumulate
+them unreviewed. Secret scanning and push protection were already enabled,
+and workflow tokens default to read only.
+
+GitHub still lists the repository as a fork of AngelsSwordStudios'. Only
+GitHub's support can detach a fork, which is the operator's decision.
 
 ## Commits
 

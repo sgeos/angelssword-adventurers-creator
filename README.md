@@ -1,5 +1,13 @@
 # ⚔️ AS Adventurer Creator
 
+[![verify](https://github.com/sgeos/angelssword-adventurers-creator/actions/workflows/verify.yml/badge.svg?branch=main)](https://github.com/sgeos/angelssword-adventurers-creator/actions/workflows/verify.yml)
+[![License: MIT](https://img.shields.io/github/license/sgeos/angelssword-adventurers-creator)](./LICENSE)
+[![Node.js 22.18+](https://img.shields.io/badge/node-%E2%89%A522.18-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![TypeScript 6](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Expo SDK 58](https://img.shields.io/badge/Expo-SDK%2058-000020?logo=expo&logoColor=white)](./mobile/)
+[![Status: on hold](https://img.shields.io/badge/status-on%20hold-lightgrey)](./docs/process/HANDOFF.md)
+[![Hard fork of AngelsSwordStudios](https://img.shields.io/badge/fork%20of-AngelsSwordStudios-blue?logo=github)](https://github.com/AngelsSwordStudios/angelssword-adventurers-creator)
+
 **VTuber Creation Pipeline by Angel's Sword Studios**
 
 *Design · Generate · Prepare · Export*
