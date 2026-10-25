@@ -51,7 +51,7 @@ missing.
 3. `src/core/ports/` holds **three** capability interfaces, namely
    `storage.mts`, `http.mts`, and `clock.mts`, and `src/core/` holds
    **twenty-three** modules, counting `proxy.mts`, `tabs.mts` and `accept.mts`.
-4. `npm test` reports **721** unit tests and **60** application programming
+4. `npm test` reports **721** unit tests and **61** application programming
    interface tests, all passing. It needs no mobile install.
 5. `npm run test:browser` reports **90** passing browser specifications. Use
    that script rather than `npx playwright test`, which reuses a running

@@ -705,6 +705,42 @@ development dependency only, and the runtime floor is unaffected.
 which would also bring the security releases since 22.18, or to hold `jsdom`
 at a version whose declared range includes 22.18.
 
+## The local server listens on every interface, without authentication
+
+**Recorded 2026-10-25, while writing `SECURITY.md`.** Writing the policy also
+found that the server answered every origin with
+`Access-Control-Allow-Origin: *`, allowed the `Authorization` header, and
+parsed form bodies, all inherited from upstream's first commit. Any site the
+user visited could therefore drive the proxy through their browser and read
+its answers, spending an environment key if one was set. Nothing legitimate
+needed it, because the page is served from the server's own origin and Vite's
+dev server proxies `/api`. **Fixed the same day.** The headers and the form
+parser are gone, and a server test and a browser specification, each of which
+had pinned the wildcard, now assert that no other origin is granted anything
+and that a form body is not read. The server test was shown to fail before
+the fix. What remains below is the network exposure, which is a decision.
+
+`server.mts` calls
+`listen(PORT)` with no host, which in Node is every interface. The proxy has
+no authentication, and it falls back to keys in `OPENAI_API_KEY`,
+`GOOGLE_API_KEY` and `XAI_API_KEY`. So whoever can reach the port can use the
+proxy, and spend an environment key if one is set. Established by reading the
+code, not by a request from a second machine.
+
+For the container this is the stated purpose, one deployment serving several
+people, and the operator places it behind a network boundary. For the desktop
+binary and `npm start`, nothing needs another machine to reach the port.
+Listening on loopback by default, with a `HOST` variable the container sets
+to every interface, would close it for the desktop at no cost to the
+container. That changes documented behaviour, so it is the operator's
+decision, and was not made while the project is on hold. `SECURITY.md` states
+the exposure meanwhile.
+
+Not closed: a domain name rebound to the machine's address would make a
+page same-origin with the server, and the server does not check the `Host`
+header. Checking it would refuse the names a shared deployment is reached by
+unless they were configured, so it belongs with the binding decision above.
+
 ## No release has been cut
 
 The binary is how a non-technical user obtains this tool, and at present the

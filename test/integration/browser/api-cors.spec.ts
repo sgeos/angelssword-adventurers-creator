@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('C — Static / API proxy smoke', () => {
-  test('static assets and CORS headers are available', async ({ request }) => {
+  test('static assets are available and no other origin is granted the API', async ({ request }) => {
     const home = await request.get('/');
     expect(home.ok()).toBeTruthy();
     expect(await home.text()).toMatch(/AS Adventurer/);
@@ -9,11 +9,13 @@ test.describe('C — Static / API proxy smoke', () => {
     const css = await request.get('/style.css');
     expect(css.ok()).toBeTruthy();
 
-    // Preflight-style CORS on API routes
-    const options = await request.fetch('/api/chat', { method: 'OPTIONS' });
-    expect(options.status()).toBe(200);
-    const allowOrigin = options.headers()['access-control-allow-origin'];
-    expect(allowOrigin).toBe('*');
+    // The page calls /api from its own origin, so a preflight from another
+    // origin is granted nothing. Upstream granted every origin; see SECURITY.md.
+    const options = await request.fetch('/api/chat', {
+      method: 'OPTIONS',
+      headers: { Origin: 'https://elsewhere.example', 'Access-Control-Request-Method': 'POST' },
+    });
+    expect(options.headers()['access-control-allow-origin']).toBeUndefined();
   });
 
   test('mocked /api/chat test connection from Settings', async ({ page }) => {

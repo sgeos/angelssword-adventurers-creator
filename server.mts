@@ -145,19 +145,13 @@ const STATIC_DIR: string = isSea()
 export const createApp = (fetchImpl: FetchLike = nodeFetch, staticDir: string = STATIC_DIR): Express => {
 const app = express();
 
+// JSON only, and no cross-origin headers. The page is served from this origin
+// and Vite's dev server proxies /api, so no legitimate caller is on another
+// origin. Upstream granted every origin, which let any site the user visited
+// drive the proxy and read its answers, spending an environment key if one
+// was set. A form body is not parsed because another origin can send one
+// without a preflight. See SECURITY.md.
 app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
-
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  if (req.method === "OPTIONS") {
-    res.sendStatus(200);
-    return;
-  }
-  next();
-});
 
 // The page is the browser build's output, `dist/client`, beside this file in
 // a checkout or the container. The standalone binary carries the same files

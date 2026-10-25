@@ -312,13 +312,41 @@ describe('AS Adventurer API characterization', () => {
         assert.match(errorText(res.body), /^Proxy error:/);
     });
 
-    // --- 12: OPTIONS CORS ---
+    // --- 12: No cross-origin access ---
+    //
+    // The page is served from this origin and Vite's dev server proxies /api,
+    // so nothing legitimate calls the proxy from another origin. A wildcard
+    // let any site the user visited drive the proxy and read its answers,
+    // spending an environment key if one was set. See SECURITY.md.
 
-    it('OPTIONS → 200 + Access-Control-Allow-Origin *', async () => {
-        const res = await request(app).options('/api/generate');
+    it('grants no cross-origin access, to a preflight or to a request', async () => {
+        const preflight = await request(app)
+            .options('/api/generate')
+            .set('Origin', 'https://elsewhere.example')
+            .set('Access-Control-Request-Method', 'POST')
+            .set('Access-Control-Request-Headers', 'authorization, content-type');
+        assert.equal(preflight.headers['access-control-allow-origin'], undefined);
+        assert.equal(preflight.headers['access-control-allow-headers'], undefined);
+
+        mockFetchResponse(200, {});
+        const res = await request(app)
+            .post('/api/generate')
+            .set('Origin', 'https://elsewhere.example')
+            .set('Authorization', 'Bearer sk-test')
+            .send({ prompt: 'x' });
+        assert.equal(res.headers['access-control-allow-origin'], undefined);
+    });
+
+    it('does not parse a form body, which another origin can send without a preflight', async () => {
+        mockFetchResponse(200, {});
+        const res = await request(app)
+            .post('/api/generate')
+            .set('Authorization', 'Bearer sk-test')
+            .type('form')
+            .send('prompt=from-a-form');
 
         assert.equal(res.status, 200);
-        assert.equal(res.headers['access-control-allow-origin'], '*');
+        assert.equal(callBodyText(), '{}');
     });
 
     // --- 13: GET / serves the page directory's index ---
