@@ -5,11 +5,11 @@
  * What remains here styles the insides of the four media stages: the
  * controls, canvases and generated markup their controllers drive. The page
  * chrome, panels, layout, settings and toasts are Tamagui components in
- * src/entry-browser/, and their rules were removed from this file as each
+ * src/entry-browser/ and src/ui/, and their rules were removed from this file as each
  * component took over. Grid layout and gradient text that Tamagui cannot
- * type live in src/entry-browser/ui/web-only.ts.
+ * type live in src/ui/web-only.ts.
  *
- * The design tokens below are duplicated in src/entry-browser/ui/config.ts.
+ * The design tokens below are duplicated in src/ui/config.ts.
  * The two must agree while both exist.
  */
 
@@ -1097,7 +1097,7 @@ input[type="range"]::-moz-range-thumb {
    RESPONSIVE
    ============================================ */
 /* Only the stage interiors. The layout's breakpoints are Tamagui media
-   queries and the rules in src/entry-browser/ui/web-only.ts. */
+   queries and the rules in src/ui/web-only.ts. */
 @media (max-width: 640px) {
     .results-grid {
         grid-template-columns: 1fr;

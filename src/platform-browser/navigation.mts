@@ -11,19 +11,9 @@
  * and a native shell can subscribe to the same store.
  */
 
-export const TAB_IDS = [
-    'tab-sprite-prep',
-    'tab-video-gen',
-    'tab-video-prep',
-    'tab-exporter',
-    'tab-settings',
-] as const;
+import { asTabId, type TabId } from "../core/tabs.mts";
 
-export type TabId = (typeof TAB_IDS)[number];
-
-/** A tab identifier, or `undefined` for a string that names no tab. */
-export const asTabId = (value: string): TabId | undefined =>
-    TAB_IDS.find((id) => id === value);
+export { TAB_IDS, asTabId, type TabId } from "../core/tabs.mts";
 
 let current: TabId = 'tab-sprite-prep';
 const listeners = new Set<() => void>();

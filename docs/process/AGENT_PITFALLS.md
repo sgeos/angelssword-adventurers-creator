@@ -300,6 +300,102 @@ had started reading it. It is published in the client entry, before hydration,
 which is when the old page published it. A specification that reads the page
 directly, rather than through a locator, waits for an element first.
 
+## The mobile application
+
+**A later lint block replaces a rule, it does not add to it.** The storage ban
+and the network ban were two flat-configuration blocks over the same files,
+both setting `no-restricted-globals`. The second replaced the first's options,
+so `localStorage` was allowed everywhere while the configuration and this
+project's instructions said otherwise. Nothing had used it yet. It was found
+only by linting a deliberately failing file. After changing a restriction,
+exercise it, and read `eslint --print-config` for one file per layer.
+
+**`expo start --localhost` listens on IPv6 alone.** Metro bound `[::1]` only,
+and the phone, reaching the computer through `adb reverse` on `127.0.0.1`,
+could not connect. Use `--lan`, which listens on every interface.
+
+**Metro failed with "Failed to collapse" when it watched two sibling
+directories.** It represents a watched path outside the project root relative
+to that root, and `../src` and `../public` broke it. Watch the repository root
+and block what must not be indexed, which is how Expo arranges a monorepo.
+
+**Expo's Babel preset ignores `.mts`.** It strips TypeScript from `.ts` and
+`.tsx` only, so the shared sources reached the bundle with their types in
+place and failed to parse. A wrapper transformer hands each `.mts` file to
+Expo's transformer under a `.ts` name.
+
+**Expo applies `tsconfig.json` paths to Metro by default.** The mobile
+project maps `react` to its type package so that the shared sources typecheck
+against the right copy, and Metro then tried to bundle `@types/react`. The
+paths are for the typechecker, and `experiments.tsconfigPaths` is off in
+`app.json`.
+
+**A vendor declaration can be wrong without an error.** Expo's configuration
+type names a Metro type that Metro does not export, and with `skipLibCheck`
+the configuration's `transformer` section silently became an unresolved type.
+Expo's declaration for its Babel transformer exports nothing, while the module
+exports an object. Both appeared only as lint errors in this repository's
+files. Probe a suspect type by assigning it to `number`, and look at what the
+compiler says it is.
+
+**Metro bundles a stylesheet's rules but not the files its `url()` names.**
+The web view had no fonts at all, and `document.fonts` reported none loaded.
+Import each file so that it becomes an asset, and register it with the font
+loading interface.
+
+**Another project's emulator can share the same `adb` server.** A device
+called `emulator-5584` appeared, first offline and later online, and it was
+running another project's tests. Set `ANDROID_SERIAL` or pass `-s` on every
+command, and never act on a device this work did not start.
+
+**A locked phone gives black screenshots.** That looks like a rendering
+failure and is not one. Check the lock state before diagnosing.
+
+**Expo's DOM web view has no Web Storage and no file chooser.** `localStorage`
+is null in it, and a tap on a file input does nothing. Neither fails loudly: the
+storage adapter treats a missing store as a blocked one and returns defaults,
+so every setting silently vanished, and the input simply did not open. Both
+were found only by using the screens on the phone, after the exports had
+already passed. Check that a setting saved natively reaches a stage, and that
+a file input opens a picker, rather than inferring either from a stage loading.
+
+**A swipe that starts near a screen edge is Android's back gesture.** One left
+the app, and the tap that followed landed on a home screen widget and opened
+another application. Keep swipes away from the edges, and check the resumed
+activity before every tap as well as before every capture.
+
+**A stress test on a personal phone stresses everything else on it.** A
+memory-heavy export killed the web view and left another application on the
+phone not responding. Find a limit by arithmetic first, here frames times
+pixels times four bytes against the phone's memory, and run only the case
+that settles the question, once.
+
+**A function prop crosses Expo's bridge as a new function on every render.**
+An effect keyed on one ran on every render, and a warning meant to appear once
+filled the screen. Report a once-per-load event with a module flag, which only
+a reload resets.
+
+**The memory that kills an operation may belong to another one.** The
+export was made to stream and still died, and the export was measured and
+found flat. The two gigabytes were Video Prep's scrubbing cache, filling in the
+background at the same time. When a fix to the suspect does not help, list
+everything that holds memory while it runs, not only the suspect.
+
+**A heap figure is not a retention figure.** The page's heap read 159 and 290
+megabytes after loading large clips, which looked like the clip's bytes being
+held. After a forced collection it matched a fresh page's 78. Collect through
+the protocol, `HeapProfiler.collectGarbage`, before calling memory retained.
+
+**A tap during a scroll animation is swallowed.** The tab bar had just
+scrolled, and a tap on a tab did nothing. Wait for the motion to end.
+
+**A specification that passes without the fix proves nothing about the
+fix.** The phone's web view clipped a mode selector label at 384 pixels. A
+specification at that width, and a rule meant to fix it, were written, and the
+specification passed with the rule removed and with the fonts blocked. The
+hypothesis was wrong, the rule was reverted, and the cause is still to be
+found in the web view itself.
+
 ## Working discipline
 
 **Commit each unit as soon as it is clean.** Recovery from a botched scripted

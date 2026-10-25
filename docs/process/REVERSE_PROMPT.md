@@ -12,11 +12,129 @@ file is arranged this way rather than being rewritten wholesale.
 
 ## Last Updated
 
+2026-10-24. The mobile port to Tamagui and Expo runs on the Android phone in
+Expo Go, and the web page passes its full gate after the refactoring it
+needed. Nothing is committed, because committing was not authorised for this
+goal.
+
+## Verification
+
+`npm run check` passes across eight TypeScript projects, the mobile one
+included, and the lint. 719 unit tests and 58 application programming
+interface tests pass. 90 browser specifications pass outside the sandbox.
+`npx expo export --platform android` bundles the application, with its fonts
+and worker bundles. Every new lint zone and both capability bans were exercised
+against deliberately failing files, in every layer and in each adapter.
+
+On a Galaxy A16 in Expo Go: frame rate detection at 15 and 30 frames per
+second, a Graphics Interchange Format export in 2.4 seconds and a WebM export
+in 3.1 seconds, each ending in the share sheet, the handoff from Video Prep to
+the exporter in 0.28 seconds with the native tab following, native toasts,
+native tab presses, all five fonts, and no horizontal overflow at 384 pixels.
+Then, in a second window: the tab bar scrolling to an off-screen tab; the key
+test with a fake OpenAI key, through the native transport to OpenAI and back;
+that key saved and read by a sprite generation; the key and a stage's
+preference both surviving a restart; Android's document picker opening from a
+file input and the chosen clip loading; and the notification sound playing.
+The fake key, the test clip and the changed preference were removed after.
+Then large clips: 25 and 100 megabytes at 1280 by 720 load through the picker
+in 3.1 and 33.7 seconds, after a fix. The WebM export was rewritten to stream
+one frame at a time, after the 100 megabyte clip's export killed the web view;
+the 25 megabyte clip then exported on the phone, and a new browser
+specification reads sixty correctly timed frames from an exported file. The
+100 megabyte clip still exhausted the phone until Video Prep's scrubbing
+cache, a full-size canvas per frame and 2.2 gigabytes for that clip, was given
+a 256 megabyte budget; it then exported, 600 frames in eight and a half
+minutes. A 40 second clip of 200 megabytes then exported too. The user is
+also told if the web view is ever reclaimed. The clips were removed from the
+phone.
+
+Continuous integration's jobs were simulated on a clean copy of the tree, the
+files that would be committed, under Node 22.18.0 with fresh installs: check,
+test, browser, mobile and binary all passed, on macOS. The container job was
+not run, as Docker is unavailable here.
+
+Not verified: iOS; a production build on a device; a request with a valid
+key; a clip larger than 200 megabytes and 40 seconds at 720p; the container and the Linux and Windows
+binaries on their own platforms, and the container, which only continuous
+integration runs.
+
+## Summary
+
+**The mobile application.** `mobile/` is an Expo package on SDK 58. Native
+chrome and settings in Tamagui; the four stages in one web view as an Expo DOM
+component, rendering `src/ui/StagePanels.tsx`, which the web page renders too.
+What the web view lacks comes through seams in the browser platform, each
+defaulting to the web page's behaviour: the transport, file saving, the
+workers and the sound. The proxy's routing is now a core planner that the
+server and the phone both execute.
+
+**What the device found.** The stage column was 1,339 pixels wide on a 384
+pixel screen. Both workers failed to load, because Expo built their addresses
+relative to the mobile project and they live outside it, and the exporter
+reported that as an unknown error. The fonts did not load. Expo's web view has
+no `localStorage`, so no setting or key reached a stage, and no file chooser,
+so file inputs did nothing. All fixed: the settings are held in memory, filled
+from native storage before any stage module loads and written back to it, and
+a file input's tap opens the system document picker natively.
+
+**What exercising the rules found.** The storage ban had never been in force:
+the network ban, a later block setting the same rule, replaced it everywhere.
+Nothing had used storage outside its adapter. Both bans are now one setting
+per file. Two applications now exist, and lint forbids each to import the
+other.
+
+**What reading the proxy found.** The desktop server decodes every upstream
+body as text, so a ComfyUI image through the relay is corrupted, and possibly
+the Grok video download. Recorded in `OPEN.md`, not fixed, because the fix
+changes the network port.
+
+## Questions for Human Pilot
+
+**May this be committed and pushed?** Continuous integration's `mobile`,
+`container` and `binary` jobs run only on push, and the `check` job now
+installs the mobile package, which has not run there.
+
+**Should the desktop proxy's binary bodies be fixed?** See `OPEN.md`.
+
+**Is a native build wanted?** It needs the Android SDK or Xcode's simulators,
+an icon and a bundle identifier. Expo's placeholder icons are in
+`mobile/assets/`.
+
+## Technical Concerns
+
+The keys are handed from SecureStore to the web view, which holds them in
+memory and never on its disk. A picked file over 32 megabytes crosses the
+bridge in chunks, at about 3 megabytes a second. Unused copies of the workers ship in the mobile
+bundle, about 23 kilobytes. Expo's command line tooling carries two audit
+advisories, not shipped in the application. All recorded in `OPEN.md`. The
+corrected declaration for Expo's Babel transformer, in `mobile/types/`, must
+be removed if Expo fixes theirs, or it will hide the fix.
+
+## Intended Next Step
+
+Commit and push on authorisation, then read continuous integration.
+
+## Session Context
+
+`main` at `b8778a3` before this work. Metro may still be running from
+`mobile/`, on port 8081.
+
+---
+
+## Superseded history
+
+Nothing below this line describes the present.
+
+### Superseded 2026-10-24 — the web port to Tamagui and TanStack Start
+
+#### Last Updated
+
 2026-10-24. The web port to Tamagui and TanStack Start is complete and verified
 locally. It is not committed, because committing was not authorised for this
 goal.
 
-## Verification
+#### Verification
 
 `npm run check` passes across seven TypeScript projects and the lint. 677 unit
 tests and 57 application programming interface tests pass. 88 browser
@@ -35,7 +153,7 @@ Not verified: the container, because Docker is not running here, and the Linux
 and Windows binaries. Continuous integration builds and serves all three, and
 has not seen this work.
 
-## Summary
+#### Summary
 
 **The page is a React application.** TanStack Start prerenders the document
 shell; the routes render in the browser inside a `ClientOnly` boundary. The
@@ -57,7 +175,7 @@ re-indented by the converter. And a stale copy of the old build's output in
 `public/js/`, shipped beside the new one, which let the worker specifications
 pass against files nothing used. All fixed, and the layout ones pinned.
 
-## Questions for Human Pilot
+#### Questions for Human Pilot
 
 **May this be committed and pushed?** It is staged and not committed.
 Continuous integration's container and binary jobs are the only check of the
@@ -66,7 +184,7 @@ Dockerfile and the Linux and Windows builds, and they run on push.
 The device question stands: the native spike's Android half can run on the
 operator's phone; the iOS half waits for an iPhone.
 
-## Technical Concerns
+#### Technical Concerns
 
 The stage components must never re-render, and nothing enforces it beyond their
 having no props. The design tokens exist twice, in Tamagui and in the stage
@@ -74,20 +192,14 @@ stylesheet. The page's scripts grew from 113 to 192 kilobytes gzipped, and the
 parse cost on modest hardware is unmeasured. All three are recorded in
 `OPEN.md`.
 
-## Intended Next Step
+#### Intended Next Step
 
 Commit and push on authorisation, then read continuous integration. Then the
 native spike, Android first.
 
-## Session Context
+#### Session Context
 
 `main` at `cc05bbd` before this work.
-
----
-
-## Superseded history
-
-Nothing below this line describes the present.
 
 ### Superseded 2026-10-24 — the migration plan recorded
 

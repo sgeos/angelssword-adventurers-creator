@@ -338,8 +338,10 @@ async function autoCacheFrames(): Promise<void> {
 
     const video = state.video;
     if (video === null) return;
-    const cw = state.videoWidth, ch = state.videoHeight;
     const total = state.totalFrames;
+    // Bounded: a full-size cache of a long clip ran to gigabytes and left a
+    // phone nothing for the export. See cacheFrameSize.
+    const { width: cw, height: ch } = VideoPrepCore.cacheFrameSize(total, state.videoWidth, state.videoHeight);
     state.frameCache = new Array(total).fill(null);
     state.frameCacheComplete = false;
 

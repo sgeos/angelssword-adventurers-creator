@@ -95,10 +95,35 @@ export const createLocalStore = (): KeyValueStore => {
     };
 };
 
+/** What `browserStore` reads and writes through. Web Storage unless a host replaces it. */
+let backing: KeyValueStore | undefined;
+
+const current = (): KeyValueStore => {
+    backing ??= createLocalStore();
+    return backing;
+};
+
+/**
+ * Replace where the browser half's settings live. The mobile application's
+ * web view has no Web Storage at all, since Expo's web view does not enable
+ * it, and keeps its settings natively, so its host installs a store here. It
+ * must be called before any module that reads a setting when it loads, which
+ * several stages do.
+ */
+export const setStoreBacking = (store: KeyValueStore): void => {
+    backing = store;
+};
+
 /**
  * The one store the browser half uses.
  *
- * A single instance rather than one per stage, so the probe runs once and so
- * that nothing can end up with a different view of the same origin's data.
+ * A single instance rather than one per stage, so that nothing can end up
+ * with a different view of the same data. It delegates, so that a host's
+ * replacement reaches every module that imported it, and the Web Storage
+ * probe runs only if nothing replaced it first.
  */
-export const browserStore: KeyValueStore = createLocalStore();
+export const browserStore: KeyValueStore = {
+    read: (key) => current().read(key),
+    write: (key, value) => { current().write(key, value); },
+    remove: (key) => { current().remove(key); },
+};

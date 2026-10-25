@@ -2,7 +2,7 @@
 
 > **Navigation**: [Architecture](./README.md) | [Documentation Root](../README.md)
 
-## The two halves
+## The three parts
 
 The server runs directly. Node strips the types as it loads `server.mts`, so
 there is no build step and nothing to keep synchronised. This requires Node
@@ -24,11 +24,21 @@ prerender and is never run. The reasons for each part of the build's
 configuration are in `vite.config.mts`. How the page was moved onto this stack,
 and what it does and does not change, is in [MIGRATION.md](./MIGRATION.md).
 
+The mobile application, in `mobile/`, is an Expo package with its own
+dependencies, kept out of the web build's install so that the page and the
+server do not carry React Native. Metro bundles it, with the core, the shared
+interface in `src/ui/` and the browser platform imported from `../src`, and the
+fonts and sounds from `../public`. The four media stages run in a web view as
+one Expo DOM component, `mobile/dom/Stages.tsx`, and the chrome and settings are
+native. `mobile/metro.config.mts` and `mobile/babel-transformer.mts` give the
+reasons for how the shared sources are resolved and transformed, and
+[MIGRATION.md](./MIGRATION.md) gives what has been verified on a device.
+
 Anything left in `public/` ships. A stale copy of the previous build's output
 there once made the worker specifications pass against files the application
 no longer used.
 
-## Seven TypeScript projects
+## Eight TypeScript projects
 
 They differ in which global types each may see, and that separation is
 enforced rather than assumed. A project is this codebase's equivalent of a
@@ -39,10 +49,11 @@ crate, and its `lib` and `types` settings are its manifest.
 | `tsconfig.core.json` | `src/core` | ECMAScript alone. Neither node nor the Document Object Model |
 | `tsconfig.json` | Server and build scripts | Node, no Document Object Model |
 | `tsconfig.browser.json` | `src/platform-browser` | Document Object Model, no node, no framework |
-| `tsconfig.app.json` | `src/entry-browser`, the React application | Document Object Model, JSX, React, Tamagui, TanStack |
+| `tsconfig.app.json` | `src/entry-browser`, the web page, and `src/ui`, the interface it shares | Document Object Model, JSX, React, Tamagui, TanStack |
 | `tsconfig.worker.json` | The two Web Workers and the encoder they drive | WebWorker, neither |
-| `tsconfig.tools.json` | `vite.config.mts` | Node and the Document Object Model |
+| `tsconfig.tools.json` | `vite.config.mts`, and Metro's configuration and transformer in `mobile/` | Node and the Document Object Model |
 | `tsconfig.test.json` | Tests and the Playwright configuration | Everything |
+| `mobile/tsconfig.json` | The mobile application, and the shared code it imports | Document Object Model, JSX, React Native, Expo, Tamagui |
 
 The core project is the layering rule made executable and is described in
 [LAYERING.md](./LAYERING.md). It emits nothing, existing to answer one
@@ -64,8 +75,18 @@ and argues, in its header, the two settings it relaxes: third-party
 declaration checks, which fail inside Tamagui, React Native and TanStack and
 nowhere in this code, and `isolatedDeclarations`, which protects modules that
 others import and so has nothing to protect in a layer nothing imports. The
-tools project relaxes the first of those for the same reason, for Vite's
-configuration alone.
+tools project relaxes the first of those for the same reason, for the two
+bundlers' configurations alone.
+
+The mobile project relaxes the same two settings as the application project,
+and argues them in its header. It sees the Document Object Model because the
+DOM component and the shared code need it, which means native code could name
+a browser global and still compile. `eslint.config.mjs` refuses those globals
+in `mobile/app/`, where they would fail on the phone. Its packages resolve from
+`mobile/node_modules` for every file, the shared ones included, as Metro
+resolves them, so the shared interface is checked against the copy of React
+the phone runs. `npm run typecheck` checks it, so the gate needs
+`npm ci --prefix mobile` first, and continuous integration runs both installs.
 
 ## Strictness
 

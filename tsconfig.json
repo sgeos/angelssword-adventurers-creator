@@ -133,6 +133,10 @@
     "dist",
     "tmp",
     "secret",
+    // The Expo application is its own package, with its own node_modules and
+    // its own project, mobile/tsconfig.json. React Native's global types
+    // collide with node's, so it must not be checked here.
+    "mobile",
     // Browser code and its end-to-end harness. Both need the DOM lib,
     // which the server must not have, so they have their own projects
     // rather than being half-checked under this one.
@@ -149,9 +153,11 @@
     // DOM lib and withholds the node types. Checking them here too would
     // report every DOM global as missing.
     "src/platform-browser",
-    // The entry layer belongs to tsconfig.app.json, the one project with JSX
-    // and the framework types.
+    // The entry layer and the interface it shares with the mobile application
+    // belong to tsconfig.app.json, the one project with JSX and the framework
+    // types.
     "src/entry-browser",
+    "src/ui",
     "src/platform-worker",
     // The core belongs to tsconfig.core.json, which withholds BOTH the DOM lib
     // and the node types. Checking it here would hand it the node types and

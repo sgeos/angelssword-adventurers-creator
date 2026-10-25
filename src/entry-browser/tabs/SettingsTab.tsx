@@ -52,7 +52,7 @@ import {
     PanelTitleText,
     StatusLine,
     Text,
-} from "../ui/primitives.tsx";
+} from "../../ui/primitives.tsx";
 
 const Column = styled(View, { maxWidth: 640 });
 

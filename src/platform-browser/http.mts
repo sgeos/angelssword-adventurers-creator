@@ -36,7 +36,7 @@ import type { BinaryHttpClient, HttpRequest } from "../core/ports/http.mts";
  * always produce bytes and the ComfyUI retrieval needs them. It remains
  * usable wherever the weaker `HttpClient` is wanted.
  */
-export const browserHttp: BinaryHttpClient = async (
+const fetchTransport: BinaryHttpClient = async (
     url: string,
     init?: HttpRequest,
 ) => {
@@ -52,4 +52,30 @@ export const browserHttp: BinaryHttpClient = async (
         text: async () => response.text(),
         bytes: async () => new Uint8Array(await response.arrayBuffer()),
     };
+};
+
+let transport: BinaryHttpClient = fetchTransport;
+
+/**
+ * The page's network client.
+ *
+ * Every call goes through the current transport, which is `fetch` unless a
+ * host has replaced it. The mobile application replaces it, because inside its
+ * web view there is no local server to answer `/api` routes: its transport plans
+ * each route on the page and sends only the upstream request to the native
+ * side. See `in-page-proxy.mts`.
+ */
+export const browserHttp: BinaryHttpClient = async (url: string, init?: HttpRequest) => transport(url, init);
+
+/** The transport `browserHttp` uses before any host replaces it. */
+export const pageFetch: BinaryHttpClient = fetchTransport;
+
+/**
+ * Replace the transport. Called once, at start-up, by a host that has no
+ * server behind the page. Deliberately a call rather than a global a script
+ * could set, so that only code inside the module graph can redirect requests
+ * that carry the user's keys.
+ */
+export const setHttpTransport = (next: BinaryHttpClient): void => {
+    transport = next;
 };

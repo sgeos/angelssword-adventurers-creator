@@ -44,7 +44,9 @@ exist, which makes the boundary a compile error rather than a convention.
 | Core | `src/core/` | `tsconfig.core.json` | ECMAScript only |
 | Platform, browser | `src/platform-browser/` | `tsconfig.browser.json` | ECMAScript and the Document Object Model |
 | Platform, worker | `src/platform-worker/` | `tsconfig.worker.json` | ECMAScript and the Web Worker scope |
+| Shared interface | `src/ui/` | `tsconfig.app.json`, and `mobile/tsconfig.json` for the mobile application | The Document Object Model, JSX, React and Tamagui |
 | Entry, browser | `src/entry-browser/` | `tsconfig.app.json` | The Document Object Model, JSX, and the React, Tamagui and TanStack types |
+| Entry, mobile | `mobile/` | `mobile/tsconfig.json` | React Native and Expo, and the Document Object Model for the DOM component |
 | Platform and entry, node | `server.mts`, `build-exe.mts` | `tsconfig.json` | ECMAScript and node |
 | Tests | `test/` | `tsconfig.test.json` | Everything |
 
@@ -93,6 +95,20 @@ import the entry layer. It has been exercised against a deliberately failing
 file. A second zone stopped one entry point importing another while there were
 five; the components of one application import each other, and that zone went
 with the script tags.
+
+The mobile port brought a second application, and with it a layer between
+the entries and the platform. `src/ui/` holds what both render: the design
+system, the panels, and the four stage components with the sequence that
+mounts their controllers. Three more zones keep the direction. The platform may
+not import `src/ui/`, which renders onto the platform. `src/ui/` may import
+neither application. And neither application may import the other, which is the
+rule the five script-tag entries once had, returned in the form that now
+applies. Each was exercised against a deliberately failing file.
+
+The mobile application's native code, in `mobile/app/`, compiles with the
+Document Object Model, because its project also covers the DOM component. Lint
+refuses the browser's globals there, since naming one type-checks and then
+fails on the phone.
 
 The core needs no zone. Importing a platform module would pull that file into
 the core program, where the globals it uses do not exist, so the core project
@@ -274,6 +290,45 @@ a count of tests.
 Both now return bytes or base64 rather than a `Blob`. What to wrap a payload
 in is the platform's decision, and returning the language's own type is what
 lets one function serve two callers that want different wrappers.
+
+### The proxy, moved into the core for a second platform
+
+On the desktop, the page's `/api` routes reach the providers through the
+Express proxy. A phone has no such server. So the proxy's decisions, which
+route a request takes, which upstream address it reaches, which key it
+carries, and how the reply is shaped, moved into `src/core/proxy.mts` as a
+planner that returns a plan rather than sending anything. Each platform
+executes the plan its own way. `server.mts` sends it with node, and the mobile
+application's DOM component hands it across the bridge to native code, which
+sends it with Expo's fetch, outside the web view's cross-origin rules. The
+address checks that guard both, the video download allow list and the ComfyUI
+origin rule, are the same functions in both places.
+
+Two consequences follow. A request the desktop proxy would refuse is refused
+on the phone by the same code, and covered by the same tests. And the move
+exposed two defects in the desktop proxy, which predate it and are kept,
+because fixing them changes the network port and was not part of this work.
+The server reads every upstream body as text, so a binary body relayed through
+it is decoded as UTF-8 and corrupted, which is what happens to the image a
+ComfyUI run retrieves from `/view`. On the phone a relayed body keeps its
+bytes, carried as base64 across the bridge. The Grok video download is wrapped
+as `{ data: text }` from the decoded text on both platforms, although the
+comment in the original route says the upstream sends base64, so it shares the
+defect on both. Both are recorded in [OPEN.md](../decisions/OPEN.md). Neither
+provider has been run against a live key.
+
+### A ban that was not enforced
+
+The storage ban and the network ban were once two lint blocks over the same
+files, each setting the same rule. In ESLint's flat configuration a later
+block replaces the earlier block's options for that rule, so the network ban
+silently cancelled the storage ban, and `localStorage` was reachable from every
+browser file while this document said otherwise. A search found no use of it
+outside the adapter, so nothing had escaped. It was found by exercising the
+ban against a deliberately failing file during the mobile port. Each file now
+receives one setting of the rule, with both lists, and each adapter receives
+the list for the capability it does not implement. Both bans now cover the
+shared interface and the DOM component as well.
 
 ## Randomness, resolved without an interface
 

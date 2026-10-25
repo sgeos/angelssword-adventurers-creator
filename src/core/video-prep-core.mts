@@ -343,3 +343,48 @@ export const describeLoop = (
 
   return { kind: "ok", summary: loopSummary(loopMode, loopPoint, totalFrames, loopStart) };
 };
+
+/**
+ * The most memory Video Prep's scrubbing cache may hold, in bytes.
+ *
+ * The cache keeps one canvas per frame, four bytes a pixel. At full size a 20
+ * second clip at 1280 by 720 is 2.2 gigabytes, which on a four gigabyte phone
+ * left nothing for the export that follows, and the system reclaimed the web
+ * view. A two second clip at 720p is 221 megabytes, under this budget, so the
+ * clips the pipeline is built around are cached at full size as before.
+ */
+export const FRAME_CACHE_BUDGET_BYTES: number = 256 * 1024 * 1024;
+
+/** The size each cached frame is stored at. */
+export interface CacheFrameSize {
+    readonly width: number;
+    readonly height: number;
+}
+
+/**
+ * The size to cache each of `frames` frames of a `width` by `height` clip at,
+ * so that the whole cache fits `budgetBytes`: full size when it fits, and
+ * otherwise scaled down by one factor on both axes, never below one pixel.
+ * The cache feeds the scrubber and the loop preview, which draw it scaled to
+ * their canvas, so a smaller frame is softer there and nothing else changes.
+ *
+ * Invalid input, a non-positive or non-finite dimension, count or budget,
+ * yields a one by one frame rather than throwing; the caller's own checks
+ * have already refused such a clip, and this keeps the cache bounded anyway.
+ */
+export const cacheFrameSize = (
+    frames: number,
+    width: number,
+    height: number,
+    budgetBytes: number = FRAME_CACHE_BUDGET_BYTES,
+): CacheFrameSize => {
+    const valid = [frames, width, height, budgetBytes].every((n) => Number.isFinite(n) && n > 0);
+    if (!valid) return { width: 1, height: 1 };
+    const fullBytes = frames * width * height * 4;
+    if (fullBytes <= budgetBytes) return { width: Math.round(width), height: Math.round(height) };
+    const scale = Math.sqrt(budgetBytes / fullBytes);
+    return {
+        width: Math.max(1, Math.floor(width * scale)),
+        height: Math.max(1, Math.floor(height * scale)),
+    };
+};

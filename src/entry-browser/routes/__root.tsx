@@ -13,8 +13,8 @@
 import { ClientOnly, createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { TamaguiProvider } from "@tamagui/core";
 import type { ReactNode } from "react";
-import { config } from "../ui/config.ts";
-import { WEB_ONLY_CSS } from "../ui/web-only.ts";
+import { config } from "../../ui/config.ts";
+import { WEB_ONLY_CSS } from "../../ui/web-only.ts";
 
 const DESCRIPTION =
     "AS Adventurer Creator — VTuber Creation Pipeline by Angel's Sword Studios. Create animated PNGtuber and VTuber assets from scratch in minutes.";

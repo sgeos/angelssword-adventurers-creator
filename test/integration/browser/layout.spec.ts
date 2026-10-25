@@ -17,6 +17,11 @@ import { expect, test, type Page } from '@playwright/test';
  *   Tamagui has no last-child selector.
  * - React reported a hydration mismatch on every load, recovered, and threw the
  *   prerendered shell away.
+ *
+ * One more is a guard rather than a regression. The mobile application's web
+ * view showed the mode selector clipping a label at 384 pixels. The page
+ * itself does not, with its fonts or without them, so the cause lies in the
+ * web view, and this records that the page's own narrow layout is sound.
  */
 
 const box = async (page: Page, selector: string): Promise<{ x: number; y: number; width: number; height: number }> => {
@@ -80,6 +85,28 @@ test.describe('P — Layout preserved by the port', () => {
             return { last: style(rowOf(zoom)), earlier: style(rowOf(offset)) };
         });
         expect(margins).toEqual({ last: '0px', earlier: '16px' });
+    });
+
+    test('the mode buttons fit their labels at a phone\'s width', async ({ page }) => {
+        // The width of the Galaxy A16's web view, where the clipping was seen.
+        await page.setViewportSize({ width: 384, height: 800 });
+        await page.goto('/');
+        await page.locator('#spritePrepMode .mode-btn').first().waitFor({ state: 'visible' });
+        const fits = await page.evaluate(() => {
+            const selector = document.getElementById('spritePrepMode');
+            if (selector === null) return ['the selector is missing'];
+            const outer = selector.getBoundingClientRect();
+            const problems: string[] = [];
+            for (const button of selector.querySelectorAll('.mode-btn')) {
+                const edge = button.getBoundingClientRect();
+                const label = button.textContent.trim();
+                if (button.scrollWidth > button.clientWidth) problems.push(`${label} overflows its button`);
+                if (edge.right > outer.right + 0.5 || edge.left < outer.left - 0.5) problems.push(`${label} extends past the selector`);
+            }
+            if (document.documentElement.scrollWidth > window.innerWidth) problems.push('the page scrolls sideways');
+            return problems;
+        });
+        expect(fits).toEqual([]);
     });
 
     test('loads without an error or a warning in the console', async ({ page }) => {

@@ -46,6 +46,9 @@
     "skipLibCheck": true,
     "isolatedDeclarations": false
   },
-  "include": ["src/entry-browser/**/*.tsx", "src/entry-browser/**/*.ts"],
+  // src/ui is the interface both entry points share: the design system, the
+  // stage markup and the panels that mount the stage controllers. It sees what
+  // the web entry sees, and nothing more.
+  "include": ["src/entry-browser/**/*.tsx", "src/entry-browser/**/*.ts", "src/ui/**/*.tsx", "src/ui/**/*.ts"],
   "exclude": []
 }

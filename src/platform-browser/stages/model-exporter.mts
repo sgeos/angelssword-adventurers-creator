@@ -23,6 +23,7 @@ import {
 import { exportRangeFromHandoff, type ExportRange, type HandoffPayload } from "../../core/video-prep-core.mts";
 import { ChromaKey } from "../../core/chroma-key.mts";
 import { closestFrom, queryAll, require2d, requireEl } from "../dom.mts";
+import { saveFile } from "../save-file.mts";
 import { channel } from "../../core/pixels.mts";
 import {
     MODE_LIMITS,
@@ -63,6 +64,7 @@ import {
 import { ColorQuantizer } from "../../core/gif-codec.mts";
 import { browserStore } from "../local-storage.mts";
 import { fetchBlob } from "../binary.mts";
+import { describeWorkerError, startWorker } from "../workers.mts";
 import type { EncodeRequest, EncodeResponse, WorkerFrame } from "../../core/gif-worker-core.mts";
 import type { TimerCommand } from "../../platform-worker/timer-worker.mts";
 import { ASSUMED_SOURCE_FPS, describeSourceRate, type FrameRateOrigin, type SourceFrameRate } from "../../core/frame-rate.mts";
@@ -1187,10 +1189,6 @@ export class ModelExporter {
             recCanvas.height = height;
             const recCtx = require2d(recCanvas, { willReadFrequently: true });
 
-            // ── Phase 1: Extract all frames with chroma key ──
-            progressText.textContent = 'Extracting frames...';
-            const frameImages: ImageData[] = [];
-
             const drawScaled = (): void => {
                 recCtx.clearRect(0, 0, width, height);
                 const { dx, dy, sw, sh } = placeScaled(width, height, videoScale, videoOffset);
@@ -1201,29 +1199,28 @@ export class ModelExporter {
                 }
             };
 
-            for (let fi = 0; fi < totalFrames; fi++) {
-                if (this.cancelled()) break;
-
-                const f = frameList[fi];
-                if (f === undefined) continue;
+            /** Seek to a frame, key it, and leave it on the recording canvas. */
+            const prepare = async (f: number): Promise<void> => {
                 await this.seekToAsync(f / this.sourceFps);
-
                 drawScaled();
                 const imageData = recCtx.getImageData(0, 0, width, height);
                 this.chromaKey.process(imageData);
                 if (this.chromaKey.antiAlias) this.chromaKey.applyAntiAlias(imageData);
                 this.chromaKey.applyEdgeFade(imageData, this.chromaKey.edgeFadeWidth);
-                frameImages.push(imageData);
+                recCtx.putImageData(imageData, 0, 0);
+            };
 
-                const pct = ((fi + 1) / totalFrames) * 50;
-                progressFill.style.width = `${pct.toString()}%`;
-                progressText.textContent = `Extracting frame ${(fi + 1).toString()} / ${totalFrames.toString()}...`;
-            }
-
-            if (this.cancelled()) throw new Error('cancelled');
-
-            // ── Phase 2: Record frames at correct frame rate ──
-            // Uses a Web Worker timer to avoid browser throttling when tab is unfocused
+            // ── Each frame is extracted, keyed and recorded in turn ──
+            //
+            // This used to extract and key every frame first, holding them all
+            // at four bytes a pixel, and then play them into the recorder in
+            // real time. A 600 frame clip at 1280 by 720 is 2.2 gigabytes held
+            // that way, which killed the web view on a four gigabyte phone.
+            // Now one frame is held at a time. The recorder is paused while a
+            // frame is prepared, which takes as long as it takes, and resumed
+            // for exactly one frame interval while that frame is shown. A
+            // recorder leaves paused time out of its timestamps, so the
+            // recording's timing is the interval's, not the preparation's.
             progressText.textContent = 'Encoding WebM...';
 
             const isFirefox = navigator.userAgent.includes('Firefox');
@@ -1247,51 +1244,65 @@ export class ModelExporter {
             const chunks: Blob[] = [];
             recorder.ondataavailable = (e): void => { if (e.data.size > 0) chunks.push(e.data); };
             const recorderDone = new Promise<void>(resolve => { recorder.onstop = (): void => { resolve(); }; });
-
-            // Draw first processed frame before starting recorder
-            const firstFrame = frameImages[0];
-            if (firstFrame !== undefined) {
-                recCtx.putImageData(firstFrame, 0, 0);
-            }
-            recorder.start();
             const frameDelay = 1000 / exportFps;
 
-            // Worker-based timer (immune to background tab throttling)
-            const timerWorker = new Worker(new URL('../../platform-worker/timer-worker.mts', import.meta.url), {
-                type: 'module',
+            // A worker's timer, because the main thread's is throttled to a
+            // second in a background tab, which would stretch every frame.
+            const timerWorker = startWorker('timer');
+            let timerFailure: Error | undefined;
+            let waiting: { resolve: () => void; reject: (error: Error) => void } | undefined;
+            timerWorker.addEventListener('error', (event: Event) => {
+                timerFailure = new Error(`Frame timer failed: ${describeWorkerError(event)}`);
+                waiting?.reject(timerFailure);
             });
-            let frameIdx = 0;
+            timerWorker.onmessage = (): void => { waiting?.resolve(); };
+            // A timer fires late, never early, and the recorder resumes a
+            // little after it is asked to, so each interval runs a few
+            // milliseconds long. Unchecked, that stretched a two second clip by
+            // a tenth of a second. Each interval's overrun is carried into the
+            // next one's request, so the error stays within one interval
+            // instead of accumulating.
+            let overrun = 0;
+            const oneInterval = async (): Promise<void> => {
+                if (timerFailure !== undefined) throw timerFailure;
+                const requested = Math.max(0, frameDelay - overrun);
+                const began = performance.now();
+                await new Promise<void>((resolve, reject) => {
+                    waiting = { resolve, reject };
+                    timerWorker.postMessage({ cmd: 'once', ms: requested } satisfies TimerCommand);
+                });
+                waiting = undefined;
+                overrun += performance.now() - began - frameDelay;
+            };
 
-            await new Promise<void>((resolve) => {
-                timerWorker.onmessage = (): void => {
-                    if (this.cancelled() || frameIdx >= frameImages.length) {
-                        timerWorker.postMessage({ cmd: 'stop' } satisfies TimerCommand);
-                        resolve();
-                        return;
+            try {
+                let started = false;
+                for (let fi = 0; fi < totalFrames; fi++) {
+                    if (this.cancelled()) break;
+                    const f = frameList[fi];
+                    if (f === undefined) continue;
+
+                    await prepare(f);
+                    if (!started) {
+                        recorder.start();
+                        started = true;
+                    } else {
+                        recorder.resume();
                     }
-
-                    // Clear and redraw to trigger Firefox's auto-capture
-                    recCtx.clearRect(0, 0, recCanvas.width, recCanvas.height);
-                    const nextFrame = frameImages[frameIdx];
-                    if (nextFrame === undefined) {
-                        timerWorker.postMessage({ cmd: 'stop' } satisfies TimerCommand);
-                        resolve();
-                        return;
-                    }
-                    recCtx.putImageData(nextFrame, 0, 0);
-
                     // Chrome: manually push frame. Firefox: auto-captured by stream.
                     if (track instanceof CanvasCaptureMediaStreamTrack) track.requestFrame();
+                    await oneInterval();
+                    recorder.pause();
 
-                    const pct = 50 + ((frameIdx + 1) / frameImages.length) * 50;
+                    const pct = ((fi + 1) / totalFrames) * 100;
                     progressFill.style.width = `${pct.toString()}%`;
-                    progressText.textContent = `Encoding frame ${(frameIdx + 1).toString()} / ${frameImages.length.toString()}...`;
-                    frameIdx++;
-                };
-                timerWorker.postMessage({ cmd: 'start', ms: frameDelay } satisfies TimerCommand);
-            });
-
-            recorder.stop();
+                    progressText.textContent = `Encoding frame ${(fi + 1).toString()} / ${totalFrames.toString()}...`;
+                }
+                if (this.cancelled()) throw new Error('cancelled');
+            } finally {
+                timerWorker.postMessage({ cmd: 'stop' } satisfies TimerCommand);
+                if (recorder.state !== 'inactive') recorder.stop();
+            }
             await recorderDone;
 
             if (this.cancelled()) {
@@ -1511,9 +1522,7 @@ export class ModelExporter {
                 // The encoder is a real module (gif-worker.mts), compiled by
                 // tsconfig.worker.json. It used to be a template literal built
                 // into a blob URL, which put it outside the type checker.
-                const worker = new Worker(new URL('../../platform-worker/gif-worker.mts', import.meta.url), {
-                    type: 'module',
-                });
+                const worker = startWorker('gif');
 
                 worker.addEventListener('message', (event: MessageEvent<EncodeResponse>) => {
                     const message = event.data;
@@ -1528,9 +1537,9 @@ export class ModelExporter {
                     }
                 });
 
-                worker.addEventListener('error', (err: ErrorEvent) => {
+                worker.addEventListener('error', (event: Event) => {
                     worker.terminate();
-                    reject(new Error(`Worker encoding failed: ${(err instanceof Error ? err.message : 'unknown error')}`));
+                    reject(new Error(`Worker encoding failed: ${describeWorkerError(event)}`));
                 });
 
                 // Copy for transfer; the cached frames stay usable afterwards.
@@ -1589,14 +1598,7 @@ export class ModelExporter {
         // Remove any existing extension
         name = name.replace(/\.(webm|gif|mp4)$/i, '');
 
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${name}.${ext}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => { URL.revokeObjectURL(url); }, 5000);
+        saveFile(blob, `${name}.${ext}`);
     }
 
     // ─── SEEK HELPER ───

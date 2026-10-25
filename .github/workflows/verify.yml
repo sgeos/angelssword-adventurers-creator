@@ -42,11 +42,44 @@ jobs:
           # capability the floor is chosen for.
           node-version: '22.18.0'
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            mobile/package-lock.json
 
       - run: npm ci
 
-      # Typechecks every tsconfig project, then lints.
+      # The mobile application is its own package. Its project, and the Metro
+      # configuration in the tools project, resolve types from its
+      # node_modules, so the check needs both installs.
+      - run: npm ci --prefix mobile
+
+      # Typechecks every tsconfig project, the mobile one included, then lints.
       - run: npm run check
+
+  mobile:
+    name: mobile bundles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.18.0'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - run: npm ci --prefix mobile
+
+      # Bundles the application for Android as Expo Go would load it: the
+      # native bundle, and the DOM component's web bundle beside it. This is
+      # the step that exercises metro.config.mts and babel-transformer.mts,
+      # which no typecheck can, because they decide how the shared sources
+      # are resolved and transformed. No native build: that needs the Android
+      # SDK, and Expo Go supplies the native half.
+      - run: npx expo export --platform android --output-dir "$RUNNER_TEMP/mobile-export"
+        working-directory: mobile
+        env:
+          EXPO_NO_TELEMETRY: '1'
 
   test:
     name: unit and API tests

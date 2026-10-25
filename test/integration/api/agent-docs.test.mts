@@ -38,12 +38,23 @@ const COMMAND_FILES: readonly string[] = [
 
 const read = (file: string): string => readFileSync(join(ROOT, file), 'utf8');
 
-const scriptNames = (): ReadonlySet<string> => {
+const scripts = (): ReadonlyMap<string, string> => {
     const parsed: unknown = JSON.parse(read('package.json'));
-    if (parsed === null || typeof parsed !== 'object' || !('scripts' in parsed)) return new Set();
-    const scripts = parsed.scripts;
-    if (scripts === null || typeof scripts !== 'object') return new Set();
-    return new Set(Object.keys(scripts));
+    if (parsed === null || typeof parsed !== 'object' || !('scripts' in parsed)) return new Map();
+    const found = parsed.scripts;
+    if (found === null || typeof found !== 'object') return new Map();
+    return new Map(Object.entries(found).flatMap(([name, body]): [string, string][] => (typeof body === 'string' ? [[name, body]] : [])));
+};
+
+const scriptNames = (): ReadonlySet<string> => new Set(scripts().keys());
+
+/**
+ * The projects `npm run typecheck` checks, by configuration file. A bare
+ * `tsc` reads `tsconfig.json`.
+ */
+const typecheckedProjects = (): readonly string[] => {
+    const body = scripts().get('typecheck') ?? '';
+    return [...body.matchAll(/\btsc\b([^&]*)/g)].map((m) => /-p\s+(\S+)/.exec(m[1] ?? '')?.[1] ?? 'tsconfig.json');
 };
 
 /** The bodies of fenced shell blocks, where commands meant to be run live. */
@@ -83,9 +94,23 @@ describe('agent instruction files agree with the tree', () => {
         }
     });
 
+    /**
+     * Every project in the repository root is one the gate checks, and every
+     * project the gate names exists. The mobile application's project sits in
+     * its own directory and is counted because the gate checks it.
+     */
+    it('typecheck every project, and only projects that exist', () => {
+        const checked = typecheckedProjects();
+        assert.ok(checked.length > 0, 'no projects parsed from the typecheck script, so this would pass vacuously');
+        for (const project of checked) assert.ok(existsSync(join(ROOT, project)), `the typecheck script names ${project}, which does not exist`);
+        for (const project of readdirSync(ROOT).filter((f) => /^tsconfig.*\.json$/.test(f))) {
+            assert.ok(checked.includes(project), `${project} is never typechecked by npm run typecheck`);
+        }
+    });
+
     /** "Four projects" stood in AGENTS.md while five existed. */
     it('state the number of TypeScript projects correctly', () => {
-        const actual = readdirSync(ROOT).filter((f) => /^tsconfig.*\.json$/.test(f)).length;
+        const actual = typecheckedProjects().length;
         const word = NUMBER_WORDS[actual];
         assert.ok(word !== undefined, `no number word for ${actual.toString()}`);
         let seen = 0;

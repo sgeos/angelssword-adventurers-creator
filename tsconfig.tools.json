@@ -21,8 +21,15 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "noEmit": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    // Expo's declaration for its Babel transformer omits the module's one
+    // value. See mobile/types/expo-babel-transformer.d.ts.
+    "paths": {
+      "@expo/metro-config/babel-transformer": ["./mobile/types/expo-babel-transformer.d.ts"]
+    }
   },
-  "include": ["vite.config.mts"],
+  // Metro's configuration and transformer for the mobile application are the
+  // same kind of file, run by node at build time.
+  "include": ["vite.config.mts", "mobile/metro.config.mts", "mobile/babel-transformer.mts", "mobile/types/*.d.ts"],
   "exclude": []
 }

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { LOOP_CLIP, LOOP_CLIP_15FPS, toggleSwitch } from './helpers';
+import { webmFrameTimes } from './webm';
 
 /**
  * F — The model exporter's controls.
@@ -386,5 +387,34 @@ test.describe('F — Default exports keep the source rate', () => {
         test.setTimeout(120_000);
         const { elapsedMs } = await exportAtDefaults(page, 'adventurer');
         expect(elapsedMs).toBeGreaterThan(1_500);
+    });
+
+    /**
+     * The WebM is recorded one frame at a time, with the recorder paused while
+     * each frame is prepared, so that only one frame is held in memory; the
+     * whole clip held at once killed the web view on a phone. That relies on
+     * the recorder leaving paused time out of its timestamps, and on the
+     * frame timer's overruns not accumulating. Both are asserted on the file
+     * itself: sixty frames, ending where sixty frames at thirty per second
+     * end, at 1.967 seconds. Before the overrun was carried forward the clip
+     * ended at 2.07 seconds.
+     *
+     * The reader is checked first against the fixture, whose frames are known,
+     * so that a reader that miscounts cannot pass the export.
+     */
+    test('a WebM holds every frame at the source rate', async ({ page }) => {
+        test.setTimeout(120_000);
+        const fixture = webmFrameTimes(readFileSync(LOOP_CLIP));
+        expect(fixture.length).toBe(60);
+        expect(fixture.at(-1)).toBeCloseTo(59 / 30, 2);
+
+        const { path } = await exportAtDefaults(page, 'adventurer');
+        const times = webmFrameTimes(readFileSync(path));
+        expect(times.length).toBe(60);
+        expect(times[0]).toBe(0);
+        const last = times.at(-1) ?? 0;
+        expect(Math.abs(last - 59 / 30)).toBeLessThan(0.05);
+        const gaps = times.slice(1).map((time, i) => time - (times[i] ?? 0));
+        expect(Math.min(...gaps)).toBeGreaterThan(0);
     });
 });

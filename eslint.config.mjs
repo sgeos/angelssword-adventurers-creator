@@ -33,6 +33,37 @@
 import { defineConfig } from "eslint/config";
 import tseslint from "typescript-eslint";
 
+// The files that reach browser capabilities only through their adapters:
+// the browser platform, both interface layers, and the mobile application's
+// DOM component, which runs the same code in a web view.
+const CAPABILITY_FILES = ["src/platform-browser/**/*.mts", "src/entry-browser/**/*.{ts,tsx}", "src/ui/**/*.{ts,tsx}", "mobile/dom/**/*.{ts,tsx}"];
+
+const STORAGE_GLOBALS = [
+  {
+    name: "localStorage",
+    message:
+      "Use the storage capability. `browserStore` from platform-browser/local-storage.mts is the one adapter, and it is the only place that handles a store which throws.",
+  },
+  {
+    name: "sessionStorage",
+    message:
+      "Use the storage capability. If session-scoped storage is genuinely wanted, add a second adapter beside local-storage.mts rather than reaching for it here.",
+  },
+];
+
+const NETWORK_GLOBALS = [
+  {
+    name: "fetch",
+    message:
+      "Use the network capability. `browserHttp` from platform-browser/http.mts is the one adapter; for an object URL or a bundled asset use platform-browser/binary.mts.",
+  },
+  {
+    name: "XMLHttpRequest",
+    message:
+      "Use the network capability. `browserHttp` from platform-browser/http.mts is the one adapter.",
+  },
+];
+
 export default defineConfig(
   {
     // tools/probe is excluded because probe.mts is DESIGNED to fail. It is
@@ -414,51 +445,29 @@ export default defineConfig(
   // adapter existed there were twenty-seven unguarded call sites, each with
   // its own handling of an absent value and none with any handling of a store
   // that throws.
-  {
-    files: ["src/platform-browser/**/*.mts", "src/entry-browser/**/*.{ts,tsx}"],
-    ignores: ["src/platform-browser/local-storage.mts"],
-    rules: {
-      "no-restricted-globals": [
-        "error",
-        {
-          name: "localStorage",
-          message:
-            "Use the storage capability. `browserStore` from platform-browser/local-storage.mts is the one adapter, and it is the only place that handles a store which throws.",
-        },
-        {
-          name: "sessionStorage",
-          message:
-            "Use the storage capability. If session-scoped storage is genuinely wanted, add a second adapter beside local-storage.mts rather than reaching for it here.",
-        },
-      ],
-    },
-  },
-
+  //
   // The network is implemented in platform-browser/http.mts. Two files are
   // exempt rather than one, and the second is not a second adapter: reading
   // an object URL or a bundled asset is not a request the core reasons about,
   // and platform-browser/binary.mts exists to give those a home so that they
   // are not scattered. Its own header argues why they do not belong behind
   // the HttpClient port.
-  {
-    files: ["src/platform-browser/**/*.mts", "src/entry-browser/**/*.{ts,tsx}"],
-    ignores: ["src/platform-browser/http.mts", "src/platform-browser/binary.mts"],
-    rules: {
-      "no-restricted-globals": [
-        "error",
-        {
-          name: "fetch",
-          message:
-            "Use the network capability. `browserHttp` from platform-browser/http.mts is the one adapter; for an object URL or a bundled asset use platform-browser/binary.mts.",
-        },
-        {
-          name: "XMLHttpRequest",
-          message:
-            "Use the network capability. `browserHttp` from platform-browser/http.mts is the one adapter.",
-        },
-      ],
-    },
-  },
+  //
+  // Both bans are one rule, no-restricted-globals, and a later flat-config
+  // block that sets a rule replaces the options an earlier block set for the
+  // same file. These were once two blocks over the same files, and the
+  // network ban silently cancelled the storage ban everywhere. So each file
+  // gets one setting of the rule: both lists, or, in an adapter, the list it
+  // is not the adapter for.
+  ...[
+    { ignores: ["src/platform-browser/local-storage.mts", "src/platform-browser/http.mts", "src/platform-browser/binary.mts"], globals: [...STORAGE_GLOBALS, ...NETWORK_GLOBALS] },
+    { only: ["src/platform-browser/local-storage.mts"], globals: NETWORK_GLOBALS },
+    { only: ["src/platform-browser/http.mts", "src/platform-browser/binary.mts"], globals: STORAGE_GLOBALS },
+  ].map(({ ignores, only, globals }) => ({
+    files: only ?? CAPABILITY_FILES,
+    ...(ignores === undefined ? {} : { ignores }),
+    rules: { "no-restricted-globals": ["error", ...globals] },
+  })),
 
   // ===================================================================
   // THE LAYERING RULE, for the half of it no tsconfig can express.
@@ -492,6 +501,32 @@ export default defineConfig(
               message:
                 "The platform layer may not import an entry point. An entry point constructs the platform, not the other way round; if the platform needs this, it belongs in the platform.",
             },
+            {
+              group: ["**/ui/**", "../ui/*"],
+              message:
+                "The platform layer may not import the shared interface. The interface renders onto the platform and mounts its controllers; a platform module that needs a component has its direction backwards.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  // The shared interface sits between the entry points and the platform.
+  // Both entry points import it; it imports neither, or one entry point's code
+  // would reach the other through it.
+  {
+    files: ["src/ui/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["**/entry-browser/**", "**/mobile/**"],
+              message:
+                "The shared interface may not import an entry point. Both entry points import it; if it needs something from one, that thing is shared and belongs here or in the platform.",
+            },
           ],
         },
       ],
@@ -504,6 +539,30 @@ export default defineConfig(
   // import each other as any component tree does. What made a layer an entry
   // point was that nothing outside it imports it, and the platform rule above
   // still states that. The core cannot import it for the reason given there.
+  //
+  // There are two applications again, the web page and the mobile
+  // application, and the rule returns in the form that now applies: neither
+  // imports the other. What both need is shared, and lives in src/ui or the
+  // platform.
+  ...[
+    { files: ["src/entry-browser/**/*.{ts,tsx}"], other: "**/mobile/**", name: "the mobile application" },
+    { files: ["mobile/**/*.{ts,tsx,mts}"], other: "**/entry-browser/**", name: "the web page" },
+  ].map(({ files, other, name }) => ({
+    files,
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [other],
+              message: `An application may not import ${name}. What both need is shared, and belongs in src/ui or the platform.`,
+            },
+          ],
+        },
+      ],
+    },
+  })),
 
   // The browser platform lives in a second TypeScript project, which supplies
   // the DOM lib and withholds the node types and every framework's types. The
@@ -526,7 +585,7 @@ export default defineConfig(
   // the root config are argued in its header. Every lint rule here applies to
   // it unchanged.
   {
-    files: ["src/entry-browser/**/*.{ts,tsx}"],
+    files: ["src/entry-browser/**/*.{ts,tsx}", "src/ui/**/*.{ts,tsx}"],
     languageOptions: {
       parserOptions: {
         projectService: false,
@@ -536,10 +595,40 @@ export default defineConfig(
     },
   },
 
-  // Vite's configuration lives in tsconfig.tools.json, for the reason given
-  // in that file.
+  // The mobile application, native code and DOM component, lives in its own
+  // project, mobile/tsconfig.json, which argues its settings in its header.
   {
-    files: ["vite.config.mts"],
+    files: ["mobile/**/*.{ts,tsx,mts}"],
+    ignores: ["mobile/metro.config.mts", "mobile/babel-transformer.mts", "mobile/types/**", "mobile/dom/*-worker.ts"],
+    languageOptions: {
+      parserOptions: {
+        projectService: false,
+        project: "./mobile/tsconfig.json",
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
+
+  // Native code sees the DOM's types, because the DOM component in the same
+  // project needs them, but has no DOM at run time. Naming one of its globals
+  // type-checks and then fails on the phone, so it is refused here instead.
+  {
+    files: ["mobile/app/**/*.{ts,tsx}", "mobile/index.ts"],
+    rules: {
+      "no-restricted-globals": [
+        "error",
+        ...["document", "window", "location", "localStorage", "sessionStorage", "navigator", "HTMLElement"].map((name) => ({
+          name,
+          message: "Native code has no DOM. Browser work belongs in the DOM component, mobile/dom/, or the shared code it imports.",
+        })),
+      ],
+    },
+  },
+
+  // Vite's and Metro's configurations live in tsconfig.tools.json, for the
+  // reason given in that file.
+  {
+    files: ["vite.config.mts", "mobile/metro.config.mts", "mobile/babel-transformer.mts", "mobile/types/**/*.d.ts"],
     languageOptions: {
       parserOptions: {
         projectService: false,
@@ -553,7 +642,7 @@ export default defineConfig(
   // declare `self` and cannot be loaded together, so a worker cannot join the
   // browser project. Every rule still applies here.
   {
-    files: ["src/platform-worker/**/*.mts"],
+    files: ["src/platform-worker/**/*.mts", "mobile/dom/*-worker.ts"],
     languageOptions: {
       parserOptions: {
         projectService: false,

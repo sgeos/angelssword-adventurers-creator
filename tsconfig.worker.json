@@ -25,7 +25,10 @@
   "include": [
     "src/platform-worker/**/*.mts",
     "src/core/gif-worker-core.mts",
-    "src/core/gif-codec.mts"
+    "src/core/gif-codec.mts",
+    // The mobile application's entries for the same two workers, which import
+    // them and nothing else. They run in a worker, so they are checked here.
+    "mobile/dom/*-worker.ts"
   ],
   "exclude": []
 }

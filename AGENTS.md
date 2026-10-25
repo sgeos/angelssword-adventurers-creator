@@ -50,8 +50,9 @@ TypeScript throughout, a hard fork of a JavaScript upstream that is dormant.
 - **Narrow by returning a value, not a predicate.** Type predicates are
   banned. A narrowing helper returns the narrowed value or `undefined`.
 - **Element types come from the markup.** Read the tag in the component that
-  renders the element, under `src/entry-browser/tabs/`, where the stage
-  controllers' elements are still found by identifier. Inferring an element
+  renders the element, under `src/ui/stages/`, where the stage controllers'
+  elements are still found by identifier, or `src/entry-browser/tabs/` for
+  settings. Inferring an element
   type from an identifier has already produced five runtime failures here.
 - **Three layers, and the direction is enforced.** `src/core/` is portable and
   compiles without the Document Object Model and without the node types. A
@@ -59,9 +60,13 @@ TypeScript throughout, a hard fork of a JavaScript upstream that is dormant.
   implements. Lint bans `Math.random`, `Date.now` and `new Date` there, since no
   compiler setting can. `localStorage` and `fetch` are reachable only from their
   named adapters in `src/platform-browser/`. Nothing imports
-  `src/entry-browser/`. Pure logic belongs in the core, where tests reach it.
+  `src/entry-browser/` or `mobile/`, and neither imports the other. What both
+  need belongs in `src/ui/`. Pure logic belongs in the core, where tests reach
+  it.
 - **The page is a React application on Tamagui and TanStack Start.** The entry
-  layer, `src/entry-browser/`, renders it. The four media stages are memoized
+  layer, `src/entry-browser/`, renders it, and `mobile/` is an Expo application
+  that runs the same four stages in a web view, as an Expo DOM component, with
+  native chrome and settings around them. The four media stages are memoized
   components that render once and hand their subtree to a controller in
   `src/platform-browser/stages/`, which finds elements by identifier, so a
   stage component must not re-render. Settings is React throughout.
@@ -93,7 +98,7 @@ TypeScript throughout, a hard fork of a JavaScript upstream that is dormant.
 npm install
 npm start              # builds the browser half, then serves on port 3001
 npm run dev            # Vite's dev server; start the server on 3001 for /api
-npm run check          # typecheck across seven projects, then lint
+npm run check          # typecheck across eight projects, then lint
 npm test               # unit and application programming interface tests
 npm run test:browser   # browser specifications, rebuilding first
 npm run test:all       # all of the above

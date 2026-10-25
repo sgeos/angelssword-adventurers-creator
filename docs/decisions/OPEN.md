@@ -541,8 +541,19 @@ Each is to be settled by running it on a physical device, not by reading.
 server output could be built into the single executable. It did not need to
 be: the page is built as files, which the existing server and the binary serve.
 
-**What would decide the rest.** The spike's measurements, recorded here, then
-the branch in MIGRATION.md's order of work that they select.
+**Answered on Android, 2026-10-24,** by the application itself on one Galaxy
+A16 in Expo Go, with the measurements in MIGRATION.md. Frame-accurate seeking
+and the rate probe work in the web view. Both exports work, in 2.4 and 3.1
+seconds for the two second fixture, and the boundary cost for that clip is
+inside those figures. Expo's types held against the strict configuration, with
+two vendor declarations needing correction or avoidance, as
+`mobile/types/expo-babel-transformer.d.ts` and `mobile/metro.config.mts` argue.
+
+**Still open.** Everything about iOS, WebKit's WebM first among it. Export
+time on slower phones. Whether large clips are practical across the bridge,
+since a saved file crosses it as base64 in one message.
+
+**What would decide the rest.** An iOS device, and a slower Android one.
 
 ## What the web port left as it was, deliberately
 
@@ -566,6 +577,60 @@ controllers rather than rewriting them, each a choice rather than an oversight.
 **What would decide them.** Whether the stages are rewritten as React, which is
 the native plan's question as much as the web's: on a phone they are meant to
 run as they are, inside a web view.
+
+## The desktop proxy corrupts binary bodies
+
+**Found 2026-10-24, not fixed.** The server reads every upstream body with
+`text()`, which decodes it as UTF-8. A binary body relayed through it is
+corrupted. The image a ComfyUI run retrieves from `/view` goes through that
+relay, so ComfyUI image retrieval cannot work on the desktop as written. The
+Grok video download wraps the decoded text as `{ data }`; the original route's
+comment says the upstream sends base64, which is not established, and if it
+sends the video itself the download is corrupted on both platforms, because
+the mobile path reshapes it from text too. Neither provider has run against a
+live key, which is how this survived.
+
+On the phone, a relayed body keeps its bytes. The desktop routes were left as
+they were, because the fix changes the network port, whose response type has
+only `text()`.
+
+**What would decide it.** Running ComfyUI and Grok once against live
+services, then giving the port a bytes method and the relay a binary reply.
+
+## The mobile application's open matters
+
+**Recorded 2026-10-24.**
+
+- **iOS has never run it.** No device and no simulator are available.
+- **No native build exists.** It runs in Expo Go. A standalone Android or iOS
+  build needs the Android SDK or Xcode's simulators and signing, and no store
+  listing, icon set or bundle identifier has been decided.
+- **The provider keys are held in the web view's memory.** They are kept
+  natively in SecureStore and handed to the web view, which holds them in
+  memory while it runs, because the stages read them through the storage
+  port. They are never written to the web view's disk. Passing a key only with
+  each request would shorten its life in memory further, and touches every
+  stage that reads one.
+- **Phone exports are slow for long clips, and their ceiling is above what
+  was tried.** With the WebM export streamed and Video Prep's scrubbing cache
+  bounded to 256 megabytes, a 20 second 720p clip of 100 megabytes exports on
+  the four gigabyte test phone in eight and a half minutes, and a 40 second one
+  of 200 megabytes exports too, in 18 minutes, after a cache of about as long. Nothing larger was
+  tried. Video Prep's cache taking 20 minutes for a long clip on a phone is
+  itself a cost: scrubbing works by seeking meanwhile, and nothing waits on it
+  but the loop preview. The Graphics Interchange Format export does not stream; its frames are
+  one byte a pixel and its modes cap their count and size, so a normal export
+  fits, but a premium export at its full 4000 by 4000 would not fit a phone. If
+  the system reclaims the web view, the user is told.
+- **A large picked file is slow to load.** Files over 32 megabytes cross the
+  bridge in 4 megabyte chunks, about 3 megabytes a second on the test phone.
+- **Expo's command line tools carry advisories.** `npm audit` in `mobile/`
+  reports node-forge and zod advisories, both inside `@expo/cli`, which runs on
+  the developer's machine and is not shipped in the application. Not accepted
+  or dismissed; recorded.
+- **Unused worker copies ship in the mobile bundle.** The platform's default
+  worker factory names the workers in Vite's form, and Expo bundles those too,
+  about 23 kilobytes that the phone never starts.
 
 ## The Windows executable has never carried the project icon
 

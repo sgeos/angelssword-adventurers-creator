@@ -87,6 +87,13 @@ class NotificationSound {
 
     private _initOnGesture(): void {
         const handler = (): void => {
+            // A host that plays the sound itself needs no audio here, and the
+            // clips are not at this page's address to preload.
+            if (this.hostPlayer !== undefined) {
+                document.removeEventListener('click', handler);
+                document.removeEventListener('keydown', handler);
+                return;
+            }
             if (this.audioContext === null) {
                 // BEHAVIOUR CHANGE, stated rather than hidden: the original
                 // fell back to window.webkitAudioContext. That value is
@@ -123,9 +130,25 @@ class NotificationSound {
         console.log(`[Sound] Preloaded ${Object.keys(this.buffers).length.toString()} clips`);
     }
 
+    /**
+     * A player supplied by a host that cannot play the clips here. The mobile
+     * application's web view has no copy of the sound files at the page's
+     * address, so it plays them natively instead.
+     */
+    private hostPlayer: (() => void) | undefined = undefined;
+
+    setPlayer(player: () => void): void {
+        this.hostPlayer = player;
+    }
+
     play(): void {
+        if (!this.enabled) return;
+        if (this.hostPlayer !== undefined) {
+            this.hostPlayer();
+            return;
+        }
         const ctx = this.audioContext;
-        if (!this.enabled || ctx === null) return;
+        if (ctx === null) return;
 
         // Pick random clip
         const clip = this.clips[Math.floor(Math.random() * this.clips.length)];

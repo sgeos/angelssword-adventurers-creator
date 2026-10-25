@@ -17,6 +17,7 @@ import {
 import { base64ToBlob, blobToBase64, bytesToDataUri, debounce } from "../app-utils.mts";
 import { colorName } from "../../core/color.mts";
 import { closestFrom, fieldValue, queryAll, require2d, requireEl } from "../dom.mts";
+import { saveFile } from "../save-file.mts";
 import * as Core from "../../core/sprite-prep-core.mts";
 import { buildWorkflowFor, loadComfySettings } from "../../core/comfyui-core.mts";
 import {
@@ -361,11 +362,7 @@ function downloadPNG(): void {
         }
         const name = ASAdventurer.characterName !== '' ? ASAdventurer.characterName
             : spriteFileName !== '' ? spriteFileName : 'sprite';
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `${name}_1280x720.png`;
-        a.click();
-        URL.revokeObjectURL(a.href);
+        saveFile(blob, `${name}_1280x720.png`);
     }, 'image/png');
 }
 
@@ -647,11 +644,8 @@ function displayResults(): void {
         if (chosen === undefined) return;
 
         if (btn.dataset['action'] === 'download') {
-            const a = document.createElement('a');
-            a.href = chosen.dataUrl;
             const who = ASAdventurer.characterName !== '' ? ASAdventurer.characterName : 'sprite';
-            a.download = `${who}_gen_${(idx + 1).toString()}.png`;
-            a.click();
+            saveFile(chosen.dataUrl, `${who}_gen_${(idx + 1).toString()}.png`);
         } else if (btn.dataset['action'] === 'select') {
             for (const c of queryAll(grid, '.result-card', HTMLElement)) {
                 c.classList.remove('selected');

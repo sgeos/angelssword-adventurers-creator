@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  // ===================================================================
+  // The mobile application: native code in app/, and the DOM component in
+  // dom/, which imports the shared interface and the browser platform.
+  //
+  // The repository's strict configuration, with the same two settings the
+  // web entry layer relaxes, for the same reasons, argued in
+  // ../tsconfig.app.json: third-party declarations are not checked, because
+  // React Native's, Expo's and Tamagui's fail inside their own files, and
+  // isolatedDeclarations is off, because nothing imports an entry point.
+  //
+  // The DOM library is present because the DOM component and the shared
+  // code it reaches use it. That lets native code name a DOM global and still
+  // type-check, so eslint.config.mjs bans the DOM's globals in app/, where
+  // they would fail at run time.
+  //
+  // Packages resolve from this directory's node_modules for every file,
+  // shared ones included, which is what Metro does too (see
+  // metro.config.mts). Otherwise a shared file would be checked against the
+  // web build's copy of React and Tamagui.
+  // ===================================================================
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": [],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedDeclarations": false,
+    // The shared sources sit above this directory.
+    "rootDir": "..",
+    "paths": {
+      "react": ["./node_modules/@types/react"],
+      "react/*": ["./node_modules/@types/react/*"],
+      "@tamagui/*": ["./node_modules/@tamagui/*"]
+    }
+  },
+  "include": ["index.ts", "assets.d.ts", "app/**/*.ts", "app/**/*.tsx", "dom/**/*.ts", "dom/**/*.tsx"],
+  // The worker entries run in a worker, not a page, and are checked by
+  // ../tsconfig.worker.json, whose WebWorker lib cannot join this one's DOM lib.
+  "exclude": ["node_modules", "dom/*-worker.ts"]
+}

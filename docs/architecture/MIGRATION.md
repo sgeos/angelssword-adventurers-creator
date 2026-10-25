@@ -7,10 +7,11 @@ Expo for iOS and Android. Adopted by the operator on 2026-10-24. The decision
 is recorded in [RESOLVED.md](../decisions/RESOLVED.md), and the questions still
 open are in [OPEN.md](../decisions/OPEN.md).
 
-**The web port is complete, as of 2026-10-24. The native half has not begun.**
-The plan put a spike on devices first. The operator then directed the web port
-ahead of it, so the web port was done first and the spike remains the first
-step of the native half.
+**The web port is complete, as of 2026-10-24. The native half runs on one
+Android phone in Expo Go, and has not run on iOS.** The plan put a spike on
+devices first. The operator then directed the web port ahead of it, and then
+the mobile application itself, so the spike's questions were answered by the
+application rather than by a disposable one, on Android only.
 
 ## What the web port did
 
@@ -51,8 +52,115 @@ implementation. The chrome and the settings panel are Tamagui and React state
 throughout, which is the shape that runs natively.
 
 Three web-only rules that Tamagui's types cannot express, grid layout,
-gradient text and a last-child margin, live in `src/entry-browser/ui/web-only.ts`
+gradient text and a last-child margin, live in `src/ui/web-only.ts`
 rather than in Tamagui components, for the reason given there.
+
+## How the mobile half is put together
+
+`mobile/` is an Expo application, SDK 58, with React Native 0.88, a package of
+its own. Native code draws the header, the tab bar, the toasts and the
+settings screen in Tamagui. The four media stages run in one web view, as the
+Expo DOM component `mobile/dom/Stages.tsx`, which renders `src/ui/StagePanels.tsx`,
+the same component the web page renders, and so the same controllers. One web
+view rather than four, because the stages share one handoff object in memory.
+
+What the web view lacks, native code supplies through seams in the browser
+platform, each with the web page's behaviour as its default.
+
+| Seam | Web page | Mobile |
+|---|---|---|
+| `http.mts`, the transport behind `HttpClient` | `fetch` to the local proxy | `in-page-proxy.mts` plans each `/api` route with the core's `planProxyRequest`, and native code sends it with Expo's fetch, outside cross-origin rules |
+| `save-file.mts` | A download link | The bytes cross to native code, are written to the cache and handed to the share sheet |
+| `workers.mts` | Vite's worker bundling | Entry files inside `mobile/dom/`, because Expo built addresses for workers outside its project root that did not exist |
+| The notification sound | Web Audio | `expo-audio` |
+| Storage, `local-storage.mts`'s backing | `localStorage` | Expo's web view has no Web Storage. The DOM component holds the settings in memory, filled from native storage before any stage module loads and written back to it: keys in SecureStore, the rest in SQLite |
+| File inputs | The browser's file chooser | Expo's web view has none. A tap on a file input is intercepted, native code opens the system document picker filtered by the input's `accept`, and the chosen file is set on the input with a change event |
+
+The fonts are imported as assets and registered with the font loading
+interface, because Metro bundles a stylesheet's rules but not the files its
+`url()` references name.
+
+## What was verified on a device
+
+On a Galaxy A16, Android 16, web view 155, through Expo Go 58, on 2026-10-24.
+The web view was driven over the Chrome DevTools Protocol and the screen was
+captured. These are results on one phone, not on modest hardware in general.
+
+| Check | Result |
+|---|---|
+| The application loads, and all four stages initialise | Yes |
+| The web view has `MediaRecorder` with WebM, VP8 and VP9, `requestVideoFrameCallback`, `captureStream` and Web Audio, in a secure context | Yes |
+| The fifteen frame per second fixture in Video Prep | Detected as 15, 30 frames, scrubber end 29 |
+| The thirty frame per second fixture in the exporter | Detected as 30, 60 frames |
+| A Graphics Interchange Format export, two second fixture | The share sheet opened 2.4 seconds after the click |
+| A WebM export, the same fixture | The share sheet opened 3.1 seconds after the click |
+| The handoff from Video Prep to the exporter | 0.28 seconds; the exporter received 30 frames at 15 per second, and the native tab followed |
+| Toasts raised in the web view | Shown natively |
+| A native tab press | Switches the web view's stage |
+| The web fonts | All five faces load |
+| Layout at the web view's 384 pixel width | No horizontal overflow, after the fix below |
+| The tab bar following a stage to an off-screen tab | It scrolls to Model Exporter and highlights it |
+| The settings screen's key test, with a fake OpenAI key | The request went through the native transport, and OpenAI's rejection showed in the status line |
+| Saving that key, then a sprite generation | The stage read the key and its request was rejected for the key, not refused for a missing one |
+| Settings across a restart | The key, saved natively, and the sprite zoom, saved from the web view, both returned |
+| The system file picker | Android's document picker opened from Video Prep's input, and the chosen clip loaded at 15 frames per second |
+| The notification sound | A native player started at the end of an export and stopped 1.6 seconds later |
+| A 25 megabyte clip, 1280 by 720, 10 seconds, through the picker | Loaded in 3.1 seconds, 300 frames at 30 per second |
+| A 100 megabyte clip, 1280 by 720, 20 seconds, through the picker | Loaded in 33.7 seconds, 600 frames; handed to the exporter in 2.2 seconds |
+| A WebM export of the 25 megabyte clip, after the export was made to stream | Finished: 300 frames, 9.6 megabytes, in about four and a half minutes, the renderer's memory falling rather than growing |
+| A WebM export of the 100 megabyte clip, with the export streamed and Video Prep's cache bounded | Finished: 600 frames, 26.7 megabytes, in eight and a half minutes, the phone's free memory never below 473 megabytes |
+| A 200 megabyte clip, 1280 by 720, 40 seconds, end to end | Loaded in 69.7 seconds, 1,200 frames; cached in 20 minutes; handed off in 2.4 seconds; exported as WebM, about 51 megabytes, in 1,106 seconds measured in the page, 0.92 seconds a frame, the phone's free memory never below 317 megabytes over two runs |
+
+Five defects were found on the device and fixed. The stage column was 1,339
+pixels wide on a 384 pixel screen, because Expo's root element is a flex row
+and a React Native Web view does not shrink. Both workers failed to load,
+for the address reason above, and the exporter's handler reported the failure
+as an unknown error, because an `ErrorEvent` is not an `Error`. The fonts did
+not load. `localStorage` is null in Expo's web view, so no setting, and no key,
+reached a stage. And a file input did nothing when tapped. The community web
+view, which has a file chooser, was tried and abandoned, because Expo's DOM
+runtime fails to start in it.
+
+Reading a picked file whole as base64 failed for the 100 megabyte clip,
+needing a 272 megabyte allocation in a 256 megabyte heap. Files up to 32
+megabytes are now read whole, by the file system module's fast native encoder,
+and larger ones in 4 megabyte chunks assembled as `Blob` parts in the web
+view. Chunking costs time: the 25 megabyte clip took 9.6 seconds in chunks
+against 3.1 whole, which is why the threshold exists.
+
+**The WebM export streams.** It used to decode and key every frame first,
+four bytes a pixel, and then play them into the recorder; 600 frames at 1280
+by 720 were 2.2 gigabytes. Now each frame is prepared while the recorder is
+paused and shown for one frame interval while it runs, so one frame is held at
+a time. A recorder leaves paused time out of its timestamps, and each
+interval's timer overrun is carried into the next, so a sixty frame export
+ends at 1.97 seconds, where sixty frames at thirty per second end, which a
+browser specification now reads from the file itself. On the phone, the 25
+megabyte clip exports with the renderer's memory falling throughout.
+
+**The other two gigabytes were Video Prep's.** Streaming alone did not save
+the 100 megabyte clip: the export still died five minutes in. Neither the
+renderer's memory nor the page's collected heap grew per frame, which ruled
+out a leak in the export. The cause was Video Prep, which after loading a clip
+caches every frame as a full-size canvas for instant scrubbing: 600 frames at
+720p are another 2.2 gigabytes, built in the background while the export ran.
+The cache now has a 256 megabyte budget, `cacheFrameSize` in the core. A two
+second 720p clip is still cached at full size; a twenty second one at about a
+third of the linear size, which the scrubber and the loop preview draw scaled
+to their canvas anyway.
+
+**If the system still reclaims the web view,** for a clip larger again or a
+phone with less memory, Expo reloads it and the user is now told that the
+stages restarted and what was lost, rather than seeing them reset.
+
+**Not verified on a device.** iOS, on any device. A production build, because
+Expo Go loads development bundles and there is no Android SDK here for a
+native build; continuous integration bundles the production export for Android
+on every push, which proves it bundles and not that it runs. A provider
+request with a valid key, which would spend money, as opposed to the rejected
+one. A clip larger than 200 megabytes and 40 seconds at 720p, the largest
+exported. Export time on hardware slower than this phone, which at 0.85
+seconds a frame on this one is already minutes for a long clip.
 
 ## Where the work departed from the plan
 
@@ -73,7 +181,7 @@ configuration held against the frameworks' types for this project's code, with
 two settings relaxed for the entry layer only and argued in
 `tsconfig.app.json`. That answers one of the plan's open questions.
 
-## The native half, still ahead: iOS and Android on Tamagui and Expo
+## The native half as planned, before it was built
 
 | Stage | Difficulty on a phone |
 |---|---|
@@ -89,6 +197,10 @@ navigation, file selection, settings and provider calls are native Tamagui. One
 implementation of the media work, rather than two, is the point.
 
 ## Order of work
+
+As planned. Steps one and two were taken together on Android: the application
+was built and then measured on the phone, rather than a spike first. Step one
+on iOS has not been taken.
 
 1. **Spike.** A disposable Expo application holding one DOM component, run on a
    physical iPhone and a physical Android device. It loads the fifteen frame per
@@ -119,9 +231,10 @@ implementation of the media work, rather than two, is the point.
 
 ## What this plan does not claim
 
-That WebKit's recorder can produce WebM. That a web view on modest hardware
-can export in acceptable time. Both are open, and both are what the spike is
-meant to settle by execution rather than by reading.
+That WebKit's recorder can produce WebM, which is still open, since no iOS
+device has run the application. That a web view on modest hardware can export
+in acceptable time, which is answered for one Android phone, where a two
+second clip exported in under four seconds, and open for slower ones.
 
 Two questions the plan listed are answered by the web port. The strict
 configuration holds against the framework types, with the two exemptions

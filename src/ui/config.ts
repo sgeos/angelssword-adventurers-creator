@@ -11,7 +11,7 @@
  * that are still styled by class, and the two must agree until those parts
  * move here.
  */
-import { createFont, createTamagui, createTokens, type TamaguiInternalConfig } from "@tamagui/core";
+import { createFont, createTamagui, createTokens, isWeb, type TamaguiInternalConfig } from "@tamagui/core";
 
 const color = {
     bgDeep: "#1a1a2e",
@@ -102,11 +102,18 @@ const makeFont = (family: string): ReturnType<typeof createFont> =>
         letterSpacing: { 0: 0, 1: 0.5, 2: 1, 3: 2 },
     });
 
+/**
+ * A family as the platform names it. The web takes a CSS list with fallbacks;
+ * a native platform takes exactly the name the font was loaded under, which
+ * the mobile application registers from the same files in public/fonts.
+ */
+const family = (name: string, fallback: string): string => (isWeb ? `'${name}', ${fallback}` : name);
+
 const fonts = {
-    display: makeFont("'Cinzel Decorative', 'Georgia', serif"),
-    heading: makeFont("'Cinzel', 'Georgia', serif"),
-    body: makeFont("'Outfit', 'Segoe UI', sans-serif"),
-    mono: makeFont("'Share Tech Mono', monospace"),
+    display: makeFont(family("Cinzel Decorative", "'Georgia', serif")),
+    heading: makeFont(family("Cinzel", "'Georgia', serif")),
+    body: makeFont(family("Outfit", "'Segoe UI', sans-serif")),
+    mono: makeFont(family("Share Tech Mono", "monospace")),
 };
 
 export const config: TamaguiInternalConfig = createTamagui({

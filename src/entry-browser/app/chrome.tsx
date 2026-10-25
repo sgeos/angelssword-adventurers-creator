@@ -12,7 +12,7 @@ import { styled, View } from "@tamagui/core";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { currentTab, subscribeTab, switchTab, type TabId } from "../../platform-browser/navigation.mts";
 import { currentToasts, subscribeToasts, type Toast } from "../../platform-browser/toasts.mts";
-import { Text } from "../ui/primitives.tsx";
+import { Text } from "../../ui/primitives.tsx";
 
 /** The stage showing now, re-rendering when it changes. */
 export const useCurrentTab = (): TabId => useSyncExternalStore(subscribeTab, currentTab, currentTab);

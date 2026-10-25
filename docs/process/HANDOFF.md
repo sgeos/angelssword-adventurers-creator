@@ -2,7 +2,7 @@
 
 > **Navigation**: [Process](./README.md) | [Documentation Root](../README.md)
 
-**Refreshed 2026-10-24. The anchor is `cc05bbd`, the last commit before this
+**Refreshed 2026-10-24. The anchor is `b8778a3`, the last commit before this
 refresh.** Read this block, run the validity check, then read the task below.
 
 ---
@@ -16,11 +16,11 @@ itself.
 
 ### Ancestry
 
-`main` should **contain** `cc05bbd`, the last commit before this refresh. Test
+`main` should **contain** `b8778a3`, the last commit before this refresh. Test
 containment rather than equality.
 
 ```sh
-git merge-base --is-ancestor cc05bbd HEAD
+git merge-base --is-ancestor b8778a3 HEAD
 ```
 
 If that fails, this file predates a history rewrite and is stale. If it
@@ -40,27 +40,31 @@ of the list rather than taking the next unused number, and renumber when
 inserting, because a list whose numbers skip reads as though checks are
 missing.
 
-1. `git ls-files` reports **112** TypeScript files ending `.ts` or `.mts`,
-   **12** ending `.tsx`, and exactly **one** JavaScript file,
+1. `git ls-files` reports **135** TypeScript files ending `.ts` or `.mts`,
+   **18** ending `.tsx`, and exactly **one** JavaScript file,
    `eslint.config.mjs`, which is deliberate.
 2. **Seven** projects exist at the repository root, `tsconfig.json` and six
-   `tsconfig.*.json` files, and `src/` holds exactly four directories,
-   `core`, `platform-browser`, `platform-worker`, and `entry-browser`.
+   `tsconfig.*.json` files, and an **eighth** at `mobile/tsconfig.json`.
+   `npm run typecheck` checks all eight. `src/` holds exactly five
+   directories, `core`, `platform-browser`, `platform-worker`, `ui`, and
+   `entry-browser`.
 3. `src/core/ports/` holds **three** capability interfaces, namely
    `storage.mts`, `http.mts`, and `clock.mts`, and `src/core/` holds
-   **twenty** modules, counting `frame-rate.mts`.
-4. `npm test` reports **677** unit tests and **57** application programming
-   interface tests, all passing.
-5. `npm run test:browser` reports **88** passing browser specifications. Use
+   **twenty-three** modules, counting `proxy.mts`, `tabs.mts` and `accept.mts`.
+4. `npm test` reports **719** unit tests and **58** application programming
+   interface tests, all passing. It needs no mobile install.
+5. `npm run test:browser` reports **90** passing browser specifications. Use
    that script rather than `npx playwright test`, which reuses a running
    server and therefore skips its own rebuild.
 6. `tsc -p tsconfig.core.json` succeeds, and adding `localStorage` to any file
-   under `src/core/` makes it fail.
+   under `src/core/` makes it fail. Adding it to a file under
+   `src/platform-browser/`, `src/ui/` or `mobile/dom/` makes the lint fail,
+   which was not true before this refresh; see LAYERING.md.
 7. `test/fixtures/media` holds **four** fixtures, two of them small generated
    clips at different frame rates which the loop, exporter and frame rate
    specifications require, and `test/fixtures` holds no other directory.
-8. `.github/workflows/verify.yml` declares **five** jobs, and the most recent
-   run on `main` passed all of them. Read it rather than taking this on trust:
+8. `.github/workflows/verify.yml` declares **six** jobs. Read the most recent
+   run rather than taking it on trust:
 
    ```sh
    gh run list --repo sgeos/angelssword-adventurers-creator --workflow verify.yml --limit 1
@@ -70,16 +74,25 @@ missing.
    remote and reports that the workflow does not exist, which reads as a
    failure of this assertion and is not one.
 
-   The two beyond the gate are `container`, which builds the image and fetches
-   from a running container, and `binary`, which builds the standalone
-   executable on Linux and on Windows and fetches from each.
+   The three beyond the gate are `mobile`, which installs the mobile package
+   and bundles it for Android with `expo export`, `container`, which builds
+   the image and fetches from a running container, and `binary`, which builds
+   the standalone executable on Linux and on Windows and fetches from each.
+   The `check` job now installs the mobile package too, because the gate
+   typechecks it. **The `mobile` job and the changed `check` job had not run
+   in continuous integration at this refresh.** Their steps, and the `test`,
+   `browser` and `binary` jobs', were run on a clean copy of the tree, from
+   the committed file list, under Node 22.18.0 with fresh `npm ci` installs,
+   on macOS rather than Linux, and all passed. The `container` job was not:
+   Docker was not available.
 
    Without an authenticated `gh`, report assertion 8 as **unverified**, not as
    failed, and say why. The same holds for assertions 4 and 5 under a sandbox
    that forbids binding local ports, where the tests fail with `listen EPERM`
    for reasons unrelated to the code.
 
-Every assertion above was executed at the anchor.
+Every assertion above was executed on the working tree that this refresh
+describes, except the run status in assertion 8.
 
 **Assertion 8 used to read "the container builds and serves" and was false for
 several refreshes, this author included among those who did not notice.** The
@@ -173,9 +186,10 @@ the source rate from frame timestamps, and webfonts fetched from a third party
 on every page load, resolved in `bddf5ec` by hosting the fonts.
 
 **Then the same attention went to the artefacts nobody builds, and found more.**
-Continuous integration now has five jobs: the three that run the gate, plus one
+Continuous integration then had five jobs: the three that run the gate, plus one
 that builds the container and fetches from it and one that builds the standalone
-binary on Linux and on Windows and fetches from each. All pass.
+binary on Linux and on Windows and fetches from each. The mobile port added a
+sixth, which bundles the mobile application.
 
 Writing them produced three further findings, all of the same kind and none
 reachable by a compiler or a unit test. The documented binary smoke test told the
@@ -194,39 +208,54 @@ half of the interface migration was done on 2026-10-24, ahead of the device
 spike, on the operator's direction. The core is unchanged to the line. The
 four media stages kept their controllers, moved to
 `src/platform-browser/stages/`, and mount onto markup that memoized components
-render once. The chrome and the settings panel are Tamagui and React state.
-Vite builds into `dist/client/`, which the unchanged proxy server serves. The
-port was checked against the previous build element by element, 167 bounding
-boxes agreeing within a pixel and a half, and by screenshot, which found two
-defects the measurement could not. What was done and why is in
-[MIGRATION.md](../architecture/MIGRATION.md) and `RESOLVED.md`.
+render once. Vite builds into `dist/client/`, which the proxy server serves.
+
+**The mobile application exists, and runs on one Android phone.** `mobile/`
+is an Expo application on SDK 58, with native chrome and settings in Tamagui
+and the four stages in one web view as an Expo DOM component. The stage
+components and the panels moved to `src/ui/`, which both applications render.
+The proxy's routing became a core planner, `src/core/proxy.mts`, which the
+server executes with node and the phone executes natively. On a Galaxy A16 in
+Expo Go, frame rate detection, both exports, the handoff between stages, the
+native tab switching and toasts, and the fonts were verified; the figures are
+in [MIGRATION.md](../architecture/MIGRATION.md), and so were the settings
+screen, a provider request through the native transport, settings persisting
+across a restart, the system file picker and the notification sound. Five
+defects were found on the device and fixed: the stage column was three and a
+half times the screen's width, the workers did not load, the fonts did not
+load, the web view had no storage, so no setting reached a stage, and file
+inputs did nothing, because Expo's web view has no file chooser.
 
 ## The next task
 
-**The native half of the interface migration, beginning with its spike.** The
-web half is done; see above. The native half is the disposable spike that
-[MIGRATION.md](../architecture/MIGRATION.md) describes, on a physical iPhone
-and a physical Android device, and its open questions are in `OPEN.md`. **Do
-not start the Expo application before the spike's results are recorded and the
-operator has chosen the branch they select.** The operator has a physical
-Android phone and, as of 2026-10-24, no iPhone. Run the Android half first.
-Desktop Safari and the iOS Simulator may give early indications about WebKit,
-recorded as indications only, and they do not settle the iOS questions.
+**The operator's decision on a native build, and iOS.** Everything the
+Android phone can show in Expo Go has been shown, up to a 40 second 720p clip
+of 200 megabytes loaded, cached, handed off and exported as WebM on the phone.
+That took the export streaming one frame at a time and Video Prep's scrubbing
+cache bounded; `OPEN.md` and MIGRATION.md have the measurements. A standalone build needs the
+Android SDK or Xcode's simulators, and an icon and identifier; see `OPEN.md`.
+iOS needs a device. A key test with a deliberately wrong key exercises the
+native transport without spending anything, and was how it was verified.
 
-**When editing the page,** a stage component under `src/entry-browser/tabs/`
+**Running it on the phone.** Set `ANDROID_SERIAL` to the phone's serial on
+every command, since another project's emulator shares this machine's `adb`
+server. Then `adb reverse tcp:8081 tcp:8081`, start Metro from `mobile/` with
+`npx expo start --lan`, and open `exp://127.0.0.1:8081` in Expo Go. Starting
+Expo Go cold brings it up behind the launcher; send the same intent a second
+time. The web view is reachable for a test script through
+`adb forward tcp:9333 localabstract:webview_devtools_remote_<pid>` and
+Playwright's `connectOverCDP`. Never capture the screen without first checking
+that Expo Go is the resumed activity, because the phone is a personal device,
+and never begin a swipe near a screen edge, which is the back gesture and has
+left the app. Find native elements with `uiautomator dump`, filtered to this
+application's `testID`s, rather than by screenshot. Ask before changing any
+setting on it. The pitfalls are in
+`AGENT_PITFALLS.md` under "The mobile application".
+
+**When editing the page,** a stage component under `src/ui/stages/`
 must keep rendering once. Its controller owns the subtree after it mounts, and
 a prop or state that re-rendered it would undo the controller's changes. The
-settings panel and the chrome are ordinary React. The new pitfalls from the
-port, most of them about Tamagui's CSS, are in `AGENT_PITFALLS.md` under
-"Porting the interface to Tamagui".
-
-The two frame rate browser specifications that were queued are written, in
-`frame-rate.spec.ts`. The adoption specification removes
-`requestVideoFrameCallback` after Video Preparation has measured, so that a
-second measurement would visibly fall back to thirty, and it was confirmed to
-fail with the exporter's adoption disabled. Two older specifications that
-bounded the clip's frame count loosely, because the rate used to vary by host,
-now assert sixty exactly.
+settings panel and the chrome are ordinary React.
 
 **Decisions taken by the operator.**
 
@@ -268,6 +297,11 @@ now assert sixty exactly.
   `MIGRATION.md`, open questions in `OPEN.md`.
 - **Web port first**, 2026-10-24. Complete the web port to Tamagui and TanStack
   Start ahead of the spike. Done. The decisions it took are in `RESOLVED.md`.
+- **Mobile port**, 2026-10-24. Complete the port to Tamagui and Expo, tested
+  on the Android phone to the extent it is available. Done on Android in Expo
+  Go, with the gaps listed under the next task.
+- **Phone settings**, 2026-10-24. Stay-awake on USB may be enabled for a test
+  window and must be turned off at its end. It was.
 
 **Awaiting the operator.**
 
@@ -277,6 +311,13 @@ now assert sixty exactly.
 - **The Windows icon.** The executable has never carried it, the `rcedit` call
   having had nothing to run. The archived package was removed. Whether to add
   the icon with `resedit` is recorded in `OPEN.md`.
+- **The desktop proxy's binary bodies.** The server decodes every upstream
+  body as text, which corrupts a ComfyUI image through the relay, and possibly
+  the Grok video download. Found during the mobile port, recorded in
+  `OPEN.md`, not fixed.
+- **The mobile application's open matters,** in `OPEN.md`: iOS, a native
+  build, the keys held in the web view's memory, and Expo's tooling
+  advisories.
 - **The development Node floor.** `jsdom` 30.1 declares Node 22.22.2, above the
   project's 22.18, and continuous integration tests at 22.18. Recorded in
   `OPEN.md`.
@@ -321,8 +362,8 @@ found this way lived in the wiring rather than the arithmetic.
 The core has **zero** references to a platform facility of any kind, which
 `tsconfig.core.json` refuses to compile. Storage and the network are each
 confined by lint to named adapter files, and the lint now reaches the React
-entry layer's `.tsx` files too. Twenty core modules carry what the application
-computes; 677 unit tests reach all of it.
+entry layer's `.tsx` files too. Twenty-three core modules carry what the application
+computes; 719 unit tests reach all of it.
 
 The entry-layer behaviour worth asserting is covered: the reference slots, the
 loop controls, the framing and art style selectors, the exporter's mode limits,
@@ -416,6 +457,9 @@ Recorded in [../decisions/OPEN.md](../decisions/OPEN.md).
   built and served by continuous integration on Linux and Windows, and by hand
   on macOS.
 - The Gemini key test bypasses the proxy, awaiting the operator.
+- The desktop proxy decodes binary bodies as text.
+- The mobile application has run on one Android phone in Expo Go, never on
+  iOS, and has no native build.
 - No release has been cut.
 
 ## Relationship to upstream

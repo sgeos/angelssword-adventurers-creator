@@ -15,7 +15,7 @@
  * that would run as a DOM component.
  */
 import { memo, type ReactNode } from "react";
-import { Dim, Panel, PanelTitle, PanelTitleText, PanelTitleIcon, MainLayout, TwoCol, FormRow, StageSection, StageHeader } from "../ui/primitives.tsx";
+import { Dim, Panel, PanelTitle, PanelTitleText, PanelTitleIcon, MainLayout, TwoCol, FormRow, StageSection, StageHeader } from "../primitives.tsx";
 
 const SpritePrepTabView = (): ReactNode => (
     <>

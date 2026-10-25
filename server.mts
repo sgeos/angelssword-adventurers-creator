@@ -10,7 +10,19 @@ import express, { type Express, type Request, type RequestHandler, type Response
 import nodeFetch from "node-fetch";
 
 import type { HttpClient, HttpRequest, HttpResponse } from "./src/core/ports/http.mts";
-import { OPENAI_SPRITE_MODEL } from "./src/core/providers.mts";
+import {
+  failureReply,
+  isAllowedComfyRequest as coreIsAllowedComfyRequest,
+  isAllowedVideoUrl as coreIsAllowedVideoUrl,
+  normaliseComfyOrigin as coreNormaliseComfyOrigin,
+  planProxyRequest,
+  shapeReply,
+  singleString,
+  type ProxyEnvironment,
+  type TextReply,
+  type UpstreamPlan,
+  type UrlParser,
+} from "./src/core/proxy.mts";
 import FormData from "form-data";
 import path from "node:path";
 import { execFile } from "node:child_process";
@@ -19,135 +31,27 @@ import { isSea } from "node:sea";
 // ── Helpers ──────────────────────────────────────────────────────────
 
 /**
- * A thrown value is `unknown`, not `Error`. Narrow it rather than assuming
- * `.message` exists, which throws again on a rejected non-Error.
+ * The URL parser the core's checks are given: node's WHATWG implementation,
+ * the same one its fetch uses, so the check and the request agree about what
+ * a URL means.
  */
-const errorMessage = (err: unknown): string =>
-  err instanceof Error ? err.message : "unknown error";
-
-/**
- * Express supplies header and query values as `string | string[] | ParsedQs`.
- * Anything that is not a non-empty string is rejected rather than coerced.
- *
- * This is a behaviour fix, not just a type fix. A request shaped
- * `?key[]=a&key[]=b` made `req.query.key` an array, which then reached
- * `.substring()` and threw a TypeError inside the handler, answering 502
- * with a stack-derived message instead of 400.
- */
-const singleString = (value: unknown): string | undefined =>
-  typeof value === "string" && value.length > 0 ? value : undefined;
-
-/**
- * Resolve the credential for an upstream call.
- *
- * A request header wins, so that a key held only in the browser never has to
- * reach the server's environment. An environment variable is the fallback,
- * which is what lets an operator run the tool for others without each of them
- * holding a key. Reimplemented from upstream pull request 1, which introduced
- * the environment path for container deployments.
- *
- * The header is checked with singleString, so a repeated header yields
- * undefined and a 401 rather than an array reaching string operations.
- */
-const resolveAuth = (
-  header: unknown,
-  envVar: string | undefined,
-): string | undefined => {
-  const fromHeader = singleString(header);
-  if (fromHeader !== undefined) return fromHeader;
-  const fromEnv = singleString(envVar);
-  return fromEnv === undefined ? undefined : `Bearer ${fromEnv}`;
-};
-
-/**
- * Hosts a generated video may be fetched from.
- *
- * Upstream pull request 1 proxied whatever address the request body named,
- * attaching the caller's bearer token to it. Any page the user had open could
- * therefore post an address it controlled to the local server and receive the
- * user's xAI credential, since the server also answers every origin. Failing
- * closed against an allowlist is the fix. A video served from a host not
- * listed here is refused rather than fetched, which is the correct direction
- * to be wrong in.
- */
-const XAI_VIDEO_HOSTS: readonly string[] = ["x.ai", "api.x.ai", "assets.x.ai", "imgen.x.ai"];
-
-/** Whether a URL is one this proxy will attach a credential to. */
-export const isAllowedVideoUrl = (raw: string): boolean => {
-  let parsed: URL;
+const nodeUrl: UrlParser = (raw) => {
   try {
-    parsed = new URL(raw);
-  } catch {
-    return false;
-  }
-  if (parsed.protocol !== "https:") return false;
-  return XAI_VIDEO_HOSTS.some(
-    (host) => parsed.hostname === host || parsed.hostname.endsWith(`.${host}`),
-  );
-};
-
-/**
- * ComfyUI endpoints this proxy will reach.
- *
- * Upstream pull request 1 forwarded whatever path and method the request
- * body named. That turns the local server into a general actuator for
- * anything on the user's private network, reachable by any page they have
- * open, since the server answers every origin. Restricting the set to what
- * the client actually needs contains that without costing any capability.
- */
-const COMFY_ALLOWED_PATHS: Readonly<Record<string, readonly string[]>> = {
-  "/prompt": ["POST"],
-  "/history": ["GET"],
-  "/view": ["GET"],
-  "/system_stats": ["GET"],
-  "/upload/image": ["POST"],
-};
-
-/** Whether a path and method pair is one this proxy forwards. */
-export const isAllowedComfyRequest = (rawPath: string, method: string): boolean => {
-  // /history/<id> is the only parameterised form; everything else is exact.
-  const base = rawPath.startsWith("/history/") ? "/history" : rawPath;
-  const allowed = COMFY_ALLOWED_PATHS[base];
-  return allowed?.includes(method.toUpperCase()) === true;
-};
-
-/**
- * Reduce a ComfyUI address to an origin, or reject it.
- *
- * Carried over from upstream, which had the right instinct here. A ComfyUI
- * instance lives on the user's own machine or their local network, so a
- * public address is either a mistake or an attempt to make this server fetch
- * something on the caller's behalf. Loopback and the private ranges are
- * permitted and nothing else is.
- */
-export const normaliseComfyOrigin = (raw: string): string | undefined => {
-  const trimmed = raw.trim().replace(/\/$/, "");
-  // A common typo writes the port as a path. Repair it before parsing.
-  const repaired = trimmed.replace(/^(https?:\/\/[^/:]+)\/(\d+)$/i, "$1:$2");
-
-  let url: URL;
-  try {
-    url = new URL(repaired);
+    const url = new URL(raw);
+    return { protocol: url.protocol, hostname: url.hostname, origin: url.origin };
   } catch {
     return undefined;
   }
-  if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
-
-  const host = url.hostname;
-  const isPrivate =
-    host === "localhost"
-    || host === "127.0.0.1"
-    || host === "::1"
-    || host === "comfyui"
-    || host.endsWith(".local")
-    || host.startsWith("10.")
-    || host.startsWith("192.168.")
-    || /^172\.(1[6-9]|2\d|3[01])\./.test(host);
-  return isPrivate ? url.origin : undefined;
 };
 
-/** xAI's public API base. Requests reach it only through this proxy. */
-const XAI_API_BASE = "https://api.x.ai/v1";
+/** Whether a URL is one this proxy will attach a credential to. See `core/proxy.mts`. */
+export const isAllowedVideoUrl = (raw: string): boolean => coreIsAllowedVideoUrl(raw, nodeUrl);
+
+/** Whether a ComfyUI path and method pair is one this proxy forwards. */
+export const isAllowedComfyRequest: (rawPath: string, method: string) => boolean = coreIsAllowedComfyRequest;
+
+/** Reduce a ComfyUI address to an origin on the local network, or reject it. */
+export const normaliseComfyOrigin = (raw: string): string | undefined => coreNormaliseComfyOrigin(raw, nodeUrl);
 
 /** Clamp an environment port to something `listen` will accept. */
 const parsePort = (raw: string | undefined): number => {
@@ -156,39 +60,18 @@ const parsePort = (raw: string | undefined): number => {
   return Number.isInteger(parsed) && parsed > 0 && parsed < 65536 ? parsed : 3001;
 };
 
-type AsyncRoute = (req: Request, res: Response) => Promise<void>;
+type AsyncHandler = (req: Request, res: Response, next: () => void) => Promise<void>;
 
 /**
- * Funnel an async handler's rejection into `next()`.
- *
- * Written for Express 4, which predates promise-aware routing and left a
- * rejected handler's request hanging until it timed out. Express 5 forwards a
- * rejection itself, so this is now redundant there. It is kept because it
- * states the handling at each route rather than relying on a framework
- * default, and because the lint's floating promise rules see an explicit
- * `catch`.
+ * Funnel an async handler's rejection into `next()`. Express 5 forwards a
+ * rejection itself; this is kept so the handling is stated rather than left to
+ * a framework default, and so the lint's floating promise rules see a `catch`.
  */
 const route =
-  (handler: AsyncRoute): RequestHandler =>
+  (handler: AsyncHandler): RequestHandler =>
   (req, res, next) => {
-    handler(req, res).catch(next);
+    handler(req, res, () => { next(); }).catch(next);
   };
-
-/**
- * The JSON text forwarded for a parsed request body.
- *
- * Express 5 leaves `req.body` undefined when no parser matched, where Express 4
- * gave `{}`. `JSON.stringify(undefined)` is undefined, not a string, so passing
- * the body straight through sent upstream a POST with no body at all. An
- * absent body is forwarded as the empty object Express 4 produced.
- */
-const forwardedJson = (body: unknown): string => JSON.stringify(body ?? {});
-
-/** Forward an upstream response verbatim, preserving its status. */
-const relay = async (res: Response, upstream: { status: number; text: () => Promise<string> }): Promise<void> => {
-  const body = await upstream.text();
-  res.status(upstream.status).type("application/json").send(body);
-};
 
 /**
  * The outbound fetch, injectable.
@@ -274,446 +157,76 @@ app.use((req, res, next) => {
 // here and outlived the pkg build it was written for.
 app.use(express.static(staticDir));
 
-// ── OpenAI ───────────────────────────────────────────────────────────
+// ── The proxy ─────────────────────────────────────────────────────────
+//
+// Every /api route is planned by `planProxyRequest` in src/core/proxy.mts,
+// which a phone also runs, and executed here. The plan carries the statuses,
+// the messages and the security checks; this only sends what it says.
 
-app.post(
-  "/api/generate",
-  route(async (req, res) => {
-    const authHeader = resolveAuth(req.headers.authorization, process.env["OPENAI_API_KEY"]);
-    if (authHeader === undefined) {
-      res.status(401).json({ error: "No Authorization header provided" });
-      return;
-    }
-    try {
-      console.log("  [PROXY] POST /api/generate → OpenAI /v1/images/generations");
-      const upstream = await fetchImpl("https://api.openai.com/v1/images/generations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: authHeader },
-        body: forwardedJson(req.body),
-        timeout: 300_000,
-      });
-      console.log(`  [PROXY] /v1/images/generations → ${upstream.status.toString()}`);
-      await relay(res, upstream);
-    } catch (err) {
-      console.error("  [ERROR] Generate proxy failed:", errorMessage(err));
-      res.status(502).json({ error: `Proxy error: ${errorMessage(err)}` });
-    }
-  }),
-);
+/** The credentials and ComfyUI address an operator configured, if any. */
+const environment = (): ProxyEnvironment => ({
+  openaiKey: process.env["OPENAI_API_KEY"],
+  xaiKey: process.env["XAI_API_KEY"],
+  googleKey: process.env["GOOGLE_API_KEY"],
+  comfyUrl: process.env["COMFYUI_URL"],
+});
 
-/**
- * Image edits take reference images. An entry is either a raw base64
- * string or `{ label, data }`, and either may carry a data-URI prefix.
- *
- * Classified into a discriminated union rather than narrowed by a type
- * predicate. A predicate asserts a shape the compiler never verifies; this
- * returns evidence the compiler can follow, and makes the invalid case a
- * value the caller has to handle rather than a silent skip.
- */
-type ImageEntry =
-  | { readonly kind: "image"; readonly data: string; readonly label: string | undefined }
-  | { readonly kind: "invalid" };
-
-const classifyImage = (entry: unknown): ImageEntry => {
-  if (typeof entry === "string" && entry.length > 0) {
-    return { kind: "image", data: entry, label: undefined };
+/** The request options for a plan, building a multipart stream when it asks for one. */
+const upstreamInit = (plan: UpstreamPlan): UpstreamInit => {
+  const base = { method: plan.method, timeout: plan.timeout };
+  if (plan.body === undefined) {
+    return Object.keys(plan.headers).length === 0 ? base : { ...base, headers: { ...plan.headers } };
   }
-  if (typeof entry === "object" && entry !== null && "data" in entry) {
-    const data: unknown = entry.data;
-    if (typeof data === "string" && data.length > 0) {
-      const label: unknown = "label" in entry ? entry.label : undefined;
-      return { kind: "image", data, label: typeof label === "string" ? label : undefined };
+  if (plan.body.kind === "text") return { ...base, headers: { ...plan.headers }, body: plan.body.text };
+  const form = new FormData();
+  for (const part of plan.body.parts) {
+    if (part.kind === "field") {
+      form.append(part.name, part.value);
+    } else {
+      const buffer = Buffer.from(part.base64, "base64");
+      form.append(part.name, buffer, { filename: part.filename, contentType: part.contentType });
+      console.log(`    [IMG] ${part.filename} (${buffer.length.toString()} bytes)`);
     }
   }
-  return { kind: "invalid" };
+  return { ...base, headers: { ...plan.headers, ...form.getHeaders() }, body: form };
 };
 
-app.post(
-  "/api/edits",
-  route(async (req, res) => {
-    const authHeader = resolveAuth(req.headers.authorization, process.env["OPENAI_API_KEY"]);
-    if (authHeader === undefined) {
-      res.status(401).json({ error: "No Authorization header provided" });
+app.use(
+  route(async (req, res, next) => {
+    const plan = planProxyRequest(
+      {
+        method: req.method,
+        path: req.path,
+        queryKey: singleString(req.query["key"]),
+        authorization: singleString(req.headers.authorization),
+        apiKey: singleString(req.headers["x-api-key"]),
+        body: req.body,
+      },
+      environment(),
+      nodeUrl,
+    );
+    if (plan.kind === "no-route") {
+      next();
       return;
     }
+    if (plan.kind === "reply") {
+      if (plan.warning !== undefined) console.warn(`  [PROXY] ${plan.warning}`);
+      res.status(plan.reply.status).json(plan.reply.body);
+      return;
+    }
+    const { upstream } = plan;
+    for (const warning of plan.warnings) console.warn(`    [IMG] ${warning}`);
+    console.log(`  [PROXY] ${req.method} ${req.path} → ${upstream.label}`);
+    let answer: TextReply;
     try {
-      console.log("  [PROXY] POST /api/edits → OpenAI /v1/images/edits");
-      const body: unknown = req.body;
-      if (typeof body !== "object" || body === null) {
-        res.status(400).json({ error: "Body must be a JSON object" });
-        return;
-      }
-      // Literal-key `in` narrowing reads each field without asserting a
-      // shape over the whole body.
-      const model: unknown = "model" in body ? body.model : undefined;
-      const prompt: unknown = "prompt" in body ? body.prompt : undefined;
-      const images: unknown = "images" in body ? body.images : undefined;
-      const count: unknown = "n" in body ? body.n : undefined;
-      const size: unknown = "size" in body ? body.size : undefined;
-      const quality: unknown = "quality" in body ? body.quality : undefined;
-
-      const promptText = singleString(prompt);
-      if (promptText === undefined) {
-        res.status(400).json({ error: "prompt is required" });
-        return;
-      }
-
-      const form = new FormData();
-      form.append("model", singleString(model) ?? OPENAI_SPRITE_MODEL);
-      form.append("prompt", promptText);
-      // Only a string or a finite number is forwarded. `String(unknown)`
-      // would happily send "[object Object]" upstream.
-      if (typeof count === "number" && Number.isFinite(count)) form.append("n", count.toString());
-      else if (typeof count === "string") form.append("n", count);
-      const sizeText = singleString(size);
-      if (sizeText !== undefined) form.append("size", sizeText);
-      const qualityText = singleString(quality);
-      if (qualityText !== undefined) form.append("quality", qualityText);
-
-      if (Array.isArray(images)) {
-        images.forEach((entry: unknown, index) => {
-          const classified = classifyImage(entry);
-          if (classified.kind === "invalid") {
-            console.warn(`    [IMG] entry ${index.toString()} skipped: not a base64 string or { data }`);
-            return;
-          }
-          const source = classified.data;
-          const fileName = `${classified.label ?? `ref${index.toString()}`}.png`;
-          // Strip a data-URI prefix if present.
-          const commaAt = source.indexOf(",");
-          const raw = commaAt === -1 ? source : source.slice(commaAt + 1);
-          const buffer = Buffer.from(raw, "base64");
-          form.append("image[]", buffer, { filename: fileName, contentType: "image/png" });
-          console.log(`    [IMG] ${fileName} (${buffer.length.toString()} bytes)`);
-        });
-      }
-
-      const upstream = await fetchImpl("https://api.openai.com/v1/images/edits", {
-        method: "POST",
-        headers: { Authorization: authHeader, ...form.getHeaders() },
-        body: form,
-        timeout: 300_000,
-      });
-      console.log(`  [PROXY] /v1/images/edits → ${upstream.status.toString()}`);
-      await relay(res, upstream);
+      const response = await fetchImpl(upstream.url, upstreamInit(upstream));
+      console.log(`  [PROXY] ${upstream.label} → ${response.status.toString()}`);
+      answer = shapeReply(upstream.reply, response.status, await response.text());
     } catch (err) {
-      console.error("  [ERROR] Edits proxy failed:", errorMessage(err));
-      res.status(502).json({ error: `Proxy error: ${errorMessage(err)}` });
+      console.error(`  [ERROR] ${upstream.label} failed:`, err instanceof Error ? err.message : "unknown error");
+      answer = failureReply(err);
     }
-  }),
-);
-
-app.post(
-  "/api/chat",
-  route(async (req, res) => {
-    const authHeader = resolveAuth(req.headers.authorization, process.env["OPENAI_API_KEY"]);
-    if (authHeader === undefined) {
-      res.status(401).json({ error: "No Authorization header provided" });
-      return;
-    }
-    try {
-      console.log("  [PROXY] POST /api/chat → OpenAI /v1/chat/completions");
-      const upstream = await fetchImpl("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: authHeader },
-        body: forwardedJson(req.body),
-        timeout: 30_000,
-      });
-      console.log(`  [PROXY] /v1/chat/completions → ${upstream.status.toString()}`);
-      await relay(res, upstream);
-    } catch (err) {
-      console.error("  [ERROR] Chat proxy failed:", errorMessage(err));
-      res.status(502).json({ error: `Proxy error: ${errorMessage(err)}` });
-    }
-  }),
-);
-
-// ── xAI ──────────────────────────────────────────────────────────────
-
-/**
- * Grok image generation.
- *
- * Reimplemented from upstream pull request 1 by @Manya3084. The body is
- * forwarded unchanged, because the caller builds it through
- * `buildImageRequest` in src/core/providers.mts, which knows that xAI
- * rejects a request carrying a `size`.
- *
- * Authentication is a bearer key, from the request header or from XAI_API_KEY.
- * Pull request 1 also offered an OAuth device-code flow that presented as
- * xAI's own command line client, using its client identifier, its
- * `grok-cli:access` scope, and `x-grok-client-surface: cli` headers. That path
- * is deliberately not reimplemented here. It obtains subscription access
- * through a client identity belonging to someone else, and the account it puts
- * at risk is the user's.
- */
-app.post(
-  "/api/xai/images/generations",
-  route(async (req, res) => {
-    const authHeader = resolveAuth(req.headers.authorization, process.env["XAI_API_KEY"]);
-    if (authHeader === undefined) {
-      res.status(401).json({ error: "No xAI API key provided" });
-      return;
-    }
-    try {
-      console.log("  [PROXY] POST /api/xai/images/generations → xAI /v1/images/generations");
-      const upstream = await fetchImpl(`${XAI_API_BASE}/images/generations`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: authHeader },
-        body: forwardedJson(req.body),
-        timeout: 300_000,
-      });
-      console.log(`  [PROXY] xAI /v1/images/generations → ${upstream.status.toString()}`);
-      await relay(res, upstream);
-    } catch (err) {
-      console.error("  [ERROR] xAI image proxy failed:", errorMessage(err));
-      res.status(502).json({ error: `Proxy error: ${errorMessage(err)}` });
-    }
-  }),
-);
-
-/** Start a Grok video generation. The body is built by grok-video-core. */
-app.post(
-  "/api/xai/videos/generations",
-  route(async (req, res) => {
-    const authHeader = resolveAuth(req.headers.authorization, process.env["XAI_API_KEY"]);
-    if (authHeader === undefined) {
-      res.status(401).json({ error: "No xAI API key provided" });
-      return;
-    }
-    try {
-      console.log("  [PROXY] POST /api/xai/videos/generations → xAI");
-      const upstream = await fetchImpl(`${XAI_API_BASE}/videos/generations`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: authHeader },
-        body: forwardedJson(req.body),
-        timeout: 600_000,
-      });
-      console.log(`  [PROXY] xAI /v1/videos/generations → ${upstream.status.toString()}`);
-      await relay(res, upstream);
-    } catch (err) {
-      console.error("  [ERROR] xAI video proxy failed:", errorMessage(err));
-      res.status(502).json({ error: `Proxy error: ${errorMessage(err)}` });
-    }
-  }),
-);
-
-/** Poll a generation. The client classifies the result with classifyPoll. */
-app.get(
-  "/api/xai/videos/:id",
-  route(async (req, res) => {
-    const authHeader = resolveAuth(req.headers.authorization, process.env["XAI_API_KEY"]);
-    if (authHeader === undefined) {
-      res.status(401).json({ error: "No xAI API key provided" });
-      return;
-    }
-    const id = singleString(req.params["id"]);
-    if (id === undefined) {
-      res.status(400).json({ error: "No generation id provided" });
-      return;
-    }
-    try {
-      const upstream = await fetchImpl(
-        `${XAI_API_BASE}/videos/${encodeURIComponent(id)}`,
-        { method: "GET", headers: { Authorization: authHeader }, timeout: 60_000 },
-      );
-      await relay(res, upstream);
-    } catch (err) {
-      console.error("  [ERROR] xAI video poll failed:", errorMessage(err));
-      res.status(502).json({ error: `Proxy error: ${errorMessage(err)}` });
-    }
-  }),
-);
-
-/**
- * Fetch a finished video, attaching the caller's credential.
- *
- * A proxy is needed because the asset requires the bearer token and a browser
- * cannot attach one to a media element. The address is checked against
- * XAI_VIDEO_HOSTS first, so the credential cannot be directed at a host the
- * caller chooses. See the note on that constant for what this prevents.
- */
-app.post(
-  "/api/xai/video-fetch",
-  route(async (req, res) => {
-    const authHeader = resolveAuth(req.headers.authorization, process.env["XAI_API_KEY"]);
-    if (authHeader === undefined) {
-      res.status(401).json({ error: "No xAI API key provided" });
-      return;
-    }
-
-    const body: unknown = req.body;
-    const url = typeof body === "object" && body !== null && "url" in body
-      ? singleString({ ...body }.url)
-      : undefined;
-    if (url === undefined) {
-      res.status(400).json({ error: "No video url provided" });
-      return;
-    }
-    if (!isAllowedVideoUrl(url)) {
-      console.warn("  [PROXY] Refused video fetch for a host outside the allowlist");
-      res.status(400).json({
-        error: "Refusing to fetch a video from a host outside the allowlist",
-      });
-      return;
-    }
-
-    try {
-      const upstream = await fetchImpl(url, {
-        method: "GET",
-        headers: { Authorization: authHeader },
-        timeout: 300_000,
-      });
-      if (upstream.status !== 200) {
-        res.status(upstream.status).json({
-          error: `Failed to fetch video: ${upstream.status.toString()}`,
-        });
-        return;
-      }
-      // The body is base64 rather than binary, because FetchLike describes a
-      // text response. The client turns it back into a Blob. A video of this
-      // size passes through memory either way.
-      const text = await upstream.text();
-      res.status(200).type("application/json").send(JSON.stringify({ data: text }));
-    } catch (err) {
-      console.error("  [ERROR] xAI video fetch failed:", errorMessage(err));
-      res.status(502).json({ error: `Proxy error: ${errorMessage(err)}` });
-    }
-  }),
-);
-
-// ── ComfyUI ──────────────────────────────────────────────────────────
-
-/**
- * Forward one request to a ComfyUI instance on the local network.
- *
- * A proxy is needed because the page and ComfyUI are different origins and
- * ComfyUI does not send permissive headers unless configured to. Both the
- * destination and the path are checked, so this cannot be used to reach an
- * arbitrary service or an arbitrary endpoint.
- *
- * Upstream also offered a restart route that ran a shell command from an
- * environment variable, with its compose file mounting the Docker socket to
- * make that work. That is a container escape surface in exchange for a
- * convenience button, and it is deliberately absent. Restart ComfyUI the way
- * it was started.
- */
-app.post(
-  "/api/comfyui/proxy",
-  route(async (req, res) => {
-    const body: unknown = req.body;
-    const fields: Record<string, unknown> =
-      typeof body === "object" && body !== null ? { ...body } : {};
-
-    const baseUrl = singleString(fields["baseUrl"]) ?? process.env["COMFYUI_URL"];
-    const origin = baseUrl === undefined ? undefined : normaliseComfyOrigin(baseUrl);
-    if (origin === undefined) {
-      res.status(400).json({ error: "ComfyUI address must be on the local network" });
-      return;
-    }
-
-    const rawPath = singleString(fields["path"]) ?? "/";
-    const targetPath = rawPath.startsWith("/") ? rawPath : `/${rawPath}`;
-    const method = (singleString(fields["method"]) ?? "GET").toUpperCase();
-    if (!isAllowedComfyRequest(targetPath.split("?")[0] ?? "", method)) {
-      console.warn(`  [ComfyUI] Refused ${method} ${targetPath}`);
-      res.status(400).json({ error: `Refusing to proxy ${method} ${targetPath}` });
-      return;
-    }
-
-    try {
-      const payload = fields["body"];
-      const init: UpstreamInit = method === "GET" || method === "HEAD"
-        ? { method, timeout: 120_000 }
-        : {
-            method,
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-            timeout: 600_000,
-          };
-      console.log(`  [ComfyUI] ${method} ${origin}${targetPath}`);
-      const upstream = await fetchImpl(`${origin}${targetPath}`, init);
-      await relay(res, upstream);
-    } catch (err) {
-      console.error("  [ERROR] ComfyUI proxy failed:", errorMessage(err));
-      res.status(502).json({ error: `Proxy error: ${errorMessage(err)}` });
-    }
-  }),
-);
-
-// ── Gemini ───────────────────────────────────────────────────────────
-
-/**
- * Both Gemini routes accept the key by header, by query string, or from the
- * environment. A key supplied by the caller wins, so one held only in a
- * browser never has to reach the server's configuration.
- */
-const geminiKey = (req: Request): string | undefined =>
-  singleString(req.headers["x-api-key"])
-  ?? singleString(req.query["key"])
-  ?? singleString(process.env["GOOGLE_API_KEY"]);
-
-app.post(
-  "/api/video/generate",
-  route(async (req, res) => {
-    const apiKey = geminiKey(req);
-    if (apiKey === undefined) {
-      res.status(401).json({ error: "No Google API key provided" });
-      return;
-    }
-    try {
-      console.log("  [PROXY] POST /api/video/generate → Gemini Interactions API");
-      const url = `https://generativelanguage.googleapis.com/v1beta/interactions?key=${apiKey}`;
-      console.log("  [PROXY] URL:", url.replace(apiKey, `${apiKey.slice(0, 8)}...`));
-
-      const upstream = await fetchImpl(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: forwardedJson(req.body),
-        timeout: 600_000,
-      });
-
-      const data = await upstream.text();
-      console.log(`  [PROXY] Gemini Interactions → HTTP ${upstream.status.toString()}`);
-      if (upstream.status === 200) {
-        const sizeMB = (data.length / 1024 / 1024).toFixed(1);
-        console.log(`  [PROXY] ✅ Video generated successfully! (${sizeMB} MB response)`);
-      } else {
-        console.error("  [ERROR] Gemini API error response:");
-        console.error("  ", data.slice(0, 500));
-      }
-      res.status(upstream.status).type("application/json").send(data);
-    } catch (err) {
-      console.error("  [ERROR] Video generate proxy failed:", errorMessage(err));
-      res.status(502).json({ error: `Proxy error: ${errorMessage(err)}` });
-    }
-  }),
-);
-
-app.post(
-  "/api/video/poll",
-  route(async (req, res) => {
-    const apiKey = geminiKey(req);
-    if (apiKey === undefined) {
-      res.status(401).json({ error: "No Google API key provided" });
-      return;
-    }
-    const body: unknown = req.body;
-    const operationName =
-      typeof body === "object" && body !== null && "operationName" in body
-        ? singleString(body.operationName)
-        : undefined;
-    if (operationName === undefined) {
-      res.status(400).json({ error: "No operationName provided" });
-      return;
-    }
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/${operationName}?key=${apiKey}`;
-      const upstream = await fetchImpl(url, { method: "GET", timeout: 30_000 });
-      await relay(res, upstream);
-    } catch (err) {
-      console.error("  [ERROR] Video poll failed:", errorMessage(err));
-      res.status(502).json({ error: `Proxy error: ${errorMessage(err)}` });
-    }
+    res.status(answer.status).type("application/json").send(answer.text);
   }),
 );
 

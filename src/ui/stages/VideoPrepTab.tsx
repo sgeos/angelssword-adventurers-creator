@@ -15,7 +15,7 @@
  * that would run as a DOM component.
  */
 import { memo, type ReactNode } from "react";
-import { Panel, PanelTitle, PanelTitleText, PanelTitleIcon, MainLayout, FormRow, StageSection, StageHeader, GoldDivider } from "../ui/primitives.tsx";
+import { Panel, PanelTitle, PanelTitleText, PanelTitleIcon, MainLayout, FormRow, StageSection, StageHeader, GoldDivider } from "../primitives.tsx";
 
 const VideoPrepTabView = (): ReactNode => (
     <>

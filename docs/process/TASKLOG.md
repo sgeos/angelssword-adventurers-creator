@@ -110,6 +110,13 @@ dropped.
 | Held majors and `jsdom` floor recorded | Recorded | TypeScript 7, node-fetch 3, `@types/node` 26 |
 | Interface migration plan adopted | Recorded | Tamagui on TanStack Start and Expo; spike first, not begun |
 | Web port to Tamagui and TanStack Start | Complete | 167 element boxes match the previous build; 88 browser specifications |
+| Mobile port to Tamagui and Expo, Android | Complete in Expo Go | Exports, handoff, tabs, toasts, fonts, settings, a provider request, persistence, the file picker and the sound on a Galaxy A16; iOS not run |
+| Settings and file inputs in Expo's web view | Complete | Both absent there; a memory store and a native picker, each verified on the phone; 10 new unit tests |
+| WebM export streamed one frame at a time | Complete | Sixty frames ending at 1.97 s read from the file; fails without the overrun carry; 10 s 720p clip exports on the phone |
+| Large picked files read in chunks; web view restarts announced | Complete | 100 MB clip loads in 34 s on the phone; one warning per reload, none on a fresh start |
+| Video Prep's scrubbing cache bounded to 256 MB | Complete | 6 new unit tests; the 100 MB, 20 s 720p clip then exported on the phone, free memory never below 473 MB |
+| Proxy routing moved into a core planner | Complete | 18 new unit tests, multipart checked against Node's parser; server tests unchanged |
+| Storage ban restored; application import zone added | Complete | Each ban and zone refused a failing file in every layer |
 | Stage controllers moved to the platform layer | Complete | Mount onto memoized components; behaviour unchanged |
 | Settings and chrome rewritten as React | Complete | Settings specifications pass unedited |
 | Hydration mismatch on every load fixed | Complete | Routes inside `ClientOnly`; console empty, pinned by a specification |

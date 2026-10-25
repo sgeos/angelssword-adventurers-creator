@@ -17,6 +17,7 @@ import { base64ToBlob, blobToBase64 } from "../app-utils.mts";
 
 import { reasonText, responseErrorMessage } from "../../core/api.mts";
 import { closestFrom, findEl, queryAll, require2d, requireEl } from "../dom.mts";
+import { saveFile } from "../save-file.mts";
 import {
     buildWanI2VWorkflow,
     computeLetterbox,
@@ -631,11 +632,8 @@ function bindVideoResultEvents(): void {
         } else if (btn.dataset['action'] === 'download') {
             const chosen = generatedVideos[idx];
             if (chosen !== undefined) {
-                const a = document.createElement('a');
-                a.href = chosen.url;
                 const name = ASAdventurer.characterName !== '' ? ASAdventurer.characterName : 'video';
-                a.download = `${name}_gen_${(idx + 1).toString()}.mp4`;
-                a.click();
+                saveFile(chosen.url, `${name}_gen_${(idx + 1).toString()}.mp4`);
             }
         } else if (btn.dataset['action'] === 'select') {
             if (selectedVideos.has(idx)) {

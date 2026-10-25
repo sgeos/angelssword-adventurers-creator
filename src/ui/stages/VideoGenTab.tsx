@@ -15,7 +15,7 @@
  * that would run as a DOM component.
  */
 import { memo, type ReactNode } from "react";
-import { Panel, PanelTitle, PanelTitleText, PanelTitleIcon, PanelSubtitle, MainLayout, TwoCol, ConfigGrid, FormRow, GoldDivider, InfoBanner, InfoBannerIcon, InfoBannerText, InfoNote, InfoNoteIcon } from "../ui/primitives.tsx";
+import { Panel, PanelTitle, PanelTitleText, PanelTitleIcon, PanelSubtitle, MainLayout, TwoCol, ConfigGrid, FormRow, GoldDivider, InfoBanner, InfoBannerIcon, InfoBannerText, InfoNote, InfoNoteIcon } from "../primitives.tsx";
 
 /**
  * The prompt both modes start from. Written with explicit line breaks rather
