@@ -72,8 +72,10 @@ use; the picker, the handoff, a WebM and a GIF export to the share sheet, and
 the key test all work. Touch found three defects the inspector-driven Android
 tests could not: the web view could not scroll, the settings screen's
 `display: none` cut the web view off from Expo on iOS, and the start report
-could precede its function prop. All fixed; verified on the simulator, not
-yet on the Android phone, which was locked.
+could precede its function prop. All fixed; verified on the simulator, and the
+scrolling fix in Chromium at the phone's viewport, where a touch swipe scrolled
+401 pixels with the fix and none without it; not yet on the Android phone,
+which was locked.
 
 Not verified: an iOS device; a request with a valid key, which would spend the
 operator's money and was not authorised; a clip larger than 300 megabytes and
