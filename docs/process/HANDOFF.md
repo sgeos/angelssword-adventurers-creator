@@ -225,9 +225,10 @@ inputs did nothing, because Expo's web view has no file chooser.
 
 ## The next task
 
-**Verify the scrolling and settings fixes on the Android phone, then the
-operator's decisions on a release.** Both fixes were made and verified on the
-iOS Simulator while the phone was locked; see `OPEN.md`.
+**The operator's decisions on a release.** The scrolling and settings fixes
+were verified on the iOS Simulator and an Android 16 emulator while the phone
+was locked; `tmp/android-fixes-check.sh` repeats them on the phone.
+`tmp/` is not committed, so the check is described in `OPEN.md`.
 
 **The operator's decision on a native build, and iOS.** Everything the
 Android phone can show in Expo Go has been shown, up to a 40 second 720p clip

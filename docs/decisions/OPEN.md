@@ -585,16 +585,14 @@ run as they are, inside a web view.
 - **iOS has run only in the Simulator.** In Expo Go on iOS 27.0; see
   MIGRATION.md. No device is available, and a simulator's media encoding may
   differ from a device's.
-- **The scrolling and settings fixes are unverified on the Android phone.**
-  Both were made and verified on the iOS Simulator while the phone was locked.
-  The scrolling fix was also checked in Chromium, the engine of Android's web
-  view, on the very page Metro serves the phone, at its 384 by 684 viewport
-  with touch: a touch swipe scrolled 401 of 558 pixels and brought the handoff
-  button on screen, and with the rule removed nothing scrolled and the button
-  stayed at 1,004 pixels, below the view. The settings overlay is a native
-  layout change that Android, which worked before it, has not run. The check
-  for both is `tmp/android-fixes-check.sh`, which runs only on an unlocked
-  phone.
+- **The scrolling and settings fixes are verified on an Android emulator,
+  not on the phone.** The phone was locked overnight. On an Android 16
+  emulator, created for the purpose in Expo Go 58.0.5, the same version the
+  phone runs: a touch swipe scrolled the stages 266 of 493 pixels, and the key
+  test with a fake key returned OpenAI's rejection through the settings
+  overlay. In Chromium at the phone's viewport, a touch swipe scrolled 401 of
+  558 pixels, and nothing scrolled with the rule removed.
+  `tmp/android-fixes-check.sh` repeats both on the phone when it is unlocked.
 - **An error on every iOS launch in development.** Expo's bridge reports that
   it cannot find its web view by tag at start-up. Nothing observed depends on
   it; whether it is Expo's or this application's was not established.

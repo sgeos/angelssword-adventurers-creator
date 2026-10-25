@@ -74,8 +74,9 @@ tests could not: the web view could not scroll, the settings screen's
 `display: none` cut the web view off from Expo on iOS, and the start report
 could precede its function prop. All fixed; verified on the simulator, and the
 scrolling fix in Chromium at the phone's viewport, where a touch swipe scrolled
-401 pixels with the fix and none without it; not yet on the Android phone,
-which was locked.
+401 pixels with the fix and none without it; and on an Android 16 emulator in Expo Go,
+where a swipe scrolled the stages and the key test returned through the
+overlay; not on the physical phone, which was locked.
 
 Not verified: an iOS device; a request with a valid key, which would spend the
 operator's money and was not authorised; a clip larger than 300 megabytes and
