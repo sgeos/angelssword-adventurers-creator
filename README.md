@@ -343,7 +343,8 @@ Assistants working on this repository should begin with
 
 See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the workflow and
 [`SECURITY.md`](./SECURITY.md) for the trust model and how to report a
-vulnerability privately.
+vulnerability privately. Participation is governed by the
+[`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md).
 
 ## Working on the Source
 
