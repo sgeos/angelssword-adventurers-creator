@@ -178,7 +178,10 @@ second; a GIF export and a WebM export, each to the share sheet, the WebM in
 received 30 frames at 15 per second; the key test with a fake key, through the
 native transport to OpenAI and back; the system file picker; and a stage's
 preference surviving a restart. The production page's heap is 11 megabytes,
-against 78 in development.
+against 78 in development. The 100 megabyte, 20 second 720p clip went end to
+end on it as well: loaded in 31.9 seconds, cached in 348, handed off in 1.7,
+and exported as WebM, 600 frames, in 510, the phone's free memory never below
+574 megabytes and the page never reloaded. The APK was uninstalled after.
 
 **Not verified on a device.** iOS, on any device. A provider
 request with a valid key, which would spend money, as opposed to the rejected

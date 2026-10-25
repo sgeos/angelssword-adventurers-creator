@@ -60,8 +60,10 @@ found two defects: the web view will not start a worker from the `file:` page
 a release build loads from, and Expo addressed each worker with its directory
 twice. Both exports failed until the DOM component started workers from blob
 copies of their scripts. Then verified on the release build: both exports to
-the share sheet, the sound, the handoff, the key test, the file picker, and a
-preference surviving a restart.
+the share sheet, the sound, the handoff, the key test, the file picker, a
+preference surviving a restart, and the 100 megabyte clip end to end, exported
+in 510 seconds. The APK was uninstalled after. Continuous integration run
+40172673769, on the fixes, passed all seven jobs.
 
 Not verified: iOS; a request with a valid key; a clip larger than 200
 megabytes and 40 seconds at 720p; a signed release.
