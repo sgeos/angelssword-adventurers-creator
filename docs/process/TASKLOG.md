@@ -119,6 +119,7 @@ dropped.
 | WebM export streamed one frame at a time | Complete | Sixty frames ending at 1.97 s read from the file; fails without the overrun carry; 10 s 720p clip exports on the phone |
 | Large picked files read in chunks; web view restarts announced | Complete | 100 MB clip loads in 34 s on the phone; one warning per reload, none on a fresh start |
 | iOS Simulator run; scrolling, settings overlay, start report fixed | Complete | Picker, handoff, WebM and GIF exports to the share sheet, key test, on iOS 27.0; on the phone a swipe scrolled 373 of 624 pixels and the key test returned through the overlay |
+| Dependabot alerts addressed | Complete | `zod` overridden to 4.6.7: Expo's schemas pass twelve cases, both platforms bundle, the dev server serves; `node-forge` dismissed as not used, no patched release exists |
 | README Quick Start, launcher names, mobile section | Complete | No prebuilt binary is promised; source and built launchers distinguished; the mobile application described |
 | Source launchers fixed | Complete on macOS | `bin/start` served the page with the build absent, after serving "Cannot GET /" before; the batch file not run, no Windows machine |
 | Proxy no longer grants every origin | Complete | Server test failed before the fix; 721 unit, 61 server and 90 browser tests pass after |

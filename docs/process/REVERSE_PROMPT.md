@@ -110,7 +110,10 @@ ran a `server.js` that no longer exists, and `bin/start` served no page on a
 fresh clone. Both now build the page and start `server.mts`; `bin/start` was
 verified, the batch file was not, for want of a Windows machine. The README
 no longer promises a prebuilt binary and now describes the mobile
-application.
+application. Both Dependabot alerts were then addressed: `zod` overridden to a
+patched major after testing Expo's own schemas and tooling under it, and
+`node-forge`, which has no patched release, dismissed as not used, since only
+Expo Updates code signing reaches the flawed verification.
 
 Not verified: an iOS device; a real ComfyUI server; a request with a valid key, which would spend the
 operator's money and was not authorised; a clip larger than 300 megabytes and

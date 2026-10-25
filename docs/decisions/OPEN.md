@@ -651,9 +651,11 @@ run as they are, inside a web view.
 - **A large picked file is slow to load.** Files over 32 megabytes cross the
   bridge in 4 megabyte chunks, about 3 megabytes a second on the test phone.
 - **Expo's command line tools carry advisories.** `npm audit` in `mobile/`
-  reports node-forge and zod advisories, both inside `@expo/cli`, which runs on
-  the developer's machine and is not shipped in the application. Not accepted
-  or dismissed; recorded.
+  reported node-forge and zod advisories, both inside `@expo/cli`, which runs
+  on the developer's machine and is not shipped in the application. On
+  2026-10-25 `zod` was overridden to a patched major and tested, and the
+  `node-forge` alert dismissed as not used, for want of any patched release;
+  see GIT_STRATEGY.md.
 - **Unused worker copies ship in the mobile bundle.** The platform's default
   worker factory names the workers in Vite's form, and Expo bundles those too,
   about 23 kilobytes that the phone never starts.

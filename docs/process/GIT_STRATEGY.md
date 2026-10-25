@@ -29,13 +29,32 @@ advisory link in `SECURITY.md` works for anyone. Secret scanning and push
 protection were already enabled, and workflow tokens default to read only.
 Issue and pull request templates are in `.github/`.
 
-Enabling the alerts raised two, both high, both left open on purpose. `zod`
-below 4.6.6 and `node-forge` up to 1.4.0 arrive only through `@expo/cli`, the
-development and build tooling, not the application's bundle. The command-line
-tool requires `zod` 3, so forcing the patched 4.6.6 is a major-version
-override likely to break it, and `node-forge` has no patched version. They
-are the same findings `npm audit --prefix mobile` reports; see HANDOFF.md.
-Reconsider on the next Expo upgrade.
+Enabling the alerts raised two, both high, in packages that arrive only
+through `@expo/cli`, the development and build tooling, not the application's
+bundle. Neither has a fix within Expo 58, whose newest command-line tool still
+requires `zod` ^3.25.76 and `node-forge` ^1.4.0.
+
+**`zod`, GHSA-mrhx-c7xc-m3w5, fixed by an override.** `mobile/package.json`
+overrides `zod` to ^4.6.6, a major version above what the tool declares. The
+tool uses it only to validate the commands that installed dev tools plugins
+declare, through `object`, `string().min()`, `enum`, `array().min()`,
+`literal`, `union`, `string().url()` and `strict()`, all of which `zod` 4
+keeps. Its own schemas were run under 4.6.7 against twelve cases, four
+accepted and eight rejected, each as expected; both platforms bundled, the
+configuration resolved, and the development server served its status and a
+manifest. Nothing else in the mobile install uses `zod`. **Remove the
+override when Expo's tool declares a patched `zod`,** or if a later Expo
+fails with it.
+
+**`node-forge`, GHSA-86w9-cpqp-85rv, dismissed as not used.** No patched
+release exists. The flaw is in RSA PKCS#1 v1.5 signature verification. The
+tool verifies signatures only through `@expo/code-signing-certificates`, for
+Expo Updates code signing, which runs only when `updates.codeSigningCertificate`
+is configured; this application has neither that setting nor `expo-updates`.
+Its iOS signing code only parses certificates from the keychain. Reopen the
+alert if Expo Updates code signing is ever adopted, and revisit on the next
+Expo upgrade. `npm audit --prefix mobile` still reports it, as four findings
+counting the packages that depend on it.
 
 GitHub still lists the repository as a fork of AngelsSwordStudios'. Only
 GitHub's support can detach a fork, which is the operator's decision.

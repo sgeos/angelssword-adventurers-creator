@@ -234,9 +234,10 @@ and store listing a release needs. Nothing is half done. On resuming, run the
 validity check, then `npm ci`, `npm ci --prefix mobile`, `npm run check` and
 `npm test`, and read the most recent continuous integration run, since
 dependencies will have moved. Expect `npm audit --prefix mobile` to report
-five high severity findings in Expo's own tooling, whose only offered fix is a
-downgrade to `expo@44`; they were present before the holding state and are
-Expo's to fix.
+four high severity findings, all `node-forge` and the packages that depend on
+it, in Expo's own tooling. Its Dependabot alert was dismissed as not used, and
+`zod` is overridden to a patched major; GIT_STRATEGY.md has the reasoning and
+when to undo each.
 
 The local Android toolchain used for the release build was outside the
 repository, under the machine's temporary directory, and should be presumed
