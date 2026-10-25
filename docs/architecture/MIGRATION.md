@@ -191,6 +191,37 @@ by memory: the phone's USB link dropped mid-export, and when it returned
 Expo Go reloaded the whole experience from Metro, its native bundle included,
 which a reclaimed web view does not do. A standalone build has no such link.
 
+## The iOS Simulator
+
+On 2026-10-25 the application ran in Expo Go 58.0.7 on an iPhone 17 Pro
+simulator with iOS 27.0, created for the purpose, driven with Maestro and read
+through Metro's log, since no inspector protocol reaches an iOS web view. These
+are indications, as the plan said simulator results would be: media encoding on
+a device can differ.
+
+WebKit's web view reported `MediaRecorder` with WebM in VP9 and VP8 and with
+MP4, `requestVideoFrameCallback`, `captureStream` with `requestFrame`, Web
+Audio and workers, in a secure context, 402 pixels wide with no overflow. The
+development build logs this report at start-up, on any device. On the
+simulator: the native chrome and fonts, the document picker loading both a
+WebM and an MP4, the handoff to the exporter at 15 frames per second, a WebM
+export and a GIF export, each to the iOS share sheet, and the key test with a
+fake key.
+
+It found three defects, which were then fixed and are probably not iOS's
+alone. The web view could not scroll: the shared stylesheet stops the html
+and body elements scrolling, because the web page scrolls inside its own
+container, and the web view has none, so nothing below the first screen could
+be reached. The Android device tests had reached every element through the
+inspector and never scrolled. The settings screen hid the stages with
+`display: none`, which on iOS removed the web view from Expo's registry, so the
+key test's result never arrived. And the first render could precede Expo's
+delivery of the function props. The scrolling fix and the overlay have been
+verified on the simulator only; the phone was locked when they were made.
+
+One error remains on every iOS launch in development, Expo's bridge failing to
+find its web view by tag at start-up. Nothing observed depends on it.
+
 **Not verified on a device.** iOS, on any device. A provider
 request with a valid key, which would spend money, as opposed to the rejected
 one. A clip larger than 300 megabytes and 60 seconds at 720p, the largest

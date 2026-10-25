@@ -124,6 +124,45 @@ const installFileSafeWorker = (): void => {
 };
 
 /**
+ * What this web view can do, logged once, in development only.
+ *
+ * Expo forwards a DOM component's console to the Metro terminal, and that is
+ * the only way to read a web view that no inspector protocol reaches, which
+ * is the case on iOS, where Safari's inspector is the only one. A development
+ * bundle is served over http by Metro; a release loads from file:, and skips
+ * this.
+ */
+const reportCapabilities = (): void => {
+    const recorder = typeof MediaRecorder === "function";
+    const types = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm", "video/mp4"];
+    const report = {
+        userAgent: navigator.userAgent,
+        width: innerWidth,
+        overflow: document.documentElement.scrollWidth > innerWidth,
+        secure: isSecureContext,
+        mediaRecorder: recorder,
+        recordable: recorder ? types.filter((type) => MediaRecorder.isTypeSupported(type)) : [],
+        frameCallback: "requestVideoFrameCallback" in HTMLVideoElement.prototype,
+        canvasCapture: "captureStream" in HTMLCanvasElement.prototype,
+        canvasTrackRequestFrame: typeof CanvasCaptureMediaStreamTrack === "function",
+        webAudio: typeof AudioContext === "function",
+        workers: typeof Worker === "function",
+    };
+    console.log(`[capabilities] ${JSON.stringify(report)}`);
+};
+
+/**
+ * The web view scrolls its document. The shared stylesheet stops the html and
+ * body elements scrolling, because the web page scrolls inside its own
+ * container instead, and in the web view, which has no such container, that
+ * left everything below the first screen out of reach: on a phone, the
+ * handoff button, the export controls and every stage's later sections. The
+ * device tests had not noticed, because they reached elements through the
+ * inspector rather than by scrolling.
+ */
+const WEB_VIEW_CSS = "html, body { overflow: auto; height: auto; }";
+
+/**
  * Installed once, when this module is first evaluated, so that they are in
  * place before any stage mounts. A stage's first request can come from its
  * mount, and React runs a child's effects before its parent's.
@@ -212,6 +251,7 @@ const installSeams = (): void => {
     // is replaced, on file: pages only, by one that loads a file: script as a
     // blob first.
     if (location.protocol === "file:") installFileSafeWorker();
+    if (location.protocol === "http:") reportCapabilities();
 
     // Entry files beside this one, so that the bundler's addresses for them
     // resolve. See src/platform-browser/workers.mts.
@@ -277,7 +317,7 @@ export default function StageHost(props: StagesProps): ReactNode {
 
     return (
         <TamaguiProvider config={config} defaultTheme="dark">
-            <style dangerouslySetInnerHTML={{ __html: WEB_ONLY_CSS }} />
+            <style dangerouslySetInnerHTML={{ __html: WEB_ONLY_CSS + WEB_VIEW_CSS }} />
             {/* Expo's root element is a flex row, and a React Native Web view
                 does not shrink, so without a width this grew to the widest
                 line of its content, 1,339 pixels on a 384 pixel screen. */}

@@ -71,7 +71,12 @@ export default function App(): ReactNode {
                     <Header />
                     <TabBar active={tab} onChange={setTab} />
                     <View flex={1}>
-                        <View flex={1} display={tab === "tab-settings" ? "none" : "flex"}>
+                        {/* Always laid out. Settings is drawn over it rather than this
+                            being hidden: on iOS a web view under display: none
+                            left Expo's registry, and every result native code
+                            sent it was lost, so a connection test never
+                            finished. */}
+                        <View flex={1}>
                             <Stages
                                 activeTab={tab}
                                 stored={stored}
@@ -94,12 +99,14 @@ export default function App(): ReactNode {
                             />
                         </View>
                         {tab === "tab-settings" ? (
-                            <SettingsScreen
-                                onSaved={() => { setStored(storedSettings()); }}
-                                onTest={(kind, value) => { setTest({ id: (test?.id ?? 0) + 1, kind, value }); }}
-                                outcome={outcome}
-                                toast={toasts.show}
-                            />
+                            <View position="absolute" top={0} right={0} bottom={0} left={0} backgroundColor="$bgDeep">
+                                <SettingsScreen
+                                    onSaved={() => { setStored(storedSettings()); }}
+                                    onTest={(kind, value) => { setTest({ id: (test?.id ?? 0) + 1, kind, value }); }}
+                                    outcome={outcome}
+                                    toast={toasts.show}
+                                />
+                            </View>
                         ) : null}
                     </View>
                     <Toasts items={toasts.items} />

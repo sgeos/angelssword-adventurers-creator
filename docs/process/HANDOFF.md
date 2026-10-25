@@ -225,6 +225,10 @@ inputs did nothing, because Expo's web view has no file chooser.
 
 ## The next task
 
+**Verify the scrolling and settings fixes on the Android phone, then the
+operator's decisions on a release.** Both fixes were made and verified on the
+iOS Simulator while the phone was locked; see `OPEN.md`.
+
 **The operator's decision on a native build, and iOS.** Everything the
 Android phone can show in Expo Go has been shown, up to a 40 second 720p clip
 of 200 megabytes loaded, cached, handed off and exported as WebM on the phone.

@@ -398,6 +398,17 @@ command-line tools deprecate it, print a notice, and write no licence file, so
 Gradle then refused to install the NDK. The replacement is `android sdk
 install`, which also collects usage data unless given `--no-metrics`.
 
+**Driving a web view through the inspector skips what a user must do.**
+Every Android device test reached its elements by script, so none noticed
+that the web view could not scroll at all, which left most of each stage out
+of a user's reach. Driving the iOS Simulator by touch with Maestro found it at
+once. Test at least one flow by touch, through the whole page.
+
+**On iOS, a web view under `display: none` stops receiving.** Expo looks the
+view up by tag to deliver every result and prop, and a hidden one was not
+found, so a request's answer never arrived. Draw over a web view rather than
+hiding it.
+
 **A tap during a scroll animation is swallowed.** The tab bar had just
 scrolled, and a tap on a tab did nothing. Wait for the motion to end.
 

@@ -582,7 +582,16 @@ run as they are, inside a web view.
 
 **Recorded 2026-10-24.**
 
-- **iOS has never run it.** No device and no simulator are available.
+- **iOS has run only in the Simulator.** In Expo Go on iOS 27.0; see
+  MIGRATION.md. No device is available, and a simulator's media encoding may
+  differ from a device's.
+- **The scrolling and settings fixes are unverified on Android.** Both were
+  made and verified on the iOS Simulator while the phone was locked. They are
+  a stylesheet rule and a layout change that should behave the same in
+  Android's web view, which is the reason to check rather than assume.
+- **An error on every iOS launch in development.** Expo's bridge reports that
+  it cannot find its web view by tag at start-up. Nothing observed depends on
+  it; whether it is Expo's or this application's was not established.
 - **No release build is committed or signed.** A standalone Android release
   APK was built locally on 2026-10-25 and verified on the phone; see
   MIGRATION.md. It used a temporary package name and the template's debug

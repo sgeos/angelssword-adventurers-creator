@@ -122,9 +122,13 @@ export default function Stages(props: StagesProps): ReactNode {
     // view a new function for it on every render, which re-ran such an
     // effect on every render and raised the warning repeatedly. A module
     // flag is reset only by a reload, which is exactly the event reported.
-    if (!announced) {
+    // On iOS the first render can arrive before Expo has delivered the
+    // function props, so the flag is set only once the call is made; a
+    // render without it leaves the report to the next one.
+    const { started } = props;
+    if (!announced && typeof started === "function") {
         announced = true;
-        void props.started();
+        void started();
     }
     useEffect(() => {
         let live = true;
