@@ -94,6 +94,26 @@ describe('inPageProxy', () => {
         assert.equal(sent.length, 0);
     });
 
+    /**
+     * The video download's client decodes `data` as base64. The in-page
+     * proxy used to decode the bytes as text and wrap that, as the server
+     * did, which is not base64 for a real video.
+     */
+    it('returns a fetched video as base64 of its exact bytes', async () => {
+        const video = Buffer.from([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0xff, 0xfe, 0x80, 0x00]);
+        const { send } = recordingSender({ status: 200, base64: video.toString('base64') });
+        const http = proxy.inPageProxy(send, unused);
+        const response = await http('/api/xai/video-fetch', {
+            method: 'POST',
+            headers: { Authorization: 'Bearer xai' },
+            body: JSON.stringify({ url: 'https://assets.x.ai/v/a.mp4' }),
+        });
+        assert.equal(response.status, 200);
+        const parsed: unknown = JSON.parse(await response.text());
+        assert.ok(parsed !== null && typeof parsed === 'object' && 'data' in parsed);
+        assert.deepEqual(Buffer.from(String({ ...parsed }.data), 'base64'), video);
+    });
+
     it('reports a native failure as the server reports a transport failure', async () => {
         const http = proxy.inPageProxy(async () => Promise.reject(new Error('offline')), unused);
         const response = await http('/api/chat', { method: 'POST', headers: { Authorization: 'Bearer k' }, body: '{}' });

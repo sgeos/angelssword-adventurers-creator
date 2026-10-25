@@ -116,13 +116,13 @@ export const inPageProxy = (send: UpstreamSender, other: BinaryHttpClient): Bina
         }
         try {
             const result = await send(plan.upstream);
-            const bytes = bytesFromBase64(result.base64);
-            const shaped = shapeReply(plan.upstream.reply, result.status, decoder.decode(bytes));
-            // A relayed body keeps its exact bytes, which an image needs. A
-            // reshaped one is the JSON the shape produced.
-            return plan.upstream.reply === "relay"
-                ? respond(shaped.status, shaped.text, bytes)
-                : textResponse(shaped.status, shaped.text);
+            // The host already sent the bytes as base64, which is the
+            // encoding the video download's reply wants, so it is reused
+            // rather than encoded again.
+            const shaped = shapeReply(plan.upstream.reply, result.status, bytesFromBase64(result.base64), undefined, () => result.base64);
+            return typeof shaped.body === "string"
+                ? textResponse(shaped.status, shaped.body)
+                : respond(shaped.status, decoder.decode(shaped.body), shaped.body);
         } catch (err) {
             const failed = failureReply(err);
             return textResponse(failed.status, failed.text);

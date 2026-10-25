@@ -133,3 +133,24 @@ Two encoders lived in template literals compiled at runtime, placing roughly
 150 lines of the most performance-sensitive code beyond the reach of any
 checker, linter, or test. No configuration can inspect a string, so the only
 remedy was to stop them being strings.
+
+## The proxy reads upstream bodies as bytes
+
+**Resolved 2026-10-25.** The server read every upstream body with `text()`,
+which decodes it as UTF-8 and replaces any byte sequence that is not valid
+UTF-8. Two routes carried binary bodies. The image a ComfyUI run retrieves
+from `/view` came through the relay corrupted, so ComfyUI image retrieval
+could not have worked on the desktop. The Grok video download was wrapped as
+`{ data }` from the decoded text, while its client decodes `data` as base64,
+so the video could not have decoded either. The in-page proxy on the phone
+shaped the video download from text in the same way. Neither provider had run
+against a live key, which is how both survived.
+
+The core's `shapeReply` now takes the body as bytes and a base64 encoder: a
+relay passes the bytes through with the upstream content type, and the video
+download wraps them base64 encoded. The server reads `arrayBuffer()`, which
+node-fetch provides, and its fetch type says so; the phone already carried
+bytes across its bridge. Tests at three levels pin it, the shaper, the
+Express routes and the in-page proxy, each with bytes that are not UTF-8, and
+the two route tests were shown to fail with the text decoding put back.
+Neither provider has yet been run live after the fix.

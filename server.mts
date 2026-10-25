@@ -9,7 +9,7 @@
 import express, { type Express, type Request, type RequestHandler, type Response } from "express";
 import nodeFetch from "node-fetch";
 
-import type { HttpClient, HttpRequest, HttpResponse } from "./src/core/ports/http.mts";
+import type { HttpRequest, HttpResponse } from "./src/core/ports/http.mts";
 import {
   failureReply,
   isAllowedComfyRequest as coreIsAllowedComfyRequest,
@@ -19,7 +19,7 @@ import {
   shapeReply,
   singleString,
   type ProxyEnvironment,
-  type TextReply,
+  type ShapedReply,
   type UpstreamPlan,
   type UrlParser,
 } from "./src/core/proxy.mts";
@@ -91,7 +91,14 @@ const route =
  * the proxy's prose calls it an upstream response, which is what it is from
  * this side.
  */
-export type UpstreamResponse = HttpResponse;
+export interface UpstreamResponse extends HttpResponse {
+  /**
+   * The body as bytes. The proxy reads every upstream body this way, because
+   * reading it as text decoded a binary body as UTF-8 and corrupted it.
+   */
+  readonly arrayBuffer: () => Promise<ArrayBuffer>;
+  readonly headers: { readonly get: (name: string) => string | null };
+}
 
 /**
  * The request options this server sends.
@@ -104,15 +111,18 @@ export type UpstreamResponse = HttpResponse;
 export type UpstreamInit = HttpRequest<string | FormData>;
 
 /**
- * Narrowed to what the proxy actually uses — a status and a text body —
- * rather than the whole of node-fetch. The default argument below is what
+ * Narrowed to what the proxy actually uses, a status, the body's bytes and
+ * its content type, rather than the whole of node-fetch. The default argument below is what
  * checks that the real implementation still satisfies it.
  *
  * The narrow shape is also what lets a test supply a mock without asserting
  * it into the full Response type. A mock that has to be cast into place is
  * a mock the compiler has stopped checking.
  */
-export type FetchLike = HttpClient<string | FormData>;
+export type FetchLike = (url: string, init?: UpstreamInit) => Promise<UpstreamResponse>;
+
+/** Base64, for the video download's reply; node's own encoder. */
+const toBase64 = (bytes: Uint8Array<ArrayBuffer>): string => Buffer.from(bytes).toString("base64");
 
 // ── App ──────────────────────────────────────────────────────────────
 
@@ -217,16 +227,18 @@ app.use(
     const { upstream } = plan;
     for (const warning of plan.warnings) console.warn(`    [IMG] ${warning}`);
     console.log(`  [PROXY] ${req.method} ${req.path} → ${upstream.label}`);
-    let answer: TextReply;
+    let answer: ShapedReply;
     try {
       const response = await fetchImpl(upstream.url, upstreamInit(upstream));
       console.log(`  [PROXY] ${upstream.label} → ${response.status.toString()}`);
-      answer = shapeReply(upstream.reply, response.status, await response.text());
+      const body = new Uint8Array(await response.arrayBuffer());
+      answer = shapeReply(upstream.reply, response.status, body, response.headers.get("content-type") ?? undefined, toBase64);
     } catch (err) {
       console.error(`  [ERROR] ${upstream.label} failed:`, err instanceof Error ? err.message : "unknown error");
-      answer = failureReply(err);
+      const failed = failureReply(err);
+      answer = { status: failed.status, body: failed.text, contentType: "application/json" };
     }
-    res.status(answer.status).type("application/json").send(answer.text);
+    res.status(answer.status).type(answer.contentType).send(typeof answer.body === "string" ? answer.body : Buffer.from(answer.body));
   }),
 );
 

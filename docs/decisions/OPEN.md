@@ -578,25 +578,6 @@ controllers rather than rewriting them, each a choice rather than an oversight.
 the native plan's question as much as the web's: on a phone they are meant to
 run as they are, inside a web view.
 
-## The desktop proxy corrupts binary bodies
-
-**Found 2026-10-24, not fixed.** The server reads every upstream body with
-`text()`, which decodes it as UTF-8. A binary body relayed through it is
-corrupted. The image a ComfyUI run retrieves from `/view` goes through that
-relay, so ComfyUI image retrieval cannot work on the desktop as written. The
-Grok video download wraps the decoded text as `{ data }`; the original route's
-comment says the upstream sends base64, which is not established, and if it
-sends the video itself the download is corrupted on both platforms, because
-the mobile path reshapes it from text too. Neither provider has run against a
-live key, which is how this survived.
-
-On the phone, a relayed body keeps its bytes. The desktop routes were left as
-they were, because the fix changes the network port, whose response type has
-only `text()`.
-
-**What would decide it.** Running ComfyUI and Grok once against live
-services, then giving the port a bytes method and the relay a binary reply.
-
 ## The mobile application's open matters
 
 **Recorded 2026-10-24.**

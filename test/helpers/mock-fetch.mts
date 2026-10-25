@@ -21,7 +21,10 @@ export interface RecordedCall {
     readonly method: string;
 }
 
-/** A response body may be given as a string or as anything JSON-encodable. */
+/**
+ * A response body may be given as a string, as bytes, which a binary upstream
+ * such as an image sends, or as anything JSON-encodable.
+ */
 export interface ResponseSpec {
     readonly status?: number;
     readonly body?: unknown;
@@ -41,7 +44,10 @@ let nextError: Error | null = null;
 
 export function createResponse(spec: ResponseSpec = {}): MockResponse {
     const { status = 200, body = '{}', headers = {} } = spec;
-    const textBody = typeof body === 'string' ? body : JSON.stringify(body);
+    const bytes = body instanceof Uint8Array
+        ? Uint8Array.from(body)
+        : new TextEncoder().encode(typeof body === 'string' ? body : JSON.stringify(body));
+    const textBody = new TextDecoder().decode(bytes);
     return {
         status,
         ok: status >= 200 && status < 300,
@@ -50,6 +56,7 @@ export function createResponse(spec: ResponseSpec = {}): MockResponse {
                 headers[name.toLowerCase()] ?? headers[name] ?? null,
         },
         text: async (): Promise<string> => textBody,
+        arrayBuffer: async (): Promise<ArrayBuffer> => bytes.slice().buffer,
         json: async (): Promise<unknown> => JSON.parse(textBody),
     };
 }

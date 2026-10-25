@@ -21,7 +21,7 @@ after it, under the same authorisation.
 ## Verification
 
 `npm run check` passes across eight TypeScript projects, the mobile one
-included, and the lint. 719 unit tests and 58 application programming
+included, and the lint. 721 unit tests and 60 application programming
 interface tests pass. 90 browser specifications pass outside the sandbox.
 `npx expo export --platform android` bundles the application, with its fonts
 and worker bundles. Every new lint zone and both capability bans were exercised
@@ -95,14 +95,13 @@ Nothing had used storage outside its adapter. Both bans are now one setting
 per file. Two applications now exist, and lint forbids each to import the
 other.
 
-**What reading the proxy found.** The desktop server decodes every upstream
-body as text, so a ComfyUI image through the relay is corrupted, and possibly
-the Grok video download. Recorded in `OPEN.md`, not fixed, because the fix
-changes the network port.
+**What reading the proxy found.** Both proxies, the server and the phone's,
+read every upstream body as text, which corrupted a ComfyUI image through the
+relay and the Grok video download. Fixed in the core's `shapeReply`, which now
+takes bytes; tests at three levels with non-UTF-8 bytes, and the two route
+tests fail with the old decoding put back. Recorded in `RESOLVED.md`.
 
 ## Questions for Human Pilot
-
-**Should the desktop proxy's binary bodies be fixed?** See `OPEN.md`.
 
 **What should a real release be called and signed with?** A package name, an
 icon set in place of Expo's placeholders in `mobile/assets/`, and a signing

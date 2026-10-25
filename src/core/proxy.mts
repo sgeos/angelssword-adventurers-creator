@@ -90,9 +90,9 @@ export type UpstreamBody =
 /**
  * How the upstream response becomes the reply.
  *
- * `relay` passes the status and text through as JSON. `videoData` wraps a
- * successful body as `{ data }` and turns any other status into an error,
- * which is what the video fetch route has always answered.
+ * `relay` passes the status and the body's exact bytes through, with the
+ * upstream's content type. `videoData` wraps a successful body, base64
+ * encoded, as `{ data }`, and turns any other status into an error.
  */
 export type ReplyShape = "relay" | "videoData";
 
@@ -472,11 +472,35 @@ export interface TextReply {
 
 export const replyText = (r: ProxyReply): TextReply => ({ status: r.status, text: JSON.stringify(r.body) });
 
-/** The reply for an upstream response's status and text, by the plan's shape. */
-export const shapeReply = (shape: ReplyShape, status: number, text: string): TextReply => {
-    if (shape === "relay") return { status, text };
-    if (status !== 200) return replyText({ status, body: { error: `Failed to fetch video: ${status.toString()}` } });
-    return { status: 200, text: JSON.stringify({ data: text }) };
+/** A reply whose body is either JSON text or bytes to pass through unchanged. */
+export interface ShapedReply {
+    readonly status: number;
+    readonly body: string | Uint8Array<ArrayBuffer>;
+    readonly contentType: string;
+}
+
+/**
+ * The reply for an upstream response's status and body, by the plan's shape.
+ *
+ * Takes the body as bytes. It used to take text, which both callers produced
+ * by decoding the body as UTF-8, and that corrupted every binary body: an
+ * image ComfyUI returns through the relay, and the Grok video download, whose
+ * client expects base64 and was handed the video's bytes decoded as text.
+ * Base64 encoding is a platform facility, so the encoder is a parameter.
+ */
+export const shapeReply = (
+    shape: ReplyShape,
+    status: number,
+    body: Uint8Array<ArrayBuffer>,
+    contentType: string | undefined,
+    toBase64: (bytes: Uint8Array<ArrayBuffer>) => string,
+): ShapedReply => {
+    if (shape === "relay") return { status, body, contentType: contentType ?? "application/json" };
+    if (status !== 200) {
+        const r = replyText({ status, body: { error: `Failed to fetch video: ${status.toString()}` } });
+        return { status: r.status, body: r.text, contentType: "application/json" };
+    }
+    return { status: 200, body: JSON.stringify({ data: toBase64(body) }), contentType: "application/json" };
 };
 
 /** The reply when the upstream request itself failed. */

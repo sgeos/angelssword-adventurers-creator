@@ -51,7 +51,7 @@ missing.
 3. `src/core/ports/` holds **three** capability interfaces, namely
    `storage.mts`, `http.mts`, and `clock.mts`, and `src/core/` holds
    **twenty-three** modules, counting `proxy.mts`, `tabs.mts` and `accept.mts`.
-4. `npm test` reports **719** unit tests and **58** application programming
+4. `npm test` reports **721** unit tests and **60** application programming
    interface tests, all passing. It needs no mobile install.
 5. `npm run test:browser` reports **90** passing browser specifications. Use
    that script rather than `npx playwright test`, which reuses a running
@@ -311,10 +311,6 @@ settings panel and the chrome are ordinary React.
 - **The Windows icon.** The executable has never carried it, the `rcedit` call
   having had nothing to run. The archived package was removed. Whether to add
   the icon with `resedit` is recorded in `OPEN.md`.
-- **The desktop proxy's binary bodies.** The server decodes every upstream
-  body as text, which corrupts a ComfyUI image through the relay, and possibly
-  the Grok video download. Found during the mobile port, recorded in
-  `OPEN.md`, not fixed.
 - **The mobile application's open matters,** in `OPEN.md`: iOS, a native
   build, the keys held in the web view's memory, and Expo's tooling
   advisories.
@@ -363,7 +359,7 @@ The core has **zero** references to a platform facility of any kind, which
 `tsconfig.core.json` refuses to compile. Storage and the network are each
 confined by lint to named adapter files, and the lint now reaches the React
 entry layer's `.tsx` files too. Twenty-three core modules carry what the application
-computes; 719 unit tests reach all of it.
+computes; 721 unit tests reach all of it.
 
 The entry-layer behaviour worth asserting is covered: the reference slots, the
 loop controls, the framing and art style selectors, the exporter's mode limits,
@@ -457,9 +453,8 @@ Recorded in [../decisions/OPEN.md](../decisions/OPEN.md).
   built and served by continuous integration on Linux and Windows, and by hand
   on macOS.
 - The Gemini key test bypasses the proxy, awaiting the operator.
-- The desktop proxy decodes binary bodies as text.
-- The mobile application has run on one Android phone in Expo Go, never on
-  iOS, and has no native build.
+- The mobile application has run on one Android phone, in Expo Go and as a
+  locally built release APK, never on iOS. No release is signed.
 - No release has been cut.
 
 ## Relationship to upstream

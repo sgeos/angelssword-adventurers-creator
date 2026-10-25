@@ -207,13 +207,42 @@ describe('planProxyRequest: the guards', () => {
 });
 
 describe('replies', () => {
-    it('relays any status and text unchanged', () => {
-        assert.deepEqual(shapeReply('relay', 429, '{"x":1}'), { status: 429, text: '{"x":1}' });
+    const utf8 = (text: string): Uint8Array<ArrayBuffer> => new TextEncoder().encode(text);
+    const base64 = (bytes: Uint8Array<ArrayBuffer>): string => Buffer.from(bytes).toString('base64');
+
+    it('relays any status and body unchanged, with the upstream content type or JSON by default', () => {
+        assert.deepEqual(shapeReply('relay', 429, utf8('{"x":1}'), undefined, base64), {
+            status: 429, body: utf8('{"x":1}'), contentType: 'application/json',
+        });
+        assert.equal(shapeReply('relay', 200, utf8('x'), 'image/png', base64).contentType, 'image/png');
     });
 
-    it('wraps a fetched video as data, and turns a failure into an error with its status', () => {
-        assert.deepEqual(shapeReply('videoData', 200, 'BYTES'), { status: 200, text: '{"data":"BYTES"}' });
-        assert.deepEqual(shapeReply('videoData', 404, 'nope'), { status: 404, text: '{"error":"Failed to fetch video: 404"}' });
+    /**
+     * The defect this pins: the body used to be decoded as UTF-8 text first,
+     * which replaces every byte sequence that is not valid UTF-8, so a PNG
+     * relayed from ComfyUI arrived corrupted.
+     */
+    it('relays a binary body byte for byte, including bytes that are not UTF-8', () => {
+        const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0xff, 0xfe, 0x00, 0x80]);
+        const shaped = shapeReply('relay', 200, png, 'image/png', base64);
+        assert.deepEqual(shaped.body, png);
+    });
+
+    /**
+     * The client decodes `data` as base64. It used to receive the video's
+     * bytes decoded as text, which is not base64 and decodes to nothing
+     * playable.
+     */
+    it('wraps a fetched video as base64 data, and turns a failure into an error with its status', () => {
+        const video = Uint8Array.from([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0xff, 0x80]);
+        const shaped = shapeReply('videoData', 200, video, 'video/mp4', base64);
+        assert.equal(typeof shaped.body, 'string');
+        const data: unknown = JSON.parse(String(shaped.body));
+        assert.ok(data !== null && typeof data === 'object' && 'data' in data);
+        assert.deepEqual(Uint8Array.from(Buffer.from(String({ ...data }.data), 'base64')), video);
+        assert.deepEqual(shapeReply('videoData', 404, utf8('nope'), undefined, base64), {
+            status: 404, body: '{"error":"Failed to fetch video: 404"}', contentType: 'application/json',
+        });
     });
 
     it('reports a transport failure as a 502 naming it', () => {

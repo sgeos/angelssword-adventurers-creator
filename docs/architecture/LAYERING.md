@@ -306,16 +306,12 @@ origin rule, are the same functions in both places.
 
 Two consequences follow. A request the desktop proxy would refuse is refused
 on the phone by the same code, and covered by the same tests. And the move
-exposed two defects in the desktop proxy, which predate it and are kept,
-because fixing them changes the network port and was not part of this work.
-The server reads every upstream body as text, so a binary body relayed through
-it is decoded as UTF-8 and corrupted, which is what happens to the image a
-ComfyUI run retrieves from `/view`. On the phone a relayed body keeps its
-bytes, carried as base64 across the bridge. The Grok video download is wrapped
-as `{ data: text }` from the decoded text on both platforms, although the
-comment in the original route says the upstream sends base64, so it shares the
-defect on both. Both are recorded in [OPEN.md](../decisions/OPEN.md). Neither
-provider has been run against a live key.
+exposed a defect both proxies shared: each read the upstream body as text,
+which corrupted a ComfyUI image through the relay and the Grok video
+download, whose client expects base64. `shapeReply` now takes the body as
+bytes, so the fix is one function for both platforms; see
+[RESOLVED.md](../decisions/RESOLVED.md). Neither provider has been run against
+a live key since.
 
 ### A ban that was not enforced
 

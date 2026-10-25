@@ -554,6 +554,25 @@ describe('xAI video fetch route', () => {
         assert.equal(callAt().headers['Authorization'], 'Bearer xai-test');
     });
 
+    /**
+     * The client decodes `data` as base64. The server used to read the
+     * upstream body as text and send that, which for a real video, whose
+     * bytes are not UTF-8, decoded to nothing playable.
+     */
+    it('returns the video as base64 of its exact bytes', async () => {
+        const video = Uint8Array.from([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0xff, 0xfe, 0x80, 0x00]);
+        mockFetchResponse(200, video, { 'content-type': 'video/mp4' });
+        const res = await request(app)
+            .post('/api/xai/video-fetch')
+            .set('Authorization', 'Bearer xai-test')
+            .send({ url: 'https://assets.x.ai/v/a.mp4' });
+
+        assert.equal(res.status, 200);
+        const data: unknown = res.body;
+        assert.ok(data !== null && typeof data === 'object' && 'data' in data);
+        assert.deepEqual(Uint8Array.from(Buffer.from(String({ ...data }.data), 'base64')), video);
+    });
+
     it('rejects a request with no url', async () => {
         const res = await request(app)
             .post('/api/xai/video-fetch')
@@ -629,6 +648,32 @@ describe('ComfyUI proxy route', () => {
         assert.equal(res.status, 200);
         assert.equal(callAt().url, 'http://127.0.0.1:8188/prompt');
         assert.equal(callAt().method, 'POST');
+    });
+
+    /**
+     * A ComfyUI run retrieves its image from /view through this relay. The
+     * server used to decode the body as text and resend it as JSON, which
+     * replaced every byte sequence that is not UTF-8, so the image arrived
+     * corrupted.
+     */
+    it('relays an image byte for byte, with its content type', async () => {
+        const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0xff, 0xfe, 0x00, 0x80]);
+        mockFetchResponse(200, png, { 'content-type': 'image/png' });
+        const res = await request(app)
+            .post('/api/comfyui/proxy')
+            .send({ baseUrl: 'http://127.0.0.1:8188', path: '/view?filename=a.png&type=output', method: 'GET' })
+            .buffer(true)
+            .parse((response, done) => {
+                const chunks: Buffer[] = [];
+                response.on('data', (chunk: Buffer) => { chunks.push(chunk); });
+                response.on('end', () => { done(null, Buffer.concat(chunks)); });
+            });
+
+        assert.equal(res.status, 200);
+        assert.match(String(res.headers['content-type']), /^image\/png/);
+        const body: unknown = res.body;
+        assert.ok(Buffer.isBuffer(body));
+        assert.deepEqual(Uint8Array.from(body), png);
     });
 
     it('refuses a public address without calling it', async () => {
